@@ -1,0 +1,138 @@
+# Brain's Supabase settings, kept tight and in Git so they can be reviewed.
+# Local use: `supabase start` (from the repo root).
+# Remote use: `supabase config diff --project-ref iihjcqiiavleyheqzotl`, review, then `supabase config push`.
+# Brain is one page talking to one database. Anything the page does not use is switched off.
+project_id = "Nodes"
+
+[api]
+enabled = true
+# Brain's data lives in `public`. `graphql_public` is deliberately left out: Brain has no GraphQL
+# client, and a second API surface would need its own access rules.
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+# The page reads at most 60 access-log rows and a handful of profiles at a time.
+max_rows = 200
+# New tables must be granted to the Data API roles on purpose. Supabase's cloud default is the
+# opposite (grant first, ask later), which is how readable tables are exposed by accident.
+auto_expose_new_tables = false
+
+# Brain connects from the page and the Edge Function over HTTPS only, never with a direct Postgres
+# connection. Once Owner stops running `supabase db push` from his own network, enable this with no
+# allowed CIDRs (that blocks every direct connection) — see supabase/README.md.
+# [db.network_restrictions]
+# enabled = true
+# allowed_cidrs = []
+# allowed_cidrs_v6 = []
+
+[db]
+port = 54322
+shadow_port = 54320
+health_timeout = "2m"
+# Must match the remote project (17).
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+# There is no seed file: Brain never starts with sample memory (AGENTS.md).
+enabled = false
+sql_paths = []
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[local_smtp]
+enabled = true
+port = 54324
+
+# Brain stores no files. The vault is a row in `public.vaults`, and reminders of AI keys never leave
+# the device, so the whole storage API (buckets, S3 protocol, vector buckets) stays off.
+[storage]
+enabled = false
+
+[storage.s3_protocol]
+enabled = false
+
+[storage.vector]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "https://redeemed.live"
+# Exact URLs only. The built index.html opened from disk (file://) is not listed: browsers send a
+# `null` origin for it, and the accounts function re-checks the caller anyway.
+additional_redirect_urls = ["https://redeemed.live", "https://www.redeemed.live"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+# Accounts exist only when an admin makes one through Brain's accounts function.
+enable_signup = false
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+# Brain never sets a password by hand: the page derives a 43-character password from the passcode
+# with PBKDF2. Anything shorter than 32 characters did not come from Brain.
+minimum_password_length = 32
+# No character-class rules: the derived password is base64url and would fail them.
+password_requirements = ""
+
+[auth.rate_limit]
+email_sent = 2
+token_refresh = 150
+# One page load allows one sign-in; 30 per five minutes per address still leaves room for retries.
+sign_in_sign_ups = 30
+token_verifications = 10
+
+[auth.email]
+enable_signup = false
+# Accounts are created already confirmed by the accounts function; turning confirmations on means a
+# hand-made, unconfirmed auth user could never be used as a back door into the database.
+enable_confirmations = true
+double_confirm_changes = true
+secure_password_change = true
+max_frequency = "1m"
+otp_length = 8
+otp_expiry = 900
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+
+[auth.mfa.totp]
+enroll_enabled = false
+verify_enabled = false
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
+
+[auth.oauth_server]
+enabled = false
+allow_dynamic_registration = false
+
+[auth.web3.solana]
+enabled = false
+
+# The accounts function checks every admin request itself (getUser + profiles.role), so Supabase's
+# gateway JWT check has to stay off: setup status and first-admin setup must answer before sign-in.
+# Nothing else is reachable through it.
+[functions.accounts]
+verify_jwt = false
+
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+inspector_port = 8083
+deno_version = 2
+
+[analytics]
+enabled = false
+
+[experimental.pgdelta]
+enabled = true
