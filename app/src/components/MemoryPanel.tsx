@@ -45,7 +45,7 @@ export default function MemoryPanel() {
             ) : (
               <>
                 <i style={{ color: TYPE_COLOR[t] }}>{SHAPE[t]}</i>
-                {TYPE_LABEL[t]}s {counts[t]}
+                {t === 'entity' ? 'Entities' : `${TYPE_LABEL[t]}s`} {counts[t]}
               </>
             )}
           </button>
@@ -98,7 +98,12 @@ function Detail({ e, onSession }: { e: Entry; onSession(id: string): void }) {
     [title, setTitle] = useState(e.title),
     [sure, setSure] = useState(false);
   return (
-    <article className="detail" style={{ borderColor: TYPE_COLOR[e.type] }}>
+    <article
+      tabIndex={-1}
+      data-scene-entry={`memory:${e.id}`}
+      className="detail"
+      style={{ borderColor: TYPE_COLOR[e.type] }}
+    >
       <header>
         <span style={{ color: TYPE_COLOR[e.type] }}>
           {SHAPE[e.type]} {TYPE_LABEL[e.type]}

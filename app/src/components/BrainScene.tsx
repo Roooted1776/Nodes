@@ -4,7 +4,7 @@ import type React from 'react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { STAGE_COLOR, TYPE_COLOR, colorOf } from '../data/colors';
-import { AGENTS } from '../data/team';
+import { AGENTS, isAgent } from '../data/team';
 import { OUTLINE } from '../data/outline';
 import { buildSkull, skullLines } from '../lib/skull';
 import { buildShell, midline, placeMemory, route, station, surfaceFolds, toWorld, type P3 } from '../lib/geometry';
@@ -376,17 +376,38 @@ function Agents({ locked }: { locked: boolean }) {
           .filter(a => a.name)
           .map(a => (
             <group key={a.id} position={a.p}>
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: three.js mesh; label button offers keyboard access */}
+              <mesh
+                onClick={ev => {
+                  ev.stopPropagation();
+                  if (isAgent(a.id))
+                    useStore.setState(s => ({
+                      tab: 'chat',
+                      sceneFocus: { kind: 'agent', id: a.id, sequence: (s.sceneFocus?.sequence || 0) + 1 },
+                    }));
+                }}
+              >
+                <sphereGeometry args={[0.18, 12, 12]} />
+                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+              </mesh>
               <Html center distanceFactor={9} zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
-                <div
+                <button
+                  type="button"
+                  onClick={() =>
+                    useStore.setState(s => ({
+                      tab: 'chat',
+                      sceneFocus: { kind: 'agent', id: a.id, sequence: (s.sceneFocus?.sequence || 0) + 1 },
+                    }))
+                  }
                   className={
                     'agent-tag' +
                     (active === a.id ? ' on' : '') +
                     (stages[a.id as keyof typeof stages] === 'skipped' ? ' off' : '')
                   }
-                  style={{ '--c': colorOf(a.id) } as React.CSSProperties}
+                  style={{ '--c': colorOf(a.id), pointerEvents: 'auto' } as React.CSSProperties}
                 >
                   {a.name}
-                </div>
+                </button>
               </Html>
             </group>
           ))}
@@ -486,7 +507,11 @@ function Memories() {
             <mesh
               onClick={ev => {
                 ev.stopPropagation();
-                select(on ? null : e.id);
+                select(e.id);
+                useStore.setState(s => ({
+                  tab: 'memory',
+                  sceneFocus: { kind: 'memory', id: e.id, sequence: (s.sceneFocus?.sequence || 0) + 1 },
+                }));
               }}
               onPointerOver={ev => {
                 ev.stopPropagation();
