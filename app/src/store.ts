@@ -73,6 +73,7 @@ export interface State {
   view: View;
   tab: Tab;
   selected: string | null;
+  sceneFocus: { kind: 'memory' | 'agent'; id: string; sequence: number } | null;
   autoRotate: boolean;
   /** The current task: its text, the reply streaming in now, how long each bot took (ms) and what really passed between them. */
   task: string;
@@ -215,6 +216,7 @@ export const useStore = create<State>()((set, get) => {
     view: 'brain',
     tab: 'chat',
     selected: null,
+    sceneFocus: null,
     autoRotate: true,
     task: '',
     draft: null,

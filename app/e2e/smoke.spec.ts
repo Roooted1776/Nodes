@@ -38,6 +38,18 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   await page.waitForTimeout(2500); // let the brain settle for the picture
   await info.attach('brain.png', { body: await stage.screenshot(), contentType: 'image/png' });
 
+  // Perspective selection stays explicit; station selection opens and focuses its real panel entry.
+  const views = page.getByRole('navigation', { name: 'View', exact: true });
+  await views.getByRole('button', { name: 'Team diagram' }).click();
+  await expect(views.getByRole('button', { name: 'Team diagram' })).toHaveAttribute('aria-pressed', 'true');
+  await views.getByRole('button', { name: '3D Brain' }).click();
+  await expect(views.getByRole('button', { name: '3D Brain' })).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('button.agent-tag').filter({ hasText: 'Claude' }).click({ force: true });
+  const agentEntry = page.locator('[data-scene-entry="agent:claude"]');
+  await expect(agentEntry).toBeFocused();
+  await expect(agentEntry).toHaveClass(/scene-halo/);
+  await expect(page.getByRole('tab', { name: 'Live chat' })).toHaveAttribute('aria-selected', 'true');
+
   // no key yet: the real-AI guide is shown and nothing can be sent
   await expect(page.getByRole('region', { name: 'Connect real AI' })).toBeVisible();
   await expect(page.getByLabel('Task for the team')).toBeDisabled();
@@ -79,6 +91,20 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   await expect.poll(() => JSON.stringify(backend.getEnvelope())).not.toContain('Browser verification note');
   await page.getByRole('button', { name: /Browser verification note/ }).click();
   await expect(page.getByText('Fake test data only.', { exact: true }).first()).toBeVisible();
+  await page.getByRole('tab', { name: 'Live chat' }).click();
+  const memoryLabel = page.locator('.mem-tag').filter({ hasText: 'Browser verification note' });
+  await expect(memoryLabel).toBeVisible();
+  await page.waitForTimeout(2500); // allow the selected-memory camera target to settle before aiming at the dot
+  const memoryBox = await memoryLabel.evaluate(el => {
+    // The title is translated upward; its parent stays centered on the actual 3D dot.
+    const box = el.parentElement!.getBoundingClientRect();
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  });
+  if (!memoryBox) throw new Error('Memory label has no scene position');
+  await page.mouse.click(memoryBox.x + memoryBox.width / 2, memoryBox.y + memoryBox.height / 2);
+  await expect(page.locator('.detail')).toBeFocused();
+  await expect(page.locator('.detail')).toHaveClass(/scene-halo/);
+  await expect(page.getByRole('tab', { name: 'Memory', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('tab', { name: 'Admin' }).click();
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Guest');
   await page.getByPlaceholder(/Passcode \(5/).fill('fake viewer passcode');

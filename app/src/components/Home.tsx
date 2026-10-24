@@ -39,6 +39,29 @@ export default function Home() {
     busy = useStore(s => s.busy);
   const admin = user?.role === 'admin',
     [open, setOpen] = useState(true);
+  const sceneFocus = useStore(s => s.sceneFocus);
+  useEffect(() => {
+    if (sceneFocus) setOpen(true);
+  }, [sceneFocus]);
+  useEffect(() => {
+    if (!sceneFocus || !open) return;
+    const frame = requestAnimationFrame(() => {
+      const targets = document.querySelectorAll<HTMLElement>('[data-scene-entry]');
+      const target = Array.from(targets)
+        .reverse()
+        .find(el => el.dataset.sceneEntry === `${sceneFocus.kind}:${sceneFocus.id}`);
+      if (!target) return;
+      target.focus({ preventScroll: true });
+      target.scrollIntoView({
+        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+        block: 'nearest',
+      });
+      target.classList.remove('scene-halo');
+      void target.offsetWidth;
+      target.classList.add('scene-halo');
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sceneFocus, open]);
   const t = admin ? (['chat', 'memory', 'admin'] as const) : (['chat', 'memory'] as const);
   return (
     <div className={'home' + (open ? '' : ' wide')}>
@@ -54,14 +77,6 @@ export default function Home() {
             {mem.entries.length} memories · {mem.sessions.length} sessions{busy ? ' · live' : ''}
           </small>
         </div>
-        <nav className="seg" aria-label="View">
-          <button type="button" aria-pressed={view === 'brain'} onClick={() => setView('brain')}>
-            Brain
-          </button>
-          <button type="button" aria-pressed={view === 'team'} onClick={() => setView('team')}>
-            Team
-          </button>
-        </nav>
         <Readout />
         <div className="who">
           <span className={'role ' + user?.role}>{ROLE_LABEL[user!.role]}</span>
@@ -69,50 +84,61 @@ export default function Home() {
           <button type="button" onClick={() => logout()} title="Or press Esc twice">
             Lock
           </button>
-          <button type="button" className="only-narrow" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+          <button type="button" className="panel-toggle" onClick={() => setOpen(o => !o)} aria-expanded={open}>
             {open ? 'Hide panel' : 'Panel'}
           </button>
         </div>
       </header>
-      <main className="stage" aria-label={view === 'brain' ? 'Brain view' : 'Team view'}>
-        {view === 'brain' ? (
-          <Boundary>
-            <Suspense fallback={<div className="fallback">Growing the brain…</div>}>
-              <BrainScene />
-            </Suspense>
-          </Boundary>
-        ) : (
-          <TeamDiagram />
-        )}
-        {view === 'brain' && (
-          <>
-            <p className="hint">Drag to turn the brain · scroll to zoom · click a memory</p>
-            <ul className="legend" aria-label="Legend">
-              <li>
-                <i style={{ color: '#81b8ff' }}>●</i>Concept
-              </li>
-              <li>
-                <i style={{ color: '#73dfbd' }}>●</i>Entity
-              </li>
-              <li>
-                <i style={{ color: '#ffbd70' }}>●</i>Workstream
-              </li>
-              <li>
-                <i className="bots" aria-hidden="true">
-                  {Object.values(AGENT_COLOR).map(c => (
-                    <b key={c} style={{ background: c }} />
-                  ))}
-                </i>
-                Bots
-              </li>
-              <li>
-                <i className="ln" />
-                Handoff
-              </li>
-            </ul>
-          </>
-        )}
-      </main>
+      <section className="workspace" aria-label="Visualization">
+        <nav className="view-switch" aria-label="View">
+          <span className="view-label">View</span>
+          <button type="button" aria-pressed={view === 'brain'} onClick={() => setView('brain')}>
+            3D Brain
+          </button>
+          <button type="button" aria-pressed={view === 'team'} onClick={() => setView('team')}>
+            Team diagram
+          </button>
+        </nav>
+        <main className="stage" aria-label={view === 'brain' ? 'Brain view' : 'Team view'}>
+          {view === 'brain' ? (
+            <Boundary>
+              <Suspense fallback={<div className="fallback">Growing the brain…</div>}>
+                <BrainScene />
+              </Suspense>
+            </Boundary>
+          ) : (
+            <TeamDiagram />
+          )}
+          {view === 'brain' && (
+            <>
+              <p className="hint">Drag to turn the brain · scroll to zoom · click a memory</p>
+              <ul className="legend" aria-label="Legend">
+                <li>
+                  <i style={{ color: '#81b8ff' }}>●</i>Concept
+                </li>
+                <li>
+                  <i style={{ color: '#73dfbd' }}>●</i>Entity
+                </li>
+                <li>
+                  <i style={{ color: '#ffbd70' }}>●</i>Workstream
+                </li>
+                <li>
+                  <i className="bots" aria-hidden="true">
+                    {Object.values(AGENT_COLOR).map(c => (
+                      <b key={c} style={{ background: c }} />
+                    ))}
+                  </i>
+                  Bots
+                </li>
+                <li>
+                  <i className="ln" />
+                  Handoff
+                </li>
+              </ul>
+            </>
+          )}
+        </main>
+      </section>
       {open && (
         <aside className="side">
           <div className="tabs" role="tablist">

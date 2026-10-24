@@ -49,3 +49,11 @@ Owner authorized merging all outstanding Nodes work into `main`, syncing Git, an
 Verification: formatting/lint checks and type-check passed (29 existing lint warnings), all 77 tests passed, the build reproduced the deployed SHA-256 above, and the Chromium test passed with the consistent sign-in allowance. Public HTTPS returned 200, www redirected with 308, and the downloaded HTML matched the build byte for byte. Supabase reports the encrypted-vault migration installed and accounts function version 3 active; its public status endpoint returned `setupNeeded: true`. First-admin setup remains for Owner. No real AI call or production account was created. External named-program reviews and Grok Bot's decision remain unavailable; no team PASS is claimed.
 
 Files changed in this follow-up: `AGENTS.md`, `app/e2e/smoke.spec.ts`, and this handoff. To recheck: run `npm run check`, `npm run build`, and `npm run e2e` in `app/`; compare `index.html` with the response from https://redeemed.live. The existing deployed HTML needs no replacement because its contents are identical.
+
+## Responsive panel handoff (2026-10-24)
+
+Changed `app/src/styles.css` and rebuilt `app/dist/index.html` and root `index.html`. The side panel uses the available viewport width (32vw, bounded at 320–520px) rather than a fixed 520px; intrinsic panel content cannot widen its grid column. At 900px and below, the existing stacked layout gives the canvas the full width. Canvas sizing remains automatic.
+
+Verified in real Chromium at widths 1920, 1440, 1366, 1280, 1024, 901, 900, 768, and 390: no horizontal overflow. At 1024px, the canvas has 696px and the panel 328px. Formatting, lint (warnings only), type-check, 77 unit/UI tests, build, and the existing browser check pass. Screenshots were visually checked. No real provider requests or production accounts were used for verification.
+
+Codex checked the layout and integration. Gemini context review, Muse audit, collective named-program review, and Grok Bot’s final decision were not performed in this chat; no substitute approvals are claimed.

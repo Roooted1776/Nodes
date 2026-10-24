@@ -8,7 +8,8 @@ const BrainScene = lazy(() => import('./components/BrainScene'));
 /** Shown at the top and bottom of every screen. Brain's own marking, not a government classification. */
 export const Banner = ({ at }: { at: 'top' | 'bottom' }) => (
   <div className={'banner ' + at} role={at === 'top' ? 'banner' : undefined}>
-    RESTRICTED · AUTHORIZED PERSONNEL ONLY · PROJECT BRAIN
+    <span className="banner-full">RESTRICTED · AUTHORIZED PERSONNEL ONLY · PROJECT BRAIN</span>
+    <span className="banner-short">RESTRICTED · PROJECT BRAIN</span>
   </div>
 );
 

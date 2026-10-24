@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { pulseMs, type Pulse } from '../store';
 import { colorOf } from '../data/colors';
 import { AGENT, isAgent } from '../data/team';
@@ -11,6 +11,24 @@ import Tasks, { FlowBox } from './Tasks';
 
 const tagParts = (t: string) => (/^live · /.test(t) ? t.replace(/^live · /, '').replace(' · unverified', '') : '');
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="copy-btn"
+      title="Copy message"
+      onClick={() => {
+        void navigator.clipboard?.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      }}
+    >
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
 export default function ChatPanel() {
   const log = useStore(s => s.log),
     busy = useStore(s => s.busy),
@@ -18,6 +36,8 @@ export default function ChatPanel() {
     status = useStore(s => s.status),
     viewing = useStore(s => s.viewing),
     viewSession = useStore(s => s.viewSession);
+  const sceneFocus = useStore(s => s.sceneFocus);
+  const focusedAgent = sceneFocus?.kind === 'agent' && isAgent(sceneFocus.id) ? AGENT[sceneFocus.id] : null;
   const ready = useStore(s => !!s.keys[s.live.provider]),
     end = useRef<HTMLDivElement>(null),
     draft = useStore(s => s.draft),
@@ -33,6 +53,21 @@ export default function ChatPanel() {
   ).filter(m => m.from !== 'brain');
   return (
     <section className="panel chat" aria-label="Live chat">
+      {focusedAgent && !msgs.some(m => m.from === focusedAgent.id) && (
+        <article
+          key={sceneFocus?.sequence}
+          className="agent-detail"
+          tabIndex={-1}
+          data-scene-entry={`agent:${focusedAgent.id}`}
+          style={{ '--c': colorOf(focusedAgent.id) } as CSSProperties}
+        >
+          <header>
+            <b>{focusedAgent.name}</b>
+            <span>{focusedAgent.role}</span>
+          </header>
+          <p>{focusedAgent.specialty}</p>
+        </article>
+      )}
       {!viewing && !ready && <KeyGuide />}
       <div className="live-line" role="status" aria-live="polite">
         <i className={'pulse' + (busy ? ' on' : '')} />
@@ -71,6 +106,8 @@ export default function ChatPanel() {
           return (
             <article
               key={m.id}
+              tabIndex={-1}
+              data-scene-entry={a ? `agent:${a.id}` : undefined}
               className={`msg ${a ? 'bot ' + a.kind : m.from}${m.cls === 'warn' ? ' warn' : ''}`}
               style={a ? ({ '--g1': colorOf(a.id), '--c': colorOf(a.id) } as CSSProperties) : undefined}
             >
@@ -78,6 +115,7 @@ export default function ChatPanel() {
                 <b>{who}</b>
                 {a && <span>{a.role}</span>}
                 {t && <em>{t}</em>}
+                <CopyButton text={m.text} />
               </header>
               <p>{m.text}</p>
             </article>
