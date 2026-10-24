@@ -1,4 +1,4 @@
-import { Html, Line, OrbitControls } from '@react-three/drei';
+import { Html as DreiHtml, Line, OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import type React from 'react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,6 +12,13 @@ import { TYPE_LABEL } from '../lib/memory';
 import { PULSE_AFTERGLOW, pulseMs, useMem, useStore, type Pulse } from '../store';
 import { DOT_FRAG, DOT_VERT, RIM_FRAG, RIM_VERT } from '../lib/shaders';
 import { sceneStats } from '../lib/stats';
+
+/** Keep label roots on one DOM parent while Canvas disconnects during lock/unlock. */
+function Html(props: React.ComponentProps<typeof DreiHtml>) {
+  const gl = useThree(s => s.gl);
+  const portal = useRef<HTMLElement>(gl.domElement.parentElement!);
+  return <DreiHtml {...props} portal={portal} />;
+}
 
 type V3 = [number, number, number];
 

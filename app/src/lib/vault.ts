@@ -1,6 +1,5 @@
-// Brain's old local format (before Supabase): one encrypted, admin-signed vault per browser (brain.vault.v1).
-// Brain no longer saves anything this way. This code only opens an old copy once so an admin can upload it,
-// and makes the passphrase backups (Admin, Backup).
+// Browser-side AES-256-GCM vaults, signed by admins. The database receives memory ciphertext only.
+// Account-specific sealed provider keys remain inside the signed local vault, never in the database.
 export class VaultError extends Error {
   constructor(
     msg: string,

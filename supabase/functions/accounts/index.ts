@@ -70,7 +70,7 @@ async function admins() {
 async function audit(who: { id: string; name: string }, what: string) {
   await db.from('audit_log').insert({ who: who.id, who_name: who.name, what: what.slice(0, 200) });
 }
-async function makeUser(name: string, password: string, role: Role) {
+async function makeUser(name: string, password: string, role: Role, wrap: unknown) {
   const { data: same } = await db.from('profiles').select('id').ilike('name', name).maybeSingle();
   if (same) throw new Refuse('That name is taken.', 409);
   const { data, error } = await db.auth.admin.createUser({ email: emailFor(name), password, email_confirm: true, app_metadata: { brain: true } });
@@ -80,9 +80,24 @@ async function makeUser(name: string, password: string, role: Role) {
     await db.auth.admin.deleteUser(data.user.id);
     throw new Refuse('Could not save the account: ' + pe.message, 409);
   }
+  const { error: ke } = await db.from('account_keys').insert({ id: data.user.id, wrap });
+  if (ke) {
+    await db.auth.admin.deleteUser(data.user.id);
+    throw new Refuse('Could not save the encrypted account key.', 409);
+  }
   return { id: data.user.id, name, role };
 }
 
+function checkWrap(w: any) {
+  if (!w || typeof w.iv !== 'string' || typeof w.ct !== 'string' || w.iv.length !== 16 || w.ct.length < 40 || w.ct.length > 16000 || !/^[A-Za-z0-9+/=]+$/.test(w.iv + w.ct))
+    throw new Refuse('An encrypted account key is required.');
+  return { iv: w.iv, ct: w.ct };
+}
+function checkEnvelope(v: any) {
+  if (!v || v.v !== 1 || v.n !== 1 || typeof v.sig !== 'string' || typeof v.ct !== 'string' || typeof v.iv !== 'string' || v.ct.length > 1000000)
+    throw new Refuse('An encrypted initial vault is required.');
+  return { v: 1, n: 1, sig: v.sig, ct: v.ct, iv: v.iv };
+}
 async function handle(req: Request) {
   const b = await req.json().catch(() => ({}));
   switch (b.action) {
@@ -94,12 +109,18 @@ async function handle(req: Request) {
       const name = checkName(b.name), password = checkPass(b.password);
       checkAdult(b.dob);
       if (typeof b.code !== 'string' || b.code.replace(/[\s-]/g, '').length < 16) throw new Refuse('Enter the setup code.', 403);
+      const wrap = checkWrap(b.wrap), envelope = checkEnvelope(b.envelope);
       const hash = await sha256(b.code.replace(/[\s-]/g, '').toUpperCase()); // typed with or without dashes
       const { data: ok } = await db.rpc('claim_setup', { code_sha256: hash });
       if (ok !== true) throw new Refuse('That setup code is wrong or already used.', 403);
       let u;
       try {
-        u = await makeUser(name, password, 'admin');
+        u = await makeUser(name, password, 'admin', wrap);
+        const { error: ve } = await db.from('vaults').insert({ id: 1, envelope });
+        if (ve) {
+          await db.auth.admin.deleteUser(u.id);
+          throw new Refuse('Could not create encrypted memory.', 409);
+        }
       } catch (e) {
         await db.rpc('restore_setup', { code_sha256: hash }); // the code stays usable if the account could not be made
         throw e;
@@ -118,7 +139,7 @@ async function handle(req: Request) {
       if (me.role !== 'admin') throw new Refuse('Only admins can add accounts.', 403);
       const name = checkName(b.name), password = checkPass(b.password), role: Role = b.role === 'admin' ? 'admin' : 'viewer';
       checkAdult(b.dob);
-      const u = await makeUser(name, password, role);
+      const u = await makeUser(name, password, role, checkWrap(b.wrap));
       await audit(me, `Added ${role} ${name}`);
       return { ok: true, user: u };
     }
@@ -128,22 +149,20 @@ async function handle(req: Request) {
       const password = checkPass(b.password);
       const { data: t } = await db.from('profiles').select('id, name').eq('id', b.id).maybeSingle();
       if (!t) throw new Refuse('No such account.', 404);
+      const wrap = checkWrap(b.wrap);
+      const { data: old, error: oe } = await db.from('account_keys').select('wrap').eq('id', t.id).single();
+      if (oe) throw new Refuse('Cannot read the existing encrypted account key.', 409);
+      const { error: ke } = await db.from('account_keys').update({ wrap }).eq('id', t.id);
+      if (ke) throw new Refuse('Cannot save the new encrypted account key.', 409);
       const { error } = await db.auth.admin.updateUserById(t.id, { password });
-      if (error) throw new Refuse('Could not reset: ' + error.message, 409);
+      if (error) {
+        await db.from('account_keys').update({ wrap: old.wrap }).eq('id', t.id);
+        throw new Refuse('Could not reset the account. Try again.', 409);
+      }
       await audit(me, `Reset the passcode of ${t.name}`);
       return { ok: true };
     }
-    case 'role': {
-      const me = await caller(req);
-      if (me.role !== 'admin') throw new Refuse('Only admins can change roles.', 403);
-      const role: Role = b.role === 'admin' ? 'admin' : 'viewer';
-      const { data: t } = await db.from('profiles').select('id, name, role').eq('id', b.id).maybeSingle();
-      if (!t) throw new Refuse('No such account.', 404);
-      if (t.role === 'admin' && role === 'viewer' && (await admins()) <= 1) throw new Refuse('Brain needs at least one admin.', 409);
-      await db.from('profiles').update({ role }).eq('id', t.id);
-      await audit(me, `Made ${t.name} ${role}`);
-      return { ok: true };
-    }
+    case 'role': throw new Refuse('Role changes require a new sealed account. Add a new account instead.', 409);
     case 'remove': {
       const me = await caller(req);
       if (me.role !== 'admin') throw new Refuse('Only admins can remove accounts.', 403);
@@ -167,7 +186,7 @@ Deno.serve(async req => {
     return reply(200, await handle(req));
   } catch (e) {
     if (e instanceof Refuse) return reply(e.status, { error: e.message });
-    console.error(e);
+    console.error('Accounts request failed');
     return reply(500, { error: 'Something went wrong. Nothing was changed.' });
   }
 });

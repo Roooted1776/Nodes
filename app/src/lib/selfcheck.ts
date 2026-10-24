@@ -169,7 +169,14 @@ export function checkStorage(
   const leak = keys.filter(
     k =>
       /^brain\./.test(k) &&
-      !['brain.vault.v1', 'brain.auth.v1', 'brain.audit.v1', 'brain.live.v1', 'brain.agegate.v1'].includes(k),
+      ![
+        'brain.vault.v1',
+        'brain.auth.v1',
+        'brain.audit.v1',
+        'brain.live.v1',
+        'brain.agegate.v1',
+        'brain.keys.v1',
+      ].includes(k),
   );
   const vault = store.getItem('brain.vault.v1');
   if (!vault)

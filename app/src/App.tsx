@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useAuth } from './auth-store';
 import { Login, Setup } from './components/Access';
 import Home from './components/Home';
@@ -14,6 +14,9 @@ export const Banner = ({ at }: { at: 'top' | 'bottom' }) => (
 
 export default function App() {
   const phase = useAuth(s => s.phase);
+  useEffect(() => {
+    void useAuth.getState().init();
+  }, []);
   if (phase === 'app')
     return (
       <>

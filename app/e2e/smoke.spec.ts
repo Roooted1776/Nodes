@@ -1,12 +1,15 @@
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { fakeBackend } from './fake-backend';
 
 const PAGE = pathToFileURL(fileURLToPath(new URL('../../index.html', import.meta.url))).href;
 
-test('built page: set up admin, draw brain, pass System check, lock', async ({ page }, info) => {
+test('built page: set up admin, draw brain, pass System check, lock', async ({ page, context }, info) => {
+  const backend = await fakeBackend(context);
   const problems: string[] = [];
   page.on('console', m => {
-    if (m.type() === 'error') problems.push('console: ' + m.text());
+    if (m.type() === 'error' && !m.text().includes('example.com/brain-policy-check'))
+      problems.push('console: ' + m.text());
   });
   page.on('pageerror', e => problems.push('page error: ' + e.message));
   await page.addInitScript(() =>
@@ -26,6 +29,7 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   await page.getByLabel('Month').selectOption({ label: 'January' });
   await page.getByLabel('Day').fill('1');
   await page.getByLabel('Year').fill('1990');
+  await page.getByLabel(/^Setup code/).fill('FAKE-TEST-CODE-ONLY');
   await page.getByRole('button', { name: 'Create admin' }).click();
 
   const stage = page.getByRole('main', { name: 'Brain view' });
@@ -55,6 +59,62 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   await page.getByLabel('Passcode').fill(pass);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(stage).toBeVisible({ timeout: 30_000 });
+
+  // Orbit and zoom the real WebGL canvas.
+  const canvas = stage.locator('canvas');
+  await canvas.hover();
+  await page.mouse.wheel(0, -120);
+  const box = await canvas.boundingBox();
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 20, { steps: 8 });
+    await page.mouse.up();
+  }
+  await page.getByRole('tab', { name: 'Memory' }).click();
+  await page.getByRole('button', { name: /Add a note to memory/ }).click();
+  await page.getByLabel('Title', { exact: true }).fill('Browser verification note');
+  await page.getByLabel('Note', { exact: true }).fill('Fake test data only.');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect.poll(() => JSON.stringify(backend.getEnvelope())).not.toContain('Browser verification note');
+  await page.getByRole('button', { name: /Browser verification note/ }).click();
+  await expect(page.getByText('Fake test data only.', { exact: true }).first()).toBeVisible();
+  await page.getByRole('tab', { name: 'Admin' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Guest');
+  await page.getByPlaceholder(/Passcode \(5/).fill('fake viewer passcode');
+  await page.getByLabel('Month').selectOption({ label: 'January' });
+  await page.getByLabel('Day').fill('1');
+  await page.getByLabel('Year').fill('1990');
+  await page.getByRole('button', { name: 'Add account' }).click();
+  await expect(page.getByText('Added Guest.', { exact: true })).toBeVisible();
+  const viewer = await context.newPage();
+  await viewer.goto(PAGE);
+  await expect(viewer.getByRole('heading', { name: 'Restricted system' })).toBeVisible();
+  await viewer.getByLabel('Name').fill('Guest');
+  await viewer.getByLabel('Passcode').fill('fake viewer passcode');
+  await viewer.getByRole('button', { name: 'Sign in' }).click();
+  await expect(viewer.getByRole('main', { name: 'Brain view' })).toBeVisible();
+  await expect(viewer.getByRole('tab', { name: 'Admin' })).toHaveCount(0);
+  await expect(viewer.getByLabel('Task for the team')).toHaveCount(0);
+  await viewer.getByRole('tab', { name: 'Memory' }).click();
+  await expect(viewer.getByRole('button', { name: /Browser verification note/ })).toBeVisible();
+  await expect(viewer.getByRole('button', { name: /Add a note/ })).toHaveCount(0);
+  await viewer.getByRole('tab', { name: 'Live chat' }).click();
+  // Verify the real same-browser transport with explicitly fake test text, without AI calls.
+  await page.evaluate(() => {
+    const ch = new BroadcastChannel('brain.live.v1');
+    ch.postMessage({
+      t: 'msg',
+      m: { id: 12345, from: 'grokbot', tag: 'fake test only', text: 'Fake transport verification only' },
+    });
+    ch.close();
+  });
+  await expect(viewer.getByText('Fake transport verification only', { exact: true })).toBeVisible();
+  await viewer.setViewportSize({ width: 390, height: 844 });
+  await expect(viewer.getByRole('main', { name: 'Brain view' })).toBeVisible();
+  await info.attach('phone-viewer.png', { body: await viewer.screenshot(), contentType: 'image/png' });
+  expect(await viewer.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await viewer.close();
 
   expect(problems, 'console errors, page errors or blocked content').toEqual([]);
 });

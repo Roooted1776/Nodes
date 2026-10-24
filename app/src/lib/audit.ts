@@ -12,9 +12,31 @@ let sink: AuditSink | null = null;
 export const setAuditSink = (f: AuditSink | null) => {
   sink = f;
 };
-export function audit(who: string, what: string): Promise<void> {
-  if (!sink) return Promise.resolve();
-  return sink(who.slice(0, 32), what.slice(0, 200)).catch(() => {
-    /* the log is best effort: a failed row never blocks the work */
-  });
+export const AUDIT_MAX = 300;
+type LogStore = Pick<Storage, 'getItem' | 'setItem'>;
+export function readAudit(s: Pick<Storage, 'getItem'>): AuditEvent[] {
+  try {
+    const rows = JSON.parse(s.getItem('brain.audit.v1') || '[]');
+    return Array.isArray(rows)
+      ? rows
+          .filter(r => r && typeof r.t === 'number' && typeof r.who === 'string' && typeof r.what === 'string')
+          .slice(-AUDIT_MAX)
+      : [];
+  } catch {
+    return [];
+  }
+}
+export function audit(who: string, what: string): Promise<void>;
+export function audit(s: LogStore, who: string, what: string, now?: number): Promise<void>;
+export function audit(a: string | LogStore, b: string, c?: string, now = Date.now()): Promise<void> {
+  const who = (typeof a === 'string' ? a : b).slice(0, 32);
+  const what = (typeof a === 'string' ? b : c || '').slice(0, 200);
+  if (typeof a !== 'string') {
+    try {
+      a.setItem('brain.audit.v1', JSON.stringify([...readAudit(a), { t: now, who, what }].slice(-AUDIT_MAX)));
+    } catch {
+      /* storage blocked */
+    }
+  }
+  return sink ? sink(who, what).catch(() => {}) : Promise.resolve();
 }
