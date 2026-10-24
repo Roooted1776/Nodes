@@ -1,11 +1,9 @@
-// Brain's shared data in Supabase: sign-in, memory, saved tasks, settings, the access log and the live channel.
+// Brain’s Supabase sign-in, encrypted memory/task envelopes, and access log.
 // Row-level security in the database decides who may do what: members read, only admins write.
 // AI provider keys are never sent here.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AuthError, derivePassword, emailFor, type User } from './auth';
-import { ACCOUNTS_URL, LIVE_TOPIC, SUPABASE_KEY, SUPABASE_URL } from './config';
-import { MAX_SESSIONS, sanitizeMem, type Entry, type Mem, type Session } from './memory';
-import type { Chan } from './share';
+import { ACCOUNTS_URL, SUPABASE_KEY, SUPABASE_URL } from './config';
 import type { AuditEvent } from './audit';
 
 export type Db = SupabaseClient;
@@ -100,198 +98,11 @@ export async function signOut() {
   }
 }
 
-// ---------- rows ----------
-export interface MemRow {
-  id: string;
-  key: string;
-  type: Entry['type'];
-  title: string;
-  note: string;
-  body: Omit<Entry, 'id' | 'key' | 'type' | 'title' | 'note'>;
-  archived: boolean;
-}
-export interface SesRow {
-  id: string;
-  ts: string;
-  task: string;
-  body: Session;
-}
-export interface MetaRow {
-  blocked: string[];
-  settings: Mem['settings'];
-  counters: { nextId: number; nextSession: number; runs: number; filtered: number };
-}
-export function memRow(e: Entry, archived: boolean): MemRow {
-  const { id, key, type, title, note, ...body } = e;
-  return { id, key, type, title: title.slice(0, 80), note: note.slice(0, 600), body, archived };
-}
-export const sesRow = (s: Session): SesRow => ({
-  id: s.id,
-  ts: new Date(s.ts).toISOString(),
-  task: s.q.slice(0, 300),
-  body: s,
-});
-export const metaRow = (m: Mem): MetaRow => ({
-  blocked: m.blocked,
-  settings: m.settings,
-  counters: { nextId: m.nextId, nextSession: m.nextSession, runs: m.runs, filtered: m.filtered },
-});
-/** Turn database rows back into Brain's memory, cleaned the same way any stored memory is. */
-export function memFrom(mems: MemRow[], sessions: SesRow[], meta: Partial<MetaRow> | null): Mem {
-  const entry = (r: MemRow) => ({ ...(r.body || {}), id: r.id, key: r.key, type: r.type, title: r.title, note: r.note });
-  const c = meta?.counters || ({} as Partial<MetaRow['counters']>);
-  return sanitizeMem({
-    entries: mems.filter(r => !r.archived).map(entry),
-    archived: mems.filter(r => r.archived).map(entry),
-    sessions: sessions.map(r => ({ ...(r.body || {}), id: r.id })),
-    blocked: meta?.blocked || [],
-    settings: meta?.settings || {},
-    nextId: c.nextId,
-    nextSession: c.nextSession,
-    runs: c.runs,
-    filtered: c.filtered,
-  })!;
-}
-interface Snap {
-  mems: Map<string, string>;
-  ses: Map<string, string>;
-  meta: string;
-}
-function rowsOf(m: Mem) {
-  const mems = new Map<string, MemRow>();
-  for (const e of m.archived) mems.set(e.id, memRow(e, true));
-  for (const e of m.entries) mems.set(e.id, memRow(e, false)); // a live entry wins over an archived copy
-  return { mems, ses: new Map(m.sessions.map(s => [s.id, sesRow(s)])), meta: metaRow(m) };
-}
-/** JSON with sorted keys and no undefined values, so a row reads the same however Postgres ordered its fields. */
-export function stable(v: unknown): string {
-  return JSON.stringify(v, (_k, x) =>
-    x && typeof x === 'object' && !Array.isArray(x)
-      ? Object.fromEntries(
-          Object.keys(x)
-            .sort()
-            .filter(k => x[k] !== undefined)
-            .map(k => [k, x[k]]),
-        )
-      : x,
-  );
-}
-const memKey = (r: MemRow) =>
-  stable({ id: r.id, key: r.key, type: r.type, title: r.title, note: r.note, body: r.body, archived: !!r.archived });
-const sesKey = (r: SesRow) => stable({ id: r.id, ts: new Date(r.ts).toISOString(), task: r.task, body: r.body });
-const metaKey = (r: Partial<MetaRow>) =>
-  stable({ blocked: r.blocked ?? [], settings: r.settings ?? {}, counters: r.counters ?? {} });
-export type SaveResult = 'same' | 'saved' | 'conflict';
-/** What one save would write. */
-export interface Changes {
-  upsert: MemRow[];
-  remove: string[];
-  addSessions: SesRow[];
-  changeSessions: SesRow[];
-  removeSessions: string[];
-  meta: boolean;
-}
-
-/**
- * Keeps one signed-in tab in step with the database. It remembers what was last loaded or saved, and a save writes
- * only what changed. Every save first moves brain_meta on by one revision, but only if nobody else did since this
- * tab last loaded or saved (the `rev` check). If someone did, nothing is written and the caller reloads.
- */
-export class Sync {
-  rev = 0;
-  private snap: Snap = { mems: new Map(), ses: new Map(), meta: '' };
-  constructor(
-    private uid: string,
-    private d: Db = db(),
-  ) {}
-  async load(): Promise<Mem> {
-    const [m, s, meta] = await Promise.all([
-      this.d.from('memories').select('id, key, type, title, note, body, archived').limit(2000),
-      this.d.from('sessions').select('id, ts, task, body').order('ts', { ascending: false }).limit(MAX_SESSIONS),
-      this.d.from('brain_meta').select('blocked, settings, counters, rev').eq('id', 1).maybeSingle(),
-    ]);
-    const err = m.error || s.error || meta.error;
-    if (err) throw new CloudError(`Brain's memory could not be loaded: ${why(err)}`);
-    if (!meta.data) throw new CloudError('Brain could not read its settings. Your account may have been removed.');
-    this.rev = Number(meta.data.rev) || 0;
-    const mems = (m.data || []) as MemRow[],
-      ses = [...((s.data || []) as SesRow[])].reverse();
-    // remember the rows exactly as stored: anything the cleaner drops or fixes is written on the next admin save
-    this.snap = {
-      mems: new Map(mems.map(r => [r.id, memKey(r)])),
-      ses: new Map(ses.map(r => [r.id, sesKey(r)])),
-      meta: metaKey(meta.data),
-    };
-    return memFrom(mems, ses, meta.data);
-  }
-  changes(mem: Mem): Changes {
-    const now = rowsOf(mem),
-      was = this.snap;
-    return {
-      upsert: [...now.mems.values()].filter(r => was.mems.get(r.id) !== memKey(r)),
-      remove: [...was.mems.keys()].filter(id => !now.mems.has(id)),
-      addSessions: [...now.ses.values()].filter(r => !was.ses.has(r.id)),
-      changeSessions: [...now.ses.values()].filter(r => was.ses.has(r.id) && was.ses.get(r.id) !== sesKey(r)),
-      removeSessions: [...was.ses.keys()].filter(id => !now.ses.has(id)),
-      meta: metaKey(now.meta) !== was.meta,
-    };
-  }
-  async save(mem: Mem): Promise<SaveResult> {
-    const c = this.changes(mem),
-      was = this.snap;
-    if (
-      !c.meta &&
-      !c.upsert.length &&
-      !c.remove.length &&
-      !c.addSessions.length &&
-      !c.changeSessions.length &&
-      !c.removeSessions.length
-    )
-      return 'same';
-    const meta = metaRow(mem);
-    const u = await this.d.from('brain_meta').update(meta).eq('id', 1).eq('rev', this.rev).select('rev');
-    if (u.error) throw new CloudError(`Brain could not save: ${why(u.error)}`);
-    if (!u.data?.length) return 'conflict';
-    this.rev = Number(u.data[0].rev);
-    was.meta = metaKey(meta);
-    const check = (r: { error: { message?: string } | null }) => {
-      if (r.error) throw new CloudError(`Brain could not save: ${why(r.error)}`);
-    };
-    // removals first, so a new entry may reuse a removed entry's key
-    if (c.remove.length) {
-      check(await this.d.from('memories').delete().in('id', c.remove));
-      for (const id of c.remove) was.mems.delete(id);
-    }
-    if (c.upsert.length) {
-      check(await this.d.from('memories').upsert(c.upsert, { onConflict: 'id' }));
-      for (const r of c.upsert) was.mems.set(r.id, memKey(r));
-    }
-    if (c.removeSessions.length) {
-      check(await this.d.from('sessions').delete().in('id', c.removeSessions));
-      for (const id of c.removeSessions) was.ses.delete(id);
-    }
-    if (c.addSessions.length) {
-      check(
-        await this.d
-          .from('sessions')
-          .upsert(
-            c.addSessions.map(r => ({ ...r, created_by: this.uid })),
-            { onConflict: 'id' },
-          ),
-      );
-      for (const r of c.addSessions) was.ses.set(r.id, sesKey(r));
-    }
-    for (const r of c.changeSessions) {
-      check(await this.d.from('sessions').update({ ts: r.ts, task: r.task, body: r.body }).eq('id', r.id));
-      was.ses.set(r.id, sesKey(r));
-    }
-    return 'saved';
-  }
-}
-
 // ---------- access log ----------
 export async function writeAudit(uid: string, who: string, what: string, d: Db = db()) {
-  const { error } = await d.from('audit_log').insert({ who: uid, who_name: who.slice(0, 32), what: what.slice(0, 200) });
+  const { error } = await d
+    .from('audit_log')
+    .insert({ who: uid, who_name: who.slice(0, 32), what: what.slice(0, 200) });
   if (error) throw new CloudError(why(error));
 }
 /** Newest first. Only admins can read the log. */
@@ -309,24 +120,27 @@ export async function readAudit(limit = 60, d: Db = db()): Promise<AuditEvent[]>
   }));
 }
 
-// ---------- live channel ----------
-/** The private broadcast channel `brain:live`, shaped like the old same-browser channel so share.ts works on it. */
-export function liveChan(d: Db = db(), onStatus?: (status: string) => void): Chan {
-  const ch = d.channel(LIVE_TOPIC, { config: { private: true, broadcast: { self: false } } });
-  let closed = false;
-  const c: Chan = {
-    onmessage: null,
-    postMessage: data => {
-      if (!closed) void ch.send({ type: 'broadcast', event: 'live', payload: data }).catch(() => {});
-    },
-    close: () => {
-      closed = true;
-      void d.removeChannel(ch);
-    },
-  };
-  ch.on('broadcast', { event: 'live' }, m => c.onmessage?.({ data: (m as { payload?: unknown }).payload }));
-  void d.realtime.setAuth().then(() => {
-    if (!closed) ch.subscribe(status => onStatus?.(String(status)));
-  });
-  return c;
+// Only ciphertext leaves the tab. Compare-and-swap prevents silent overwrites from another admin.
+export async function loadVault() {
+  const { data, error } = await db().from('vaults').select('envelope, rev').eq('id', 1).single();
+  if (error || !data) throw new CloudError('Encrypted memory could not be loaded. Sign in again.');
+  return data as { envelope: import('./vault').Vault; rev: number };
+}
+export async function saveVault(envelope: import('./vault').Vault, rev: number) {
+  const { data, error } = await db()
+    .from('vaults')
+    .update({ envelope, rev: rev + 1 })
+    .eq('id', 1)
+    .eq('rev', rev)
+    .select('rev')
+    .maybeSingle();
+  if (error) throw new CloudError('Encrypted memory could not be saved. Keep this tab open and back up your changes.');
+  if (!data)
+    throw new CloudError('Another admin saved first. Back up your changes, then sign in again before editing.');
+  return Number(data.rev);
+}
+export async function accountWrap(uid: string) {
+  const { data, error } = await db().from('account_keys').select('wrap').eq('id', uid).single();
+  if (error || !data) throw new CloudError('This account has no encrypted memory key. Ask an admin.');
+  return data.wrap as import('./vault').Sealed;
 }

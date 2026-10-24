@@ -12,7 +12,7 @@ export const DOT_VERT = /* glsl */ `
     gl_Position = projectionMatrix * mv;
   }`;
 export const DOT_FRAG = /* glsl */ `
-  precision mediump float;
+  precision highp float;
   uniform float uHalo;
   varying vec3 vColor; varying float vAlpha; varying float vPx; varying float vCore;
   void main() {
@@ -27,5 +27,5 @@ export const RIM_VERT = /* glsl */ `
   void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`;
 // RIM_FRAG: uFill adds a faint glass body (used by the skull only; the brain passes 0).
 export const RIM_FRAG = /* glsl */ `
-  precision mediump float; uniform float uLo; uniform float uHi; uniform float uGain; uniform float uFill; uniform vec3 uTint; varying vec3 vN; varying vec3 vV;
+  precision highp float; uniform float uLo; uniform float uHi; uniform float uGain; uniform float uFill; uniform vec3 uTint; varying vec3 vN; varying vec3 vV;
   void main() { float f = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a = smoothstep(uLo, uHi, f) * uGain + uFill * (0.4 + 0.6 * f); if (a <= 0.0) discard; gl_FragColor = vec4(uTint, a); }`;

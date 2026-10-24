@@ -101,7 +101,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
     ctxBlock = contextBlock(hits.map(h => h.e));
     notes.push(hits.length ? `${hits.length} memories sent as context` : 'no memory matched');
   }
-  const callAs = async (system: string, user: string) => {
+  const callAs = async (system: string, user: string, recordReplyTime = true) => {
     const st = get();
     if (st.calls >= st.live.callCap) throw new Error(`the page call budget (${st.live.callCap}) is used`);
     set({ calls: st.calls + 1 });
@@ -137,7 +137,11 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       throw e;
     } finally {
       ctls.delete(ctl);
-      if (bot) set(x => ({ timing: { ...x.timing, [bot]: Math.round(performance.now() - t0) }, draft: null }));
+      if (bot)
+        set(x => ({
+          ...(recordReplyTime ? { timing: { ...x.timing, [bot]: Math.round(performance.now() - t0) } } : {}),
+          draft: null,
+        }));
     }
   };
   if (notes.length) set({ status: `Live: ${PROV[pv].label} · ${model} · ${notes.join(' · ')}` });
@@ -152,7 +156,11 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
     addPulse('grokbot', 'brain', color, { words: words(msgs.filter(x => x.from === 'grokbot').at(-1)?.text) });
     try {
       const known = st.mem.entries.filter(e => e.key.startsWith(AI_KEY)).map(e => e.title);
-      const res = await callAs(MEMORY_SYSTEM, memoryPrompt(sess.q, sess.msgs, known, st.mem.settings.instructions));
+      const res = await callAs(
+        MEMORY_SYSTEM,
+        memoryPrompt(sess.q, sess.msgs, known, st.mem.settings.instructions),
+        false,
+      );
       const items = parseMemories(res.text),
         t = tally();
       let made = 0;

@@ -1,12 +1,12 @@
 # Brain
 
-Owner's **Orchestration Brain**: a full 3D brain that shows what a team of AI agents learned, and how work moved between them. Open `index.html` in a browser (double-click it). No install is needed to use it.
+Owner's **Orchestration Brain**: a full 3D brain that shows what a team of AI agents learned, and how work moved between them. Use [redeemed.live](https://redeemed.live), served by the Hostinger VPS, with accounts and encrypted memory in the Brain Supabase project. No install is needed. The single-file `index.html` also opens from your computer, but sign-in and shared memory require an internet connection.
 
 Source lives in [`app/`](app) (React, TypeScript, three.js). The root `index.html` is the built, single-file result. The earlier hand-written page was removed in Oct 2026; it is still in git history before this change.
 
 ## Look
 
-Every piece of text uses the Minecraft pixel font (Craftron Gaming, from DaFont, listed 100% Free), at 16px, or 32px for titles, which are the two sizes where its pixels stay sharp. It is built into `index.html`, so it works offline.
+Every piece of text uses the Minecraft pixel font (Craftron Gaming, from DaFont, listed 100% Free), at 16px, or 32px for titles, which are the two sizes where its pixels stay sharp. It is built into `index.html`, so it needs no external font service.
 
 ## Who can do what
 
@@ -21,7 +21,7 @@ Brain asks for a login. Accounts are for adults (18+) only, and only an admin ca
 | Live AI settings, keys, backup, erase | yes | no |
 | Add or remove accounts | yes | no |
 
-The first time you open Brain it asks you to create the admin. After that, only admins can add accounts.
+The first admin needs the owner’s one-time setup code and chooses their own passcode. The code is checked and spent by the account service. After that, only a signed-in admin can add accounts. Public sign-up cannot grant a Brain profile or a memory key.
 
 ## What you see
 
@@ -54,23 +54,23 @@ Choose one provider (Anthropic, OpenAI, Google or xAI), a model ID and one key, 
 - Limits: 9 calls and one task per page load, 120 tokens per reply by default (150 at most). **Stop** cancels calls in progress.
 - Matching memory is sent with each task ("Send matching memory with a task", on by default) so the team learns from itself. An admin can turn it off in the Admin tab.
 - The task and each handoff go to the provider, including for incognito tasks.
-- Works only when `index.html` is opened from your computer; a web preview may block calls.
+- Works on redeemed.live or from the built file. Each provider must permit browser requests; use Test to check your chosen provider. Hosting does not bypass a provider’s browser restrictions.
 
 ## Security: what it does and does not do
 
-Brain is built like a restricted system, within what a single file with no server can do.
+Brain is built like a restricted system, with Supabase Auth, database row-level access rules, and browser-side encryption. See [DEPLOYMENT.md](DEPLOYMENT.md) for the hosting layout and verification limits.
 
-- **Encrypted at rest.** Memory and any remembered AI key are stored only inside an encrypted vault (AES-256-GCM). Nothing readable is left in the browser's storage, and older plain-text memory is moved into the vault on the first admin sign-in.
+- **Encrypted at rest.** The database stores memory and tasks only in an encrypted, admin-signed vault (AES-256-GCM); only signed-in Brain members can read that ciphertext, and only admins can update it. The browser caches ciphertext at `brain.vault.v1`. Remembered AI keys are sealed for that account inside the signed local vault and never sent to Supabase. Older exported encrypted backups can be restored by an admin; local browser accounts are not uploaded.
 - **Names and passcodes:** names are 2 to 32 letters or numbers with single spaces (no symbols). Passcodes need at least 5 characters (Owner's choice); longer is much safer, because the passcode also unlocks the encrypted memory.
-- **Each account unlocks with its own passcode.** One PBKDF2 run (600,000 rounds) gives a check value, which is stored, and a key that opens that account's sealed copy of the vault key, which is never stored. Reloading the page locks it again.
+- **Each account unlocks with its own passcode.** One PBKDF2 run (310,000 rounds) derives a remote sign-in password and a separate key that opens that account’s sealed memory keys. The passcode itself never leaves the browser. Supabase holds the password verifier; the database holds each account’s sealed copy of the memory keys. Reloading the page locks it again.
 - **Only admins can change memory, and the vault enforces it.** Every save is signed with a key only admins hold. Each account checks the signature with the key from its own sealed copy, so a viewer cannot forge or edit memory even with developer tools; a changed vault is refused and logged.
-- **Locked down.** A content policy lets only the page's own script run (pinned by hash) and lets the page connect only to the four AI providers, so it cannot send data anywhere else.
+- **Locked down.** A content policy lets only the page's own script run (pinned by hash) and lets the page connect only to the four AI providers and the Brain Supabase project. The hosting response also blocks framing, MIME sniffing, camera, microphone, and geolocation.
 - **Locks:** after 15 idle minutes, after a minute hidden, or when you press Esc twice. The screen blurs while the tab is hidden, and printing is blocked.
 - **Access log** (Admin tab): sign-ins, failed tries, locks, account and memory changes. It never records passcodes or task text, and an unknown name typed at sign-in is not written down.
 - **Encrypted backups** open only with the passphrase chosen when making them.
 - **Adults only:** the date of birth is typed in once, checked, and thrown away. A failed check pauses new accounts in this browser for a day. Only admins can create accounts.
 
-What it cannot do: it is not a certified or government-approved system, and there is no server, so it cannot stop someone who controls the computer while an admin is signed in. A viewer can delete the vault (but not change it). The age check cannot prove anyone's age. The banner is Brain's own marking, not a government classification. **There is no recovery:** if every admin passcode is forgotten, the memory cannot be opened, so keep an encrypted backup. Viewers watch the live chat only in the same browser as the admin.
+What it cannot do: it is not a certified or government-approved system, and it cannot stop someone who controls the computer while an admin is signed in. A viewer cannot update or delete the database vault. Anyone controlling a device can delete its local cache. The age check cannot prove anyone's age. The banner is Brain's own marking, not a government classification. **There is no recovery:** if every admin passcode is forgotten, the memory cannot be opened, so keep an encrypted backup. Viewers watch the live chat only in the same browser as the admin.
 
 ## Build and test (for developers)
 
@@ -80,7 +80,7 @@ npm install
 npm run format      # Biome formatter (120 columns)
 npm run lint        # Biome linter
 npm run typecheck
-npm test            # 89 unit and UI tests (Node and a simulated browser)
+npm test            # unit and UI tests using fake services
 npm run build       # type-checks, bundles, and writes ../index.html
 npm run e2e:install # once: downloads Chromium for the browser test
 npm run e2e         # opens the built ../index.html in real Chromium: sets up an admin, draws the brain, runs System check, locks and signs back in
@@ -93,7 +93,7 @@ The unit tests run in Node and a simulated browser and do not draw WebGL. The br
 ## Honest limits
 
 - The brain is a schematic, not anatomy. Tract names borrow from real fibre systems, and the layout is designed, not measured.
-- Memory is stored in this browser only. Back it up (Admin tab).
+- Encrypted memory is shared through Supabase and loaded at sign-in. Live chat mirroring remains limited to tabs in the same browser. Keep an encrypted backup (Admin tab).
 - Common password and key patterns are filtered before saving. This is best effort, not a guarantee. Do not paste real secrets.
 - Not tested against live AI services. Tests use fake responses only; they check request shape, labelling, limits and key handling, not that a provider accepts the request.
 - Model IDs are editable because providers change their catalogs; the examples are starting values.

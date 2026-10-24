@@ -9,6 +9,63 @@ vi.mock('../src/components/BrainScene', () => ({
   default: ({ locked }: { locked?: boolean }) => <div data-testid="brain" data-locked={String(!!locked)} />,
 }));
 
+// Fake backend only: no test sends credentials or traffic to the real project.
+const server = vi.hoisted(() => ({
+  users: [] as { id: string; name: string; role: 'admin' | 'viewer'; password: string; wrap: any }[],
+  vault: null as any,
+  rev: 1,
+}));
+vi.mock('../src/lib/cloud', () => ({
+  async accounts(action: string, b: any = {}) {
+    if (action === 'status') return { setupNeeded: !server.users.length };
+    if (action === 'list') return { users: server.users.map(u => ({ ...u, created_at: new Date().toISOString() })) };
+    if (action === 'setup' || action === 'create') {
+      const user = {
+        id: String(server.users.length + 1),
+        name: b.name,
+        password: b.password,
+        role: action === 'setup' ? ('admin' as const) : b.role,
+        wrap: b.wrap,
+      };
+      server.users.push(user);
+      if (b.envelope) server.vault = b.envelope;
+      return { ok: true, user };
+    }
+    if (action === 'remove') {
+      server.users = server.users.filter(u => u.id !== b.id);
+      return { ok: true };
+    }
+    if (action === 'reset') {
+      Object.assign(server.users.find(u => u.id === b.id)!, { password: b.password, wrap: b.wrap });
+      return { ok: true };
+    }
+    throw new Error('Unknown fake action');
+  },
+  async signIn(name: string, pass: string) {
+    const { derivePassword } = await import('../src/lib/auth');
+    const { password, kek } = await derivePassword(name, pass);
+    const user = server.users.find(u => u.name.toLowerCase() === name.trim().toLowerCase() && u.password === password);
+    if (!user) throw new Error('Name or passcode is wrong.');
+    return { user: { id: user.id, name: user.name, role: user.role }, kek };
+  },
+  async signOut() {},
+  async accountWrap(uid: string) {
+    return server.users.find(u => u.id === uid)!.wrap;
+  },
+  async loadVault() {
+    return { envelope: server.vault, rev: server.rev };
+  },
+  async saveVault(envelope: any, rev: number) {
+    if (rev !== server.rev) throw new Error('Conflict');
+    server.vault = envelope;
+    return ++server.rev;
+  },
+  async writeAudit() {},
+  async readAudit() {
+    return [];
+  },
+}));
+
 const ADULT = { m: 'May', d: '17', y: '1980' };
 const useStoreRef: () => any = () => ({ mem: { entries: [] } });
 async function boot() {
@@ -18,12 +75,15 @@ async function boot() {
   const { default: App } = await import('../src/App');
   const auth = await import('../src/auth-store');
   const store = await import('../src/store');
+  await auth.useAuth.getState().init();
   return { App, auth, store };
 }
 const dob = async (u: ReturnType<typeof userEvent.setup>, d = ADULT) => {
   await u.selectOptions(screen.getByLabelText('Month'), d.m);
   await u.type(screen.getByLabelText('Day'), d.d);
   await u.type(screen.getByLabelText('Year'), d.y);
+  const code = screen.queryByLabelText(/^Setup code/);
+  if (code) await u.type(code, 'fake-test-code-only');
 };
 async function makeAdmin(u: ReturnType<typeof userEvent.setup>) {
   await u.clear(screen.getByLabelText('Name'));
@@ -35,6 +95,9 @@ async function makeAdmin(u: ReturnType<typeof userEvent.setup>) {
 }
 
 beforeEach(() => {
+  server.users = [];
+  server.vault = null;
+  server.rev = 1;
   localStorage.clear();
   sessionStorage.clear();
 });
@@ -64,7 +127,7 @@ describe('setup and login', () => {
     await makeAdmin(u);
     expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
     expect(document.querySelector('.who .role')!.textContent).toBe('Admin');
-    expect(localStorage.getItem('brain.auth.v1')).not.toMatch(/correct horse|1980/);
+    expect(localStorage.getItem('brain.auth.v1') || '').not.toMatch(/correct horse|1980/);
     await u.click(screen.getByRole('button', { name: 'Lock' }));
     expect(await screen.findByRole('heading', { name: 'Restricted system' })).toBeTruthy();
     expect(useStoreRef().mem.entries).toEqual([]); // locking forgets the unlocked memory
@@ -84,30 +147,27 @@ describe('who can do what', () => {
     vi.resetModules();
     localStorage.clear();
     sessionStorage.clear();
-    const { createUser, loadAuth } = await import('../src/lib/auth');
-    const { newSecrets, encryptVault } = await import('../src/lib/vault');
+    const { derivePassword } = await import('../src/lib/auth');
+    const { newSecrets, encryptVault, sealFor } = await import('../src/lib/vault');
     const { blankMem } = await import('../src/lib/memory');
-    const db = loadAuth(localStorage),
-      sec = await newSecrets(),
-      dob = { y: 1980, m: 5, d: 17 },
-      ctx = { now: Date.now(), iter: 1000, secrets: sec };
-    const admin = await createUser(
-      db,
-      localStorage,
-      { name: 'Owner', role: 'admin', passcode: 'correct horse battery', dob },
-      { ...ctx, addedBy: null },
-    );
-    if (role === 'viewer')
-      await createUser(
-        db,
-        localStorage,
-        { name: 'Guest', role: 'viewer', passcode: 'visitor pass phrase', dob },
-        { ...ctx, addedBy: admin.id },
-      );
-    localStorage.setItem(
-      'brain.vault.v1',
-      JSON.stringify(await encryptVault(sec, { mem: { ...blankMem(), ...seed }, keys: {} }, 1)),
-    );
+    const sec = await newSecrets();
+    server.users = [];
+    for (const [name, accountRole, pass] of [
+      ['Owner', 'admin', 'correct horse battery'],
+      ['Guest', 'viewer', 'visitor pass phrase'],
+    ] as const) {
+      const { password, kek } = await derivePassword(name, pass);
+      server.users.push({
+        id: name,
+        name,
+        role: accountRole,
+        password,
+        wrap: await sealFor(kek, sec, accountRole === 'admin'),
+      });
+    }
+    server.vault = await encryptVault(sec, { mem: { ...blankMem(), ...seed } }, 1);
+    if (role === 'admin') server.users = server.users.filter(u => u.role === 'admin');
+    server.rev = 1;
     const m = await boot();
     await act(async () => {
       await m.auth.useAuth
@@ -196,8 +256,6 @@ describe('who can do what', () => {
     await u.type(screen.getByLabelText('Year'), '2012');
     await u.click(screen.getByRole('button', { name: 'Add account' }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/adults only/i));
-    expect(JSON.parse(localStorage.getItem('brain.auth.v1')!).users.map((x: { name: string }) => x.name)).toEqual([
-      'Owner',
-    ]);
+    expect(server.users.map(u => u.name)).toEqual(['Owner']);
   }, 30000);
 });
