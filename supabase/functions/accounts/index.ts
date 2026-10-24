@@ -8,11 +8,26 @@ const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db = createClient(URL_, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+// Only Brain's own pages may call this function from a browser. A `null` origin is the built
+// index.html opened from disk. Other sites get no allow-origin header, so the browser blocks them.
+// (The real gate is the admin check below; this just keeps the endpoint out of other pages' reach.)
+const ORIGINS = new Set([
+  'https://redeemed.live',
+  'https://www.redeemed.live',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'null',
+]);
+function cors(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin') || '';
+  return {
+    ...(ORIGINS.has(origin) ? { 'Access-Control-Allow-Origin': origin } : {}),
+    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '600',
+    Vary: 'Origin',
+  };
+}
 const NAME_RE = /^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/;
 const PASS_RE = /^[A-Za-z0-9_-]{43}$/; // 32 bytes, base64url, made in the browser
 const MIN_AGE = 18;
@@ -24,8 +39,8 @@ class Refuse extends Error {
     super(msg);
   }
 }
-const reply = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } });
+const reply = (req: Request, status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'content-type': 'application/json' } });
 
 export const emailFor = (name: string) => name.trim().toLowerCase().replace(/ /g, '.') + '@users.redeemed.live';
 function checkName(n: unknown): string {
@@ -180,13 +195,13 @@ async function handle(req: Request) {
 }
 
 Deno.serve(async req => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
-  if (req.method !== 'POST') return reply(405, { error: 'POST only' });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors(req) });
+  if (req.method !== 'POST') return reply(req, 405, { error: 'POST only' });
   try {
-    return reply(200, await handle(req));
+    return reply(req, 200, await handle(req));
   } catch (e) {
-    if (e instanceof Refuse) return reply(e.status, { error: e.message });
+    if (e instanceof Refuse) return reply(req, e.status, { error: e.message });
     console.error('Accounts request failed');
-    return reply(500, { error: 'Something went wrong. Nothing was changed.' });
+    return reply(req, 500, { error: 'Something went wrong. Nothing was changed.' });
   }
 });
