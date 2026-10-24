@@ -110,9 +110,7 @@ export async function derivePassword(
   iter = PASS_ITER,
 ): Promise<{ password: string; kek: CryptoKey }> {
   const enc = new TextEncoder();
-  const base = await subtle().importKey('raw', enc.encode(passcode.normalize('NFKC')), 'PBKDF2', false, [
-    'deriveBits',
-  ]);
+  const base = await subtle().importKey('raw', enc.encode(passcode.normalize('NFKC')), 'PBKDF2', false, ['deriveBits']);
   const bits = new Uint8Array(
     await subtle().deriveBits(
       { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(saltFor(name)), iterations: iter },

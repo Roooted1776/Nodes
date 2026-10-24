@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../auth-store';
-import { readAudit } from '../lib/audit';
+import { readAudit } from '../lib/cloud';
+import type { AuditEvent } from '../lib/audit';
 import { PASS_MIN, ROLE_LABEL, type Role } from '../lib/auth';
 import { MODEL_RE, PROV, PROVIDERS, type ProviderId } from '../lib/providers';
 import { KEY_GUIDE } from '../lib/keyguide';
@@ -256,10 +257,10 @@ export default function AdminPanel() {
 const SECURITY: [string, string][] = [
   ['Encrypted', 'Memory and remembered keys are stored only as AES-256-GCM ciphertext.'],
   ['Admin-signed', 'Every save is signed with a key only admins hold. A changed copy is refused.'],
-  ['Locked down', 'Only the page script runs, and it can only reach the four AI providers.'],
+  ['Locked down', 'Only the page script runs. Connections are limited to Brain’s database and the four AI providers.'],
   ['Auto-lock', 'After 15 idle minutes, a minute hidden, or Esc twice.'],
   ['Adults only', 'Date of birth is checked once and never stored. It cannot prove age.'],
-  ['Limits', 'No server and no certification. No recovery if every admin passcode is lost.'],
+  ['Limits', 'No certification. No memory recovery if every admin passcode is lost.'],
 ];
 
 function Accounts() {
@@ -292,7 +293,7 @@ function Accounts() {
               type="button"
               className="danger"
               onClick={() => {
-                if (confirm(`Remove ${u.name}?`)) setNote(dropUser(u.id));
+                if (confirm(`Remove ${u.name}?`)) void dropUser(u.id).then(setNote);
               }}
               disabled={u.id === user?.id && db.users.filter(x => x.role === 'admin').length <= 1}
             >
@@ -351,11 +352,16 @@ function Accounts() {
 
 function AccessLog() {
   const [open, setOpen] = useState(false),
-    log = open ? readAudit(localStorage).slice(-60).reverse() : [];
+    [log, setLog] = useState<AuditEvent[]>([]),
+    [error, setError] = useState('');
+  useEffect(() => {
+    if (open) void readAudit().then(setLog, () => setError('The access log could not be loaded.'));
+  }, [open]);
   return (
-    <Card title="Access log" hint="Kept on this device. No passcodes or task text." wide>
+    <Card title="Access log" hint="Kept in the database. No passcodes or task text." wide>
       <details onToggle={e => setOpen((e.target as HTMLDetailsElement).open)}>
         <summary>Show the last 60 events</summary>
+        {error && <p role="alert">{error}</p>}
         <ol className="audit">
           {log.map((a, i) => (
             <li key={i}>

@@ -1,45 +1,24 @@
 import { create } from 'zustand';
 import { ageBlockedUntil, type Dob } from './lib/age';
-import { audit } from './lib/audit';
-import {
-  AuthError,
-  IDLE_MS,
-  createUser,
-  loadAuth,
-  needsSetup,
-  removeUser,
-  saveAuth,
-  setPasscode,
-  verifyLogin,
-  type AuthDb,
-  type Role,
-  type User,
-} from './lib/auth';
-import { maintain, tally } from './lib/learn';
-import { KEY, blankMem, sanitizeMem, type Mem } from './lib/memory';
-import type { ProviderId } from './lib/providers';
+import { audit, setAuditSink } from './lib/audit';
+import { AuthError, IDLE_MS, checkNewAccount, derivePassword, passcodeError, type Role, type User } from './lib/auth';
+import { accounts, signIn, signOut, accountWrap, loadVault, saveVault, writeAudit } from './lib/cloud';
+import { blankMem, sanitizeMem } from './lib/memory';
 import { mirror, openChannel, publish, type Hub } from './lib/share';
-import {
-  VaultError,
-  decryptVault,
-  encryptVault,
-  newSecrets,
-  openFor,
-  sealFor,
-  type Secrets,
-  type Vault,
-} from './lib/vault';
+import { VaultError, decryptVault, encryptVault, newSecrets, openFor, sealFor, type Secrets } from './lib/vault';
+import { openKeys, sealKeys } from './lib/keystore';
 import { setVault, useStore } from './store';
 
 export const VAULT_KEY = 'brain.vault.v1',
-  OLD_KEYS = 'brain.livekeys.v1',
   HIDE_LOCK_MS = 60_000,
   PANIC_MS = 600;
 export type Phase = 'setup' | 'login' | 'app';
-type Keys = Partial<Record<ProviderId, string>>;
+interface Listed extends User {
+  created: number;
+}
 interface AuthState {
   phase: Phase;
-  db: AuthDb;
+  db: { users: Listed[]; lockedUntil: number };
   user: User | null;
   error: string;
   notice: string;
@@ -47,11 +26,13 @@ interface AuthState {
   rev: number;
   session: string;
   lastActive: number;
-  setup(i: { name: string; passcode: string; dob: Dob }): Promise<boolean>;
+  ready: boolean;
+  init(): Promise<void>;
+  setup(i: { name: string; passcode: string; dob: Dob; code?: string }): Promise<boolean>;
   login(name: string, pass: string): Promise<boolean>;
   logout(why?: string): void;
   addUser(i: { name: string; role: Role; passcode: string; dob: Dob }): Promise<boolean>;
-  dropUser(id: string): string;
+  dropUser(id: string): Promise<string>;
   resetPasscode(id: string, pass: string): Promise<string>;
   ageBlocked(): number;
 }
@@ -61,97 +42,79 @@ const hub: Hub = {
   setState: p => useStore.setState(p as never),
   subscribe: fn => useStore.subscribe(fn as never),
 };
-
-// ---------- the vault: only this module ever holds the unlocked key, and only while someone is signed in ----------
 let secrets: Secrets | null = null,
   counter = 0,
-  chain: Promise<unknown> = Promise.resolve();
-const readVault = (): Vault | null => {
+  revision = 0;
+let chain: Promise<unknown> = Promise.resolve();
+let generation = 0;
+async function unlock(u: User, kek: CryptoKey) {
+  secrets = await openFor(kek, await accountWrap(u.id));
+  const s = secrets,
+    remote = await loadVault();
+  const data = (await decryptVault(s, remote.envelope)) as { mem?: unknown };
+  const mem = sanitizeMem(data.mem);
+  if (!mem) throw new VaultError('The encrypted memory has an invalid format.', 'format');
+  counter = remote.envelope.n;
+  revision = remote.rev;
+  chain = Promise.resolve();
+  // Account-specific sealed provider keys stay inside the signed local vault and never enter the database.
+  let deviceKeys = '{}';
   try {
-    return JSON.parse(ls.getItem(VAULT_KEY) || 'null');
-  } catch {
-    return null;
-  }
-};
-async function writeVault(data: { mem: Mem; keys: Keys }) {
-  if (!secrets?.priv) return false;
-  counter = Math.max(counter, readVault()?.n || 0) + 1;
-  ls.setItem(VAULT_KEY, JSON.stringify(await encryptVault(secrets, data, counter)));
-  return true;
-}
-async function openVault(): Promise<{ mem: Mem; keys: Keys } | null> {
-  const v = readVault();
-  if (!v || !secrets) return null;
-  const d = (await decryptVault(secrets, v)) as { mem?: unknown; keys?: unknown };
-  counter = v.n;
-  const keys: Keys = {};
-  if (d.keys && typeof d.keys === 'object')
-    for (const [p, k] of Object.entries(d.keys)) if (typeof k === 'string') keys[p as ProviderId] = k.slice(0, 300);
-  return { mem: sanitizeMem(d.mem) || blankMem(), keys };
-}
-/** Memory and a remembered key saved in plain text by the earlier version. They are moved into the vault, then deleted. */
-function takePlain(): { mem: Mem; keys: Keys } {
-  let mem = blankMem();
-  const keys: Keys = {};
-  try {
-    const raw = ls.getItem(KEY),
-      m = raw && sanitizeMem(JSON.parse(raw));
-    if (m) mem = m;
-  } catch {
-    /* unreadable */
-  }
-  try {
-    const k = JSON.parse(ls.getItem(OLD_KEYS) || 'null');
-    if (k && typeof k === 'object')
-      for (const [p, v] of Object.entries(k)) if (typeof v === 'string') keys[p as ProviderId] = v.slice(0, 300);
-  } catch {
-    /* unreadable */
-  }
-  return { mem, keys };
-}
-const hasPlain = () => !!(ls.getItem(KEY) || ls.getItem(OLD_KEYS));
-const dropPlain = () => {
-  ls.removeItem(KEY);
-  ls.removeItem(OLD_KEYS);
-};
-
-async function unlock(u: User, s: Secrets, fresh = false) {
-  secrets = s;
-  let data = fresh ? null : await openVault(),
-    notice = '';
-  if (!data) {
-    if (!s.priv) throw new AuthError('Brain memory is not set up yet. An admin needs to sign in first.', 'missing');
-    data = takePlain();
-    await writeVault(data);
-    if (hasPlain()) {
-      dropPlain();
-      notice = 'Older unencrypted memory was moved into the encrypted vault.';
+    const cached = JSON.parse(ls.getItem(VAULT_KEY) || 'null');
+    if (cached) {
+      const local = (await decryptVault(s, cached)) as { deviceKeys?: string };
+      if (typeof local.deviceKeys === 'string') deviceKeys = local.deviceKeys;
     }
-  } else if (hasPlain() && s.priv) {
-    dropPlain();
-    notice = 'An older unencrypted copy of memory was found and deleted. The encrypted copy was kept.';
-    audit(ls, u.name, 'Deleted an old unencrypted memory copy');
+  } catch {
+    /* an unusable cache never replaces the verified database copy */
   }
-  maintain(data.mem, tally(), Date.now());
-  const live = useStore.getState().live;
+  const deviceStore = {
+    getItem: () => deviceKeys,
+    setItem: (_key: string, value: string) => {
+      deviceKeys = value;
+    },
+    removeItem: () => {
+      deviceKeys = '{}';
+    },
+  };
+  const saved = s.priv ? await openKeys(deviceStore, kek, u.id) : {};
+  if (s.priv) ls.setItem(VAULT_KEY, JSON.stringify(await encryptVault(s, { mem, deviceKeys }, counter)));
+  else if (!ls.getItem(VAULT_KEY)) ls.setItem(VAULT_KEY, JSON.stringify(remote.envelope));
   useStore.setState(st => ({
     role: u.role,
     who: u.name,
-    mem: data!.mem,
+    mem,
     rev: st.rev + 1,
-    keys: live.remember ? data!.keys : {},
+    keys: st.live.remember ? saved : {},
     storageOk: true,
   }));
-  if (s.priv)
-    setVault((mem, keys) => {
-      chain = chain.then(() => writeVault({ mem, keys }));
-      return chain as Promise<boolean>;
+  setAuditSink((who, what) => writeAudit(u.id, who, what));
+  if (s.priv) {
+    const epoch = generation;
+    setVault((m, keys) => {
+      // Capture now: queued writes must never read a later mutable memory object.
+      const snapshot = structuredClone(m),
+        localKeys = { ...keys };
+      const job = chain.then(async () => {
+        if (epoch !== generation) return false;
+        const envelope = await encryptVault(s, { mem: snapshot }, counter + 1);
+        if (epoch !== generation) return false;
+        revision = await saveVault(envelope, revision);
+        counter = envelope.n;
+        if (epoch !== generation) return false;
+        await sealKeys(deviceStore, kek, u.id, localKeys);
+        const local = await encryptVault(s, { mem: snapshot, deviceKeys }, envelope.n);
+        if (epoch !== generation) return false;
+        ls.setItem(VAULT_KEY, JSON.stringify(local));
+        return true;
+      });
+      // A failed chain stays failed: later edits must not overwrite a conflicting remote save.
+      chain = job;
+      return job;
     });
-  else setVault(null);
+  } else setVault(null);
   enter(u);
-  return notice;
 }
-
 // ---------- while signed in: live sharing, idle lock, panic lock, privacy blur ----------
 let stop: (() => void)[] = [];
 function enter(u: User) {
@@ -160,10 +123,14 @@ function enter(u: User) {
   if (ch) stop.push(u.role === 'admin' ? publish(hub, ch) : mirror(hub, ch), () => ch.close());
   if (u.role === 'viewer') {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === VAULT_KEY)
-        void openVault().then(
-          d => d && useStore.setState(st => ({ mem: d.mem, rev: st.rev + 1 })),
-          err => useStore.setState({ status: err.message }),
+      const key = secrets;
+      if (e.key === VAULT_KEY && e.newValue && key)
+        void decryptVault(key, JSON.parse(e.newValue)).then(
+          d => {
+            const mem = sanitizeMem((d as { mem?: unknown }).mem);
+            if (mem) useStore.setState(st => ({ mem, rev: st.rev + 1 }));
+          },
+          () => useStore.setState({ status: 'Memory failed its signature check.' }),
         );
     };
     addEventListener('storage', onStorage);
@@ -217,6 +184,7 @@ function leave(keepKey = false) {
   stop = [];
   if (keepKey) return;
   secrets = null;
+  setAuditSink(null);
   setVault(null);
   if (useStore.getState().busy) useStore.getState().stop(); // a running task is cancelled on lock
   useStore.setState(st => ({
@@ -240,22 +208,44 @@ const sessionId = () =>
     .join('')
     .toUpperCase();
 
-const first = loadAuth(ls);
 export const useAuth = create<AuthState>()((set, get) => {
-  const bump = () => set(s => ({ rev: s.rev + 1 }));
   const fail = (e: unknown) => {
-    set({
-      error:
-        e instanceof AuthError || e instanceof VaultError || e instanceof Error ? e.message : 'Something went wrong.',
-      busy: false,
-    });
+    set({ error: e instanceof Error ? e.message : 'Something went wrong.', busy: false });
     return false;
   };
-  const signedIn = (u: User, notice: string) =>
-    set({ user: u, phase: 'app', busy: false, notice, session: sessionId(), lastActive: Date.now() });
+  const refresh = async () => {
+    if (get().user?.role !== 'admin') return;
+    const r = await accounts<{ users: (User & { created_at: string })[] }>('list', {}, true);
+    set({
+      db: { users: r.users.map(u => ({ ...u, created: Date.parse(u.created_at) })), lockedUntil: 0 },
+      rev: get().rev + 1,
+    });
+  };
+  const login = async (name: string, pass: string) => {
+    set({ busy: true, error: '', notice: '' });
+    const epoch = ++generation;
+    try {
+      const { user, kek } = await signIn(name, pass);
+      if (epoch !== generation) return false;
+      await unlock(user, kek);
+      if (epoch !== generation) {
+        leave();
+        return false;
+      }
+      set({ user, phase: 'app', busy: false, session: sessionId(), lastActive: Date.now() });
+      await refresh();
+      void audit(user.name, `Signed in (${user.role})`);
+      return true;
+    } catch (e) {
+      leave();
+      void signOut();
+      set({ user: null, phase: 'login', db: { users: [], lockedUntil: 0 } });
+      return fail(e);
+    }
+  };
   return {
-    phase: needsSetup(first) ? 'setup' : 'login',
-    db: first,
+    phase: 'login',
+    db: { users: [], lockedUntil: 0 },
     user: null,
     error: '',
     notice: '',
@@ -263,121 +253,89 @@ export const useAuth = create<AuthState>()((set, get) => {
     rev: 0,
     session: '',
     lastActive: Date.now(),
+    ready: false,
+    async init() {
+      if (get().ready || get().busy) return;
+      set({ busy: true });
+      try {
+        const r = await accounts<{ setupNeeded: boolean }>('status');
+        set({ phase: r.setupNeeded ? 'setup' : 'login', ready: true, busy: false });
+      } catch (e) {
+        fail(e);
+      }
+    },
     ageBlocked: () => ageBlockedUntil(ls, Date.now()),
     async setup(i) {
       set({ busy: true, error: '' });
       try {
-        const db = get().db;
-        if (!needsSetup(db)) throw new AuthError('Brain is already set up. Sign in instead.', 'blocked');
-        const s = await newSecrets();
-        const u = await createUser(
-          db,
-          ls,
-          { name: i.name, role: 'admin', passcode: i.passcode, dob: i.dob },
-          { now: Date.now(), addedBy: null, secrets: s },
-        );
-        audit(ls, u.name, 'Set up Brain and created the first admin');
-        signedIn(u, await unlock(u, s, true));
-        return true;
+        const name = checkNewAccount(i, ls, Date.now());
+        const { password, kek } = await derivePassword(name, i.passcode);
+        const sec = await newSecrets();
+        await accounts('setup', {
+          name,
+          password,
+          dob: i.dob,
+          code: i.code,
+          wrap: await sealFor(kek, sec, true),
+          envelope: await encryptVault(sec, { mem: blankMem() }, 1),
+        });
+        return await login(name, i.passcode);
       } catch (e) {
         return fail(e);
       }
     },
-    async login(name, pass) {
-      set({ busy: true, error: '', notice: '' });
-      try {
-        const db = get().db,
-          now = Date.now(),
-          r = await verifyLogin(db, ls, name, pass, now);
-        if (!r.ok) {
-          const known = db.users.some(u => u.name.toLowerCase() === name.trim().toLowerCase()); // an unknown name is not written down: it might be a mistyped passcode
-          audit(
-            ls,
-            known ? name.trim() : 'unknown name',
-            r.reason === 'locked' ? 'Sign-in refused: waiting after too many tries' : 'Failed sign-in',
-          );
-          const s = Math.ceil(r.waitMs / 1000);
-          bump();
-          set({
-            busy: false,
-            error:
-              r.reason === 'locked'
-                ? `Too many tries. Wait ${s} seconds.`
-                : r.waitMs
-                  ? `Name or passcode is wrong. Wait ${s} seconds before the next try.`
-                  : 'Name or passcode is wrong.',
-          });
-          return false;
-        }
-        let s: Secrets;
-        if (r.user.wrap) s = await openFor(r.kek, r.user.wrap);
-        else if (r.user.role === 'admin' && !db.users.some(u => u.wrap)) {
-          s = await newSecrets();
-          r.user.wrap = await sealFor(r.kek, s, true);
-          saveAuth(ls, db);
-          audit(ls, r.user.name, 'Turned on memory encryption');
-        } else
-          throw new AuthError(
-            'Your account needs a passcode reset by an admin before it can open the encrypted memory.',
-            'missing',
-          );
-        const notice = await unlock(r.user, s, !readVault());
-        audit(ls, r.user.name, `Signed in (${r.user.role})`);
-        signedIn(r.user, notice);
-        return true;
-      } catch (e) {
-        if (e instanceof VaultError && e.code === 'tampered')
-          audit(ls, name.trim(), 'Memory failed its signature check');
-        leave();
-        return fail(e);
-      }
-    },
+    login,
     logout(why = '') {
       const u = get().user;
-      if (u) audit(ls, u.name, why ? why.replace(/\.$/, '') : 'Locked');
+      if (u) void audit(u.name, why || 'Locked');
+      ++generation;
       leave();
-      set({ user: null, phase: 'login', notice: why, error: '' });
+      setAuditSink(null);
+      void signOut();
+      set({ user: null, phase: 'login', notice: why, error: '', busy: false, db: { users: [], lockedUntil: 0 } });
     },
     async addUser(i) {
-      const me = get().user;
-      if (me?.role !== 'admin' || !secrets?.priv)
+      if (get().user?.role !== 'admin' || !secrets?.priv)
         return fail(new AuthError('Only admins can add accounts.', 'blocked'));
       set({ busy: true, error: '' });
       try {
-        await createUser(get().db, ls, i, { now: Date.now(), addedBy: me.id, secrets });
-        audit(ls, me.name, `Added account ${i.name.trim()} (${i.role})`);
+        const name = checkNewAccount(i, ls, Date.now());
+        const { password, kek } = await derivePassword(name, i.passcode);
+        await accounts(
+          'create',
+          { name, password, role: i.role, dob: i.dob, wrap: await sealFor(kek, secrets, i.role === 'admin') },
+          true,
+        );
+        await refresh();
         set({ busy: false });
-        bump();
         return true;
       } catch (e) {
         return fail(e);
       }
     },
-    dropUser(id) {
-      const me = get().user;
-      if (me?.role !== 'admin') return 'Only admins can remove accounts.';
-      const name = get().db.users.find(u => u.id === id)?.name || id;
+    async dropUser(id) {
+      if (get().user?.role !== 'admin') return 'Only admins can remove accounts.';
       try {
-        removeUser(get().db, ls, id);
-        audit(ls, me.name, `Removed account ${name}`);
-        if (id === me.id) get().logout();
-        else bump();
+        await accounts('remove', { id }, true);
+        await refresh();
         return '';
-      } catch (e: any) {
-        return e.message;
+      } catch (e) {
+        return e instanceof Error ? e.message : 'Could not remove account.';
       }
     },
     async resetPasscode(id, pass) {
-      const me = get().user;
-      if (me?.role !== 'admin' || !secrets?.priv) return 'Only admins can reset passcodes.';
-      const name = get().db.users.find(u => u.id === id)?.name || id;
+      if (get().user?.role !== 'admin' || !secrets?.priv) return 'Only admins can reset passcodes.';
+      const u = get().db.users.find(u => u.id === id);
+      if (!u) return 'No such account.';
+      const bad = passcodeError(pass, u.name);
+      if (bad) return bad;
       try {
-        await setPasscode(get().db, ls, id, pass, undefined, secrets);
-        audit(ls, me.name, `Reset the passcode for ${name}`);
-        bump();
+        const { password, kek } = await derivePassword(u.name, pass);
+        await accounts('reset', { id, password, wrap: await sealFor(kek, secrets, u.role === 'admin') }, true);
+        if (id === get().user?.id) get().logout('Passcode changed. Sign in again.');
         return '';
-      } catch (e: any) {
-        return e.message;
+      } catch (e) {
+        return e instanceof Error ? e.message : 'Could not reset passcode.';
       }
     },
   };

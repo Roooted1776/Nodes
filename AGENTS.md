@@ -4,6 +4,14 @@ Brain is Owner's personal "Orchestration Brain": one page (`index.html`) that sh
 
 Canonical repo: **`Roooted1776/Brain`**.
 
+## Owner's usage and handoff rule (2026-10-24)
+
+- When reported AI usage reaches 90%, try to finish the current task within the remaining allowance. Use an available usage indicator; never invent a percentage or claim continuous monitoring when it is unavailable.
+- Finish only the assigned work, run the relevant checks, and leave a short handoff stating what changed, files touched, checks and results, and anything unfinished. Then step back so the next AI can continue without competing edits. Never mark unfinished work complete just to meet the threshold.
+- Owner authorizes committing and automatically pushing completed, verified task changes to `main`. This replaces earlier instructions requiring Owner to push or merge and the draft-PR-only requirement for this workflow. The 90% threshold is a wrap-up cue, not permission to publish incomplete work.
+- Before pushing, verify the repository and remote, fetch the latest `main`, inspect the working tree and outgoing commits, and ensure the push contains only the assigned task. Preserve other AIs' files, branches, uncommitted changes, and commits; never bundle unrelated work, force-push, reset, or overwrite their work. If isolation, checks, conflicts, permissions, or branch protection prevent a safe push, leave the completed work and handoff locally and report the blocker.
+- Push only after the task is actually complete and checked. Review stages that are unavailable must be reported honestly; never fabricate another program's approval.
+
 ## Hard rule: RedMed stays untouched
 
 Owner also has a separate project called RedMed. **Do not read, copy from, change, branch, or open pull requests on RedMed from this repo or this work.** Nothing from RedMed goes into Brain, including text, file names, skills lists or sample data. If a task seems to need RedMed, stop and ask Owner.

@@ -44,7 +44,6 @@ body {
   color: var(--fg);
   font: 16px / 1.5 var(--font);
   -webkit-font-smoothing: none;
-  font-smooth: never;
   overflow: hidden;
 }
 button,
