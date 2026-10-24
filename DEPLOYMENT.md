@@ -41,3 +41,11 @@ Production credential setup and authenticated production-browser checks remain o
 - No paid purchase or AI provider call was made. Named-program reviews and Grok Bot’s final decision remain incomplete. The owner subsequently authorized the complete Git commit and push; merges remain owner-controlled.
 
 Final public verification: 2026-10-24, 15:13 America/New_York. The site is reachable at https://redeemed.live. First-admin credential entry remains owner-assisted; the setup code and passcode must never be sent through chat.
+
+## Main merge handoff (2026-10-24)
+
+Owner authorized merging all outstanding Nodes work into `main`, syncing Git, and verifying deployment. The only outstanding remote branch was `codex/redeemed-deployment`. The usage/handoff rule is in `AGENTS.md`. The Chromium viewer sign-in assertion now allows the same 30 seconds as admin sign-in; its original five-second allowance expired while sign-in was still processing. No production application code changed in this follow-up.
+
+Verification: formatting/lint checks and type-check passed (29 existing lint warnings), all 77 tests passed, the build reproduced the deployed SHA-256 above, and the Chromium test passed with the consistent sign-in allowance. Public HTTPS returned 200, www redirected with 308, and the downloaded HTML matched the build byte for byte. Supabase reports the encrypted-vault migration installed and accounts function version 3 active; its public status endpoint returned `setupNeeded: true`. First-admin setup remains for Owner. No real AI call or production account was created. External named-program reviews and Grok Bot's decision remain unavailable; no team PASS is claimed.
+
+Files changed in this follow-up: `AGENTS.md`, `app/e2e/smoke.spec.ts`, and this handoff. To recheck: run `npm run check`, `npm run build`, and `npm run e2e` in `app/`; compare `index.html` with the response from https://redeemed.live. The existing deployed HTML needs no replacement because its contents are identical.

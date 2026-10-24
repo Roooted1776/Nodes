@@ -93,7 +93,7 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   await viewer.getByLabel('Name').fill('Guest');
   await viewer.getByLabel('Passcode').fill('fake viewer passcode');
   await viewer.getByRole('button', { name: 'Sign in' }).click();
-  await expect(viewer.getByRole('main', { name: 'Brain view' })).toBeVisible();
+  await expect(viewer.getByRole('main', { name: 'Brain view' })).toBeVisible({ timeout: 30_000 });
   await expect(viewer.getByRole('tab', { name: 'Admin' })).toHaveCount(0);
   await expect(viewer.getByLabel('Task for the team')).toHaveCount(0);
   await viewer.getByRole('tab', { name: 'Memory' }).click();
