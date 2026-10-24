@@ -1,0 +1,322 @@
+{
+ "w": 1000,
+ "h": 740,
+ "hub": {
+  "x": 500,
+  "y": 360
+ },
+ "outline": "M548 20 C529 20 511 24 494 26 C476 28 458 30 440 33 C422 36 405 40 387 42 C370 45 352 48 334 50 C316 52 297 52 280 56 C263 60 247 67 231 72 C214 78 197 83 182 91 C167 100 152 112 139 124 C126 136 113 149 105 165 C97 180 94 198 91 215 C89 233 89 251 90 269 C91 287 92 306 98 322 C104 338 115 357 128 366 C142 374 160 373 178 374 C195 375 214 370 232 370 C250 369 269 371 287 372 C305 374 323 376 341 380 C358 384 376 386 392 394 C407 401 424 411 436 423 C448 435 454 452 462 467 C471 482 481 498 489 513 C497 528 507 543 513 559 C519 576 521 594 524 611 C526 629 522 655 528 666 C534 677 548 681 561 678 C574 675 590 656 605 648 C621 641 639 638 655 632 C671 626 689 622 703 612 C718 603 732 590 743 576 C754 562 760 545 771 531 C782 517 793 504 807 493 C820 482 839 476 851 464 C863 451 874 436 879 420 C884 403 882 382 880 364 C879 346 875 329 872 311 C868 294 865 276 860 260 C854 243 847 227 840 211 C833 195 827 179 818 164 C808 149 796 135 784 122 C772 108 761 93 748 82 C734 71 717 65 701 58 C686 50 670 42 654 36 C637 31 620 28 602 25 C584 22 566 20 548 20 Z",
+ "folds": [
+  "M303 305 C312 298 330 274 356 264 C380 255 422 246 453 246 C484 248 517 256 543 270 C569 284 596 310 610 330 C626 350 629 380 633 390",
+  "M348 268 C370 261 440 232 483 230 C526 228 568 236 603 252 C638 269 678 315 693 328",
+  "M558 462 C576 465 630 472 663 478 C696 483 728 490 753 496 C778 500 803 506 813 508",
+  "M176 252 C184 240 207 199 228 178 C249 156 273 138 303 125 C333 112 390 106 408 102",
+  "M693 80 C700 94 723 136 738 162 C753 189 770 215 783 238 C796 260 808 288 813 298",
+  "M498 58 C503 69 516 105 528 125 C540 145 556 165 573 178 C590 190 623 196 633 200"
+ ],
+ "regions": {
+  "concept": {
+   "cx": 483,
+   "cy": 178,
+   "rx": 315,
+   "ry": 128,
+   "label": "Concepts"
+  },
+  "entity": {
+   "cx": 498,
+   "cy": 380,
+   "rx": 158,
+   "ry": 57,
+   "label": "Entities"
+  },
+  "workstream": {
+   "cx": 678,
+   "cy": 552,
+   "rx": 63,
+   "ry": 45,
+   "label": "Workstreams"
+  }
+ },
+ "stations": {
+  "gemini": {
+   "x": 805,
+   "y": 300,
+   "side": -1,
+   "area": "Occipital \u00b7 context intake"
+  },
+  "muse": {
+   "x": 735,
+   "y": 175,
+   "side": 1,
+   "area": "Parietal \u00b7 audit"
+  },
+  "chatgpt": {
+   "x": 650,
+   "y": 455,
+   "side": -1,
+   "area": "Temporal \u00b7 synthesis"
+  },
+  "claude": {
+   "x": 610,
+   "y": 110,
+   "side": 1,
+   "area": "Motor strip \u00b7 build"
+  },
+  "cursor": {
+   "x": 455,
+   "y": 100,
+   "side": -1,
+   "area": "Premotor \u00b7 integration"
+  },
+  "perplexity": {
+   "x": 310,
+   "y": 130,
+   "side": 1,
+   "area": "Frontal \u00b7 sources"
+  },
+  "grok": {
+   "x": 235,
+   "y": 200,
+   "side": -1,
+   "area": "Frontal \u00b7 strategy"
+  },
+  "xcode": {
+   "x": 700,
+   "y": 560,
+   "side": 1,
+   "area": "Cerebellum \u00b7 devices"
+  },
+  "grokbot": {
+   "x": 155,
+   "y": 310,
+   "side": 1,
+   "area": "Prefrontal \u00b7 final call"
+  }
+ },
+ "tracts": [
+  {
+   "id": "optic",
+   "from": "hub",
+   "to": "gemini",
+   "via": [
+    [
+     650,
+     350
+    ]
+   ],
+   "name": "Optic radiation",
+   "kind": "projection"
+  },
+  {
+   "id": "dorsal",
+   "from": "gemini",
+   "to": "muse",
+   "via": [
+    [
+     790,
+     230
+    ]
+   ],
+   "name": "Dorsal stream",
+   "kind": "association"
+  },
+  {
+   "id": "parietotemporal",
+   "from": "muse",
+   "to": "chatgpt",
+   "via": [
+    [
+     750,
+     330
+    ]
+   ],
+   "name": "Parieto-temporal arc",
+   "kind": "association"
+  },
+  {
+   "id": "arcuate",
+   "from": "chatgpt",
+   "to": "claude",
+   "via": [
+    [
+     590,
+     290
+    ]
+   ],
+   "name": "Arcuate arc",
+   "kind": "association"
+  },
+  {
+   "id": "motor",
+   "from": "claude",
+   "to": "cursor",
+   "via": [
+    [
+     530,
+     95
+    ]
+   ],
+   "name": "Motor U-fibres",
+   "kind": "association"
+  },
+  {
+   "id": "frontalAslant",
+   "from": "cursor",
+   "to": "perplexity",
+   "via": [
+    [
+     380,
+     105
+    ]
+   ],
+   "name": "Frontal U-fibres",
+   "kind": "association"
+  },
+  {
+   "id": "frontalArc",
+   "from": "perplexity",
+   "to": "grok",
+   "via": [
+    [
+     265,
+     155
+    ]
+   ],
+   "name": "Frontal arc",
+   "kind": "association"
+  },
+  {
+   "id": "frontalRadiation",
+   "from": "hub",
+   "to": "grok",
+   "via": [
+    [
+     360,
+     265
+    ]
+   ],
+   "name": "Frontal radiation",
+   "kind": "projection"
+  },
+  {
+   "id": "cerebellar",
+   "from": "hub",
+   "to": "xcode",
+   "via": [
+    [
+     570,
+     480
+    ]
+   ],
+   "name": "Cerebello-thalamic tract",
+   "kind": "projection"
+  },
+  {
+   "id": "anteriorThalamic",
+   "from": "hub",
+   "to": "grokbot",
+   "via": [
+    [
+     320,
+     330
+    ]
+   ],
+   "name": "Anterior thalamic radiation",
+   "kind": "projection"
+  },
+  {
+   "id": "frontalPole",
+   "from": "grok",
+   "to": "grokbot",
+   "via": [
+    [
+     185,
+     250
+    ]
+   ],
+   "name": "Frontal pole arc",
+   "kind": "association"
+  }
+ ],
+ "routes": [
+  {
+   "from": "hub",
+   "to": "gemini",
+   "tracts": [
+    "optic"
+   ]
+  },
+  {
+   "from": "gemini",
+   "to": "muse",
+   "tracts": [
+    "dorsal"
+   ]
+  },
+  {
+   "from": "muse",
+   "to": "chatgpt",
+   "tracts": [
+    "parietotemporal"
+   ]
+  },
+  {
+   "from": "chatgpt",
+   "to": "claude",
+   "tracts": [
+    "arcuate"
+   ]
+  },
+  {
+   "from": "claude",
+   "to": "cursor",
+   "tracts": [
+    "motor"
+   ]
+  },
+  {
+   "from": "cursor",
+   "to": "perplexity",
+   "tracts": [
+    "frontalAslant"
+   ]
+  },
+  {
+   "from": "perplexity",
+   "to": "grok",
+   "tracts": [
+    "frontalArc"
+   ]
+  },
+  {
+   "from": "grok",
+   "to": "xcode",
+   "tracts": [
+    "frontalRadiation",
+    "cerebellar"
+   ]
+  },
+  {
+   "from": "xcode",
+   "to": "grokbot",
+   "tracts": [
+    "cerebellar",
+    "anteriorThalamic"
+   ]
+  },
+  {
+   "from": "grokbot",
+   "to": "hub",
+   "tracts": [
+    "anteriorThalamic"
+   ]
+  },
+  {
+   "from": "grok",
+   "to": "grokbot",
+   "tracts": [
+    "frontalPole"
+   ]
+  }
+ ]
+}

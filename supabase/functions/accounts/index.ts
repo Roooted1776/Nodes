@@ -1,0 +1,173 @@
+// Brain accounts: the only way to create, change or remove a Brain account.
+// Public sign-up is never used. The first admin needs the one-time setup code; after that only admins act.
+// Passwords arrive already stretched by the browser (PBKDF2 of the passcode), so the passcode itself never leaves it.
+// Dates of birth are checked here (18+) and never stored.
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
+const URL_ = Deno.env.get('SUPABASE_URL')!;
+const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const db = createClient(URL_, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+const NAME_RE = /^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/;
+const PASS_RE = /^[A-Za-z0-9_-]{43}$/; // 32 bytes, base64url, made in the browser
+const MIN_AGE = 18;
+type Role = 'admin' | 'viewer';
+type Dob = { y: number; m: number; d: number };
+
+class Refuse extends Error {
+  constructor(msg: string, public status = 400) {
+    super(msg);
+  }
+}
+const reply = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } });
+
+export const emailFor = (name: string) => name.trim().toLowerCase().replace(/ /g, '.') + '@users.redeemed.live';
+function checkName(n: unknown): string {
+  const name = typeof n === 'string' ? n.trim() : '';
+  if (name.length < 2 || name.length > 32 || !NAME_RE.test(name))
+    throw new Refuse('Names use letters, numbers and single spaces, 2 to 32 characters.');
+  return name;
+}
+function checkPass(p: unknown): string {
+  if (typeof p !== 'string' || !PASS_RE.test(p)) throw new Refuse('The passcode was not prepared by Brain.');
+  return p;
+}
+function checkAdult(dob: unknown) {
+  const o = dob as Dob;
+  const ok = o && [o.y, o.m, o.d].every(Number.isInteger);
+  const born = ok ? new Date(Date.UTC(o.y, o.m - 1, o.d)) : null;
+  if (!born || born.getUTCMonth() !== o.m - 1 || born.getUTCDate() !== o.d) throw new Refuse('Enter a real date of birth.');
+  const now = new Date();
+  let age = now.getUTCFullYear() - o.y;
+  if (now.getUTCMonth() + 1 < o.m || (now.getUTCMonth() + 1 === o.m && now.getUTCDate() < o.d)) age--;
+  if (age > 120 || born > now) throw new Refuse('Enter a real date of birth.');
+  if (age < MIN_AGE) throw new Refuse('Brain is for adults only (18+).', 403);
+}
+const sha256 = async (s: string) =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))]
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+async function caller(req: Request) {
+  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  if (!token) throw new Refuse('Sign in first.', 401);
+  const { data, error } = await db.auth.getUser(token);
+  if (error || !data.user) throw new Refuse('Sign in again.', 401);
+  const { data: p } = await db.from('profiles').select('id, name, role').eq('id', data.user.id).maybeSingle();
+  if (!p) throw new Refuse('No Brain account.', 403);
+  return p as { id: string; name: string; role: Role };
+}
+async function admins() {
+  const { count } = await db.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'admin');
+  return count || 0;
+}
+async function audit(who: { id: string; name: string }, what: string) {
+  await db.from('audit_log').insert({ who: who.id, who_name: who.name, what: what.slice(0, 200) });
+}
+async function makeUser(name: string, password: string, role: Role) {
+  const { data: same } = await db.from('profiles').select('id').ilike('name', name).maybeSingle();
+  if (same) throw new Refuse('That name is taken.', 409);
+  const { data, error } = await db.auth.admin.createUser({ email: emailFor(name), password, email_confirm: true, app_metadata: { brain: true } });
+  if (error || !data.user) throw new Refuse('Could not create the account: ' + (error?.message || 'unknown'), 409);
+  const { error: pe } = await db.from('profiles').insert({ id: data.user.id, name, role });
+  if (pe) {
+    await db.auth.admin.deleteUser(data.user.id);
+    throw new Refuse('Could not save the account: ' + pe.message, 409);
+  }
+  return { id: data.user.id, name, role };
+}
+
+async function handle(req: Request) {
+  const b = await req.json().catch(() => ({}));
+  switch (b.action) {
+    case 'status': {
+      const { data } = await db.rpc('setup_needed');
+      return { setupNeeded: data === true };
+    }
+    case 'setup': {
+      const name = checkName(b.name), password = checkPass(b.password);
+      checkAdult(b.dob);
+      if (typeof b.code !== 'string' || b.code.replace(/[\s-]/g, '').length < 16) throw new Refuse('Enter the setup code.', 403);
+      const hash = await sha256(b.code.replace(/[\s-]/g, '').toUpperCase()); // typed with or without dashes
+      const { data: ok } = await db.rpc('claim_setup', { code_sha256: hash });
+      if (ok !== true) throw new Refuse('That setup code is wrong or already used.', 403);
+      let u;
+      try {
+        u = await makeUser(name, password, 'admin');
+      } catch (e) {
+        await db.rpc('restore_setup', { code_sha256: hash }); // the code stays usable if the account could not be made
+        throw e;
+      }
+      await audit(u, 'Created the first admin');
+      return { ok: true, email: emailFor(name) };
+    }
+    case 'list': {
+      const me = await caller(req);
+      if (me.role !== 'admin') throw new Refuse('Only admins can see accounts.', 403);
+      const { data } = await db.from('profiles').select('id, name, role, created_at').order('created_at');
+      return { users: data };
+    }
+    case 'create': {
+      const me = await caller(req);
+      if (me.role !== 'admin') throw new Refuse('Only admins can add accounts.', 403);
+      const name = checkName(b.name), password = checkPass(b.password), role: Role = b.role === 'admin' ? 'admin' : 'viewer';
+      checkAdult(b.dob);
+      const u = await makeUser(name, password, role);
+      await audit(me, `Added ${role} ${name}`);
+      return { ok: true, user: u };
+    }
+    case 'reset': {
+      const me = await caller(req);
+      if (me.role !== 'admin') throw new Refuse('Only admins can reset passcodes.', 403);
+      const password = checkPass(b.password);
+      const { data: t } = await db.from('profiles').select('id, name').eq('id', b.id).maybeSingle();
+      if (!t) throw new Refuse('No such account.', 404);
+      const { error } = await db.auth.admin.updateUserById(t.id, { password });
+      if (error) throw new Refuse('Could not reset: ' + error.message, 409);
+      await audit(me, `Reset the passcode of ${t.name}`);
+      return { ok: true };
+    }
+    case 'role': {
+      const me = await caller(req);
+      if (me.role !== 'admin') throw new Refuse('Only admins can change roles.', 403);
+      const role: Role = b.role === 'admin' ? 'admin' : 'viewer';
+      const { data: t } = await db.from('profiles').select('id, name, role').eq('id', b.id).maybeSingle();
+      if (!t) throw new Refuse('No such account.', 404);
+      if (t.role === 'admin' && role === 'viewer' && (await admins()) <= 1) throw new Refuse('Brain needs at least one admin.', 409);
+      await db.from('profiles').update({ role }).eq('id', t.id);
+      await audit(me, `Made ${t.name} ${role}`);
+      return { ok: true };
+    }
+    case 'remove': {
+      const me = await caller(req);
+      if (me.role !== 'admin') throw new Refuse('Only admins can remove accounts.', 403);
+      if (b.id === me.id) throw new Refuse('You cannot remove yourself.', 409);
+      const { data: t } = await db.from('profiles').select('id, name, role').eq('id', b.id).maybeSingle();
+      if (!t) throw new Refuse('No such account.', 404);
+      if (t.role === 'admin' && (await admins()) <= 1) throw new Refuse('Brain needs at least one admin.', 409);
+      await db.auth.admin.deleteUser(t.id); // the profile goes with it (on delete cascade)
+      await audit(me, `Removed ${t.name}`);
+      return { ok: true };
+    }
+    default:
+      throw new Refuse('Unknown action.');
+  }
+}
+
+Deno.serve(async req => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method !== 'POST') return reply(405, { error: 'POST only' });
+  try {
+    return reply(200, await handle(req));
+  } catch (e) {
+    if (e instanceof Refuse) return reply(e.status, { error: e.message });
+    console.error(e);
+    return reply(500, { error: 'Something went wrong. Nothing was changed.' });
+  }
+});

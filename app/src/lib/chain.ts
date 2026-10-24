@@ -1,0 +1,97 @@
+import { AGENT, IOS_RE, LIVE_ORDER, stagePrompt, systemPrompt, type AgentId } from '../data/team';
+import type { Msg } from './memory';
+
+// The live handoff chain. Each agent reviews the incoming handoff, does its text task and hands on.
+// A failed stage is marked as failed; nothing is ever filled in with made-up text.
+
+export type StageCall = (system: string, user: string) => Promise<{ text: string; why: string }>;
+export interface ChainHooks {
+  say(m: Msg & { cls?: 'warn' }): void;
+  active(id: AgentId | null): void;
+  handoff(from: string, to: string, payload?: string): void;
+  blocked(): string | null; // a reason to stop before the next call, or null
+}
+export interface ChainResult {
+  msgs: Msg[];
+  completed: number;
+  failed: AgentId[];
+}
+
+export const chainFor = (task: string): AgentId[] => LIVE_ORDER.filter(id => id !== 'xcode' || IOS_RE.test(task));
+
+export async function runChain(
+  task: string,
+  tag: string,
+  call: StageCall,
+  hooks: ChainHooks,
+  opts: { brainContext?: string; perTaskCap?: number; clean?: (t: string) => string } = {},
+): Promise<ChainResult> {
+  const bots = chainFor(task),
+    msgs: Msg[] = [],
+    failed: AgentId[] = [];
+  const clean = opts.clean || (t => t),
+    cap = opts.perTaskCap ?? 9;
+  const say = (m: Msg & { cls?: 'warn' }) => {
+    msgs.push({ from: m.from, text: m.text, tag: m.tag });
+    hooks.say(m);
+  };
+  say({ from: 'owner', text: task, tag: '' });
+  say({
+    from: 'brain',
+    tag: 'page',
+    text:
+      'Handoff chain: ' +
+      bots.map(b => AGENT[b].name).join(' → ') +
+      '.' +
+      (IOS_RE.test(task) ? '' : ' Xcode sits this one out because it is not an iOS task.') +
+      ' Each agent reviews the handoff first. Text only; no files change.',
+  });
+  let previous = 'Owner task: ' + task,
+    calls = 0,
+    completed = 0;
+  const handoffs: string[] = [];
+  for (let i = 0; i < bots.length; i++) {
+    const bot = bots[i],
+      next = bots[i + 1] || null;
+    const why = hooks.blocked() || (calls >= cap ? `The limit of ${cap} model calls for one task was reached.` : null);
+    if (why) {
+      say({ from: 'brain', tag: 'page', cls: 'warn', text: why + ' The rest of the team was not contacted.' });
+      break;
+    }
+    if (i === 0) hooks.handoff('owner', bot, task);
+    calls++;
+    const incomingFrom = i === 0 ? 'Owner' : AGENT[bots[i - 1]].name;
+    const incoming = bot === 'grokbot' ? handoffs.join('\n\n') || previous : previous;
+    const ctx = bot === bots[0] || bot === 'grokbot' ? opts.brainContext || '' : '';
+    hooks.active(bot);
+    try {
+      let r: { text: string; why: string };
+      try {
+        r = await call(systemPrompt(bot), stagePrompt(bot, task, incomingFrom, incoming, next, ctx));
+      } finally {
+        hooks.active(null);
+      }
+      const text = clean(r.text.replace(/\s+/g, ' ').trim());
+      if (!text)
+        throw new Error(r.why ? `the provider returned no text (${r.why})` : 'the provider returned an empty reply');
+      say({ from: bot, text, tag });
+      completed++;
+      previous = `HANDOFF FROM ${AGENT[bot].name}:\n${text}`;
+      handoffs.push(previous);
+    } catch (e: any) {
+      const msg = `${AGENT[bot].name} did not finish: ${clean(String(e?.message || e))}. Nothing was made up in its place.`;
+      say({ from: 'brain', tag: 'page', cls: 'warn', text: msg });
+      failed.push(bot);
+      previous = `HANDOFF STATUS FOR ${AGENT[bot].name}:\n${msg}`;
+      handoffs.push(previous);
+    }
+    if (next) hooks.handoff(bot, next, previous);
+  }
+  if (completed)
+    say({
+      from: 'brain',
+      tag: 'page',
+      text: `${completed} stage(s) done. Model text is unverified. Brain changed no files and ran no tools.`,
+    });
+  return { msgs, completed, failed };
+}
