@@ -458,12 +458,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="import-overlay">
-      <button
-        type="button"
-        className="import-backdrop"
-        onClick={onClose}
-        aria-label="Close modal backdrop"
-      />
+      <button type="button" className="import-backdrop" onClick={onClose} aria-label="Close modal backdrop" />
       <div className="import-modal" role="dialog" aria-modal="true" aria-label="Import Memory Files">
         <header className="import-header">
           <div>
