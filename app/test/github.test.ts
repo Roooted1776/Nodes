@@ -4,10 +4,12 @@ import {
   fetchGitHubCommits,
   fetchGitHubIssues,
   fetchGitHubReadme,
+  fetchGitHubReleases,
   fetchGitHubRepoInfo,
   githubToMemoryItems,
   parseRepoInput,
   testGitHubConnection,
+  type GitHubRelease,
   type GitHubRepoInfo,
 } from '../src/lib/github';
 
@@ -227,6 +229,50 @@ describe('GitHub Connector - Data Fetching & Decoding', () => {
     expect(commits[0].sha).toBe('abcdef1234567890abcdef1234567890abcdef12');
     expect(commits[0].author).toBe('Max');
     expect(commits[0].message).toContain('automated GitHub push pipeline');
+  });
+
+  it('fetches releases and parses tag and release notes', async () => {
+    const fakeFetch = async (url: string | URL | Request) => {
+      const u = String(url);
+      expect(u).toContain('/releases');
+      return new Response(
+        JSON.stringify([
+          {
+            tag_name: 'v2.4.0',
+            name: 'Brain v2.4.0 Neural Connectors',
+            body: 'Added GitHub repository connector and task project grouping.',
+            published_at: '2026-10-25T02:00:00Z',
+            html_url: 'https://github.com/Roooted1776/Brain/releases/tag/v2.4.0',
+            prerelease: false,
+          },
+        ]),
+        { status: 200 },
+      );
+    };
+
+    const releases = await fetchGitHubReleases('Roooted1776/Brain', { limit: 5 }, fakeFetch as typeof fetch);
+    expect(releases.length).toBe(1);
+    expect(releases[0].tagName).toBe('v2.4.0');
+    expect(releases[0].name).toContain('Neural Connectors');
+    expect(releases[0].body).toContain('Added GitHub repository connector');
+  });
+
+  it('passes since timestamp for differential issues and commits queries', async () => {
+    let issueUrl = '';
+    let commitUrl = '';
+    const fakeFetch = async (url: string | URL | Request) => {
+      const u = String(url);
+      if (u.includes('/issues')) issueUrl = u;
+      if (u.includes('/commits')) commitUrl = u;
+      return new Response(JSON.stringify([]), { status: 200 });
+    };
+
+    const since = '2026-10-24T12:00:00Z';
+    await fetchGitHubIssues('Roooted1776/Brain', { since }, fakeFetch as typeof fetch);
+    await fetchGitHubCommits('Roooted1776/Brain', { since }, fakeFetch as typeof fetch);
+
+    expect(issueUrl).toContain(`since=${encodeURIComponent(since)}`);
+    expect(commitUrl).toContain(`since=${encodeURIComponent(since)}`);
   });
 });
 
