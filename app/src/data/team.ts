@@ -129,6 +129,7 @@ export const AGENTS: Agent[] = [
     specialty: 'Audits everyone and finds what is wrong',
     skills: ['audits', 'finding bugs', 'honesty checks'],
     company: 'Independent',
+    provider: 'muse',
     free: 'groq',
   },
 ];
