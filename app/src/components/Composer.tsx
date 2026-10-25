@@ -19,7 +19,7 @@ export default function Composer() {
     activeProject = useStore(s => s.activeProject),
     setActiveProject = useStore(s => s.setActiveProject),
     mem = useStore(s => s.mem),
-    ready = useStore(s => !!s.keys[s.live.provider]);
+    ready = useStore(s => Object.values(s.keys).some(Boolean));
   const [showNew, setShowNew] = useState(false);
   const [newProj, setNewProj] = useState('');
 
