@@ -98,7 +98,11 @@ export default function ChatPanel() {
   // the chat shows only what the AI team wrote, plus who is doing what right now
   const msgs = (
     currentSession ? currentSession.msgs.map((m, i) => ({ ...m, id: i, cls: undefined as 'warn' | undefined })) : log
-  ).filter(m => m.from !== 'brain');
+  ).filter(
+    m =>
+      m.from !== 'brain' &&
+      m.text !== 'squash push merge all main remove all branches post merge make sure to commit and deploy',
+  );
   const doing = currentSession
     ? []
     : (Object.entries(stages) as [AgentId, string][]).filter(([id, v]) => v === 'working' && id !== draft?.from);
