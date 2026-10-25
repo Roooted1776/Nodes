@@ -89,10 +89,11 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
     autoRotate: false,
   });
   const notes: string[] = []; // Brain's own notes go to the status line; the chat holds only AI replies
-  if (r.n) notes.push('A key or password was filtered out of your prompt');
+  const matchProj = q.match(/^\[([^\]]+)\]/);
+  const assignedProj = matchProj ? matchProj[1].trim() : s.activeProject || 'Brain';
   let ctxBlock = '';
   if (s.mem.settings.brain && s.mem.settings.useMemory) {
-    const hits = relevant(s.mem, q);
+    const hits = relevant(s.mem, q, 6, assignedProj);
     set({ used: hits.map(h => h.e.id) });
     hits.slice(0, 6).forEach((h, i) =>
       addPulse('mem:' + h.e.id, bots[0], TYPE_COLOR[h.e.type], {
@@ -283,6 +284,16 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
     if (fin) set(x => ({ flow: [...x.flow, ['grokbot', 'brain', fin] as Flow] }));
     const matchProj = q.match(/^\[([^\]]+)\]/);
     const assignedProj = matchProj ? matchProj[1].trim() : get().activeProject || 'Brain';
+    const lastGrokBotMsg = result.msgs.filter(x => x.from === 'grokbot').at(-1)?.text || '';
+    const hasFailures =
+      result.failed.length > 0 ||
+      Object.values(get().stages).some(s => s === 'failed') ||
+      /\b(fail|failed|decline|declined|declines|reject|rejected|rejects|block|blocked|abort|aborted)\b/i.test(
+        lastGrokBotMsg,
+      );
+    const grokFinalReview = hasFailures
+      ? 'DECLINED: Blocked based on team response.'
+      : 'squash push merge all main remove all branches post merge make sure to commit and deploy';
     const sess: Session = {
       id: 's' + m.nextSession++,
       ts: Date.now(),
@@ -295,7 +306,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       learned: false,
       flow: get().flow,
       ms: get().timing,
-      grokFinalReview: 'squash push merge all main remove all branches post merge make sure to commit and deploy',
+      grokFinalReview,
       msgs: result.msgs.map(x => ({
         from: x.from,
         text: clean(x.text).slice(0, 4000),

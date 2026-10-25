@@ -242,10 +242,23 @@ describe('memory storage', () => {
     expect(sess.q).toContain('GitHub: Roooted1776/WebDev');
     expect(sess.cover?.cursor?.s).toBe('done');
     expect(sess.cover?.grokbot?.s).toBe('done');
+    expect(sess.grokFinalReview).toBeDefined();
+    expect(sess.grokFinalReview).not.toContain('DECLINED');
     expect(sess.msgs).toHaveLength(3);
     expect(sess.msgs[0].from).toBe('cursor');
     expect(sess.msgs[1].from).toBe('codex');
     expect(sess.msgs[2].from).toBe('grokbot');
+  });
+
+  it('grokFinalReview declines when a team stage has failed', () => {
+    const m = blankMem();
+    const declinedSess = saveImportedListAsTask(
+      m,
+      [{ type: 'concept', title: 'Broken Spec', note: 'Failed test' }],
+      'TestProject',
+      { hasError: true, failedStage: 'cursor' },
+    );
+    expect(declinedSess.grokFinalReview).toBe('DECLINED: Blocked based on team response.');
   });
 });
 
