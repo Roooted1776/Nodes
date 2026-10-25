@@ -11,7 +11,7 @@ import {
   syncMemoryDatabase,
   writeAudit,
 } from './lib/cloud';
-import { blankMem, sanitizeMem } from './lib/memory';
+import { blankMem, sanitizeMem, type Mem } from './lib/memory';
 import { mirror, openChannel, publish, type Hub } from './lib/share';
 import { VaultError, decryptVault, encryptVault, newSecrets, openFor, sealFor, type Secrets } from './lib/vault';
 import { openKeys, sealKeys } from './lib/keystore';
@@ -56,6 +56,18 @@ let secrets: Secrets | null = null,
   revision = 0;
 let chain: Promise<unknown> = Promise.resolve();
 let generation = 0;
+/** Mirror memory into the database and say so out loud if any row did not save. */
+async function reportSync(m: Mem) {
+  try {
+    const r = await syncMemoryDatabase(m);
+    if (r.failed)
+      useStore.setState({ status: `Memory: ${r.failed} item(s) not saved to the database (${r.firstError}).` });
+  } catch (e) {
+    useStore.setState({
+      status: `Memory could not reach the database: ${String((e as Error)?.message || e).slice(0, 120)}`,
+    });
+  }
+}
 async function unlock(u: User, kek: CryptoKey) {
   secrets = await openFor(kek, await accountWrap(u.id));
   const s = secrets,
@@ -110,7 +122,7 @@ async function unlock(u: User, kek: CryptoKey) {
   }));
   setAuditSink((who, what) => writeAudit(u.id, who, what));
   if (s.priv) {
-    void syncMemoryDatabase(mem);
+    void reportSync(mem);
     const epoch = generation;
     setVault((m, keys) => {
       // Capture now: queued writes must never read a later mutable memory object.
@@ -121,7 +133,7 @@ async function unlock(u: User, kek: CryptoKey) {
         const envelope = await encryptVault(s, { mem: snapshot, keys: localKeys }, counter + 1);
         if (epoch !== generation) return false;
         revision = await saveVault(envelope, revision);
-        void syncMemoryDatabase(snapshot);
+        void reportSync(snapshot);
         counter = envelope.n;
         if (epoch !== generation) return false;
         await sealKeys(deviceStore, kek, u.id, localKeys);
