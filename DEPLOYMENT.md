@@ -6,13 +6,13 @@ Repository: https://github.com/Roooted1776/Nodes. Local branch: `codex/redeemed-
 
 - Namecheap BasicDNS already points redeemed.live and www.redeemed.live to the VPS at 2.25.249.204. No registrar transfer or nameserver change is needed.
 - Hostinger VPS 2010795 already runs the isolated `brain-site` application. Its Caddy container serves `/var/www/redeemed` read-only on port 8080 behind the existing Traefik HTTPS route. www redirects to the apex. Certificates are managed by the existing Let's Encrypt resolver.
-- The Brain Supabase project is `iihjcqiiavleyheqzotl`. The account service authenticates each admin request itself. Only setup status and setup with a one-time code are public. The service-role credential stays in the Edge Function environment.
+- The Brain Supabase project is `iihjcqiiavleyheqzotl`. The account service authenticates each admin request itself. Only setup status and open first-admin setup are public. The service-role credential stays in the Edge Function environment.
 - `vaults` holds one encrypted, admin-signed memory/task envelope. `account_keys` holds each account’s sealed memory keys; members can read only their own key envelope. Row-level security allows members to read ciphertext and admins to update it. Revision matching refuses conflicting saves. Readable memory/session tables from the unfinished migration remain closed to client roles.
 - Provider keys are never stored in the database. Remembered keys are encrypted on the owner’s device. A lock forgets decrypted memory, keys, and auth session from the page.
 
 ## Owner setup
 
-Open https://redeemed.live. The owner must enter the existing one-time setup code, choose a passcode, and finish the adult check. Do not put these credentials in chat, Git, screenshots, or handoff notes. No production admin is created by automated tests. Keep an encrypted backup; losing every admin passcode loses access to encrypted memory.
+Open https://redeemed.live. While Brain has no accounts, the owner chooses a passcode and finishes the adult check directly (no invite or setup code required). Do not put these credentials in chat, Git, screenshots, or handoff notes. No production admin is created by automated tests. Keep an encrypted backup; losing every admin passcode loses access to encrypted memory.
 
 ## Build and publish
 
@@ -40,7 +40,7 @@ Production credential setup and authenticated production-browser checks remain o
 - The encrypted-vault migration and account Edge Function version 3 are deployed. Database metadata confirms RLS on both new tables, own-account key reads, admin-only vault updates, and no client grants on the earlier readable memory/session tables. Public self-signup was disabled and saved in the dashboard. No production account or memory has been created.
 - No paid purchase or AI provider call was made. Named-program reviews and Grok Bot’s final decision remain incomplete. The owner subsequently authorized the complete Git commit and push; merges remain owner-controlled.
 
-Final public verification: 2026-10-24, 15:13 America/New_York. The site is reachable at https://redeemed.live. First-admin credential entry remains owner-assisted; the setup code and passcode must never be sent through chat.
+Final public verification: 2026-10-24, 15:13 America/New_York. The site is reachable at https://redeemed.live. First-admin credential entry remains owner-assisted; passcodes must never be sent through chat.
 
 ## Main merge handoff (2026-10-24)
 

@@ -483,7 +483,95 @@ cd ..
 ```
 
 ## 7. Git & Deployment State
-- **Branch**: `automate_github_push` (synced with `main` at `2e87f22`).
+- **Branch**: `main`
 - **Remote Origin**: `https://github.com/Roooted1776/Nodes.git`.
-- **Auto-push Readiness**: Automated push pipeline ready for execution via `./scripts/push-work.sh` or `npm run push`.
+- **Auto-push Readiness**: Automated push pipeline active and verified.
+
+---
+
+# Scrapped Email/Invite Setup Code Removal — 2026-10-25
+
+## 1. Overview & Request
+- **User Directive**: "also remove "invite code" from everything. remeber we scrapped the email idea"
+- **Context & Intent**: Following the decision to scrap the email invitation idea, any concept of an "invite code" or "setup code" during onboarding is eliminated. The user requested complete removal of the setup code from the frontend UI, authentication state store, E2E tests, edge functions, database migrations, and documentation.
+
+## 2. What Changed & Why
+1. **Access Setup Component (`app/src/components/Access.tsx`)**:
+   - Removed the `code` state variable and `<label className="field"><span>Setup code</span>...</label>` input field.
+   - Updated `submit` handler to call `setup({ name, passcode: pass, dob })` directly without a code.
+2. **Auth State Store (`app/src/auth-store.ts`)**:
+   - Removed optional `code?: string` parameter from the `setup` method signature in `AuthStore`.
+   - Removed `code: i.code` payload from the edge function `accounts('setup', ...)` invocation.
+3. **Smoke & E2E Browser Tests (`app/e2e/smoke.spec.ts`)**:
+   - Removed `await page.getByLabel(/^Setup code/).fill('FAKE-TEST-CODE-ONLY');` from the Playwright test flow.
+4. **Unit & Integration UI Tests (`app/test/ui.test.tsx`)**:
+   - Removed query and interaction for `Setup code` from the `dob` test helper.
+5. **Supabase Accounts Function (`supabase/functions/accounts/index.ts`)**:
+   - Removed setup code length and format validations (`b.code`) and hash verification against `claim_setup`.
+   - Switched to open first-admin setup (`claim_open_setup` / `release_open_setup`) ensuring the first visitor creates the admin safely without an invite code.
+6. **Supabase Database Migration (`supabase/migrations/20261025030000_open_first_setup.sql`)**:
+   - Added migration dropping legacy setup code functions (`issue_setup_code`) and tables (`setup_links`).
+   - Created lease-backed `claim_open_setup()` and `release_open_setup()` RPCs.
+7. **Production Build Bundle (`index.html` & `app/dist/index.html`)**:
+   - Recompiled single-file production bundle with updated access form and recalculated SHA-256 CSP script hash.
+8. **Deployment & Supabase Documentation (`DEPLOYMENT.md` & `supabase/README.md`)**:
+   - Updated setup runbooks to reflect that no invite/setup code is required.
+
+## 3. Files Touched
+| File | Type | Changes Made |
+| :--- | :--- | :--- |
+| `app/src/components/Access.tsx` | Source | Removed setup code field and state. |
+| `app/src/auth-store.ts` | Source | Removed `code` parameter from `setup` and API call. |
+| `app/e2e/smoke.spec.ts` | Test | Removed setup code input step in E2E test. |
+| `app/test/ui.test.tsx` | Test | Removed setup code lookup from test helper. |
+| `supabase/functions/accounts/index.ts` | Backend | Removed code validation; uses `claim_open_setup`. |
+| `supabase/migrations/20261025030000_open_first_setup.sql` | Migration | Drops code functions; adds open setup lease. |
+| `app/dist/index.html` | Build artifact | Recompiled bundle. |
+| `index.html` | Build artifact | Root production single-file page. |
+| `DEPLOYMENT.md` | Doc | Removed setup code instructions. |
+| `supabase/README.md` | Doc | Removed setup code instructions. |
+| `HANDOFF.md` | Documentation | This handoff log entry. |
+
+## 4. Checks & Real Results
+1. **Format Check (`npm run format`)**:
+   - Output: `Checked 71 files in 49ms. No fixes applied.`
+2. **Lint Check (`npm run lint`)**:
+   - Output: `Checked 71 files in 49ms. Found 27 warnings` (0 errors).
+3. **Typecheck (`npm run typecheck`)**:
+   - Output: `tsc --noEmit` exited code 0 (0 errors).
+4. **Unit & Integration Tests (`npm test`)**:
+   - Output: `18 passed (18) files, 88 passed (88) tests` in 3.28s.
+5. **Production Build (`npm run build`)**:
+   - Output: `built in 321ms; wrote ../index.html 1593 KB; 1 script(s) pinned by hash`.
+6. **Browser E2E Chromium Check (`npm run e2e`)**:
+   - Output: `1 passed (34.8s)` in headless Chromium.
+
+## 5. Review Sequence Handoff
+1. **Claude (Anthropic)**: Removed all invite/setup code references across UI, store, tests, edge functions, migrations, and docs. Ran all 6 verification checks. (COMPLETED)
+2. **Cursor**: Ready to inspect repository integration and diffs.
+3. **Gemini**: Ready for context cross-checking and UI verification.
+4. **ChatGPT**: Ready for auth flow and schema audit.
+5. **Muse**: Ready for independent integrity audit (RedMed untouched, zero secrets leaked).
+6. **Grok Bot (Lead)**: Final verification of real test results and pass/fail decision.
+
+## 6. How the Next AI Should Check It
+```bash
+# 1. Verify absence of setup code in source files
+git grep -in "setup code" app/src
+
+# 2. Run all app verification checks
+cd app
+npm run format
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run e2e
+```
+
+## 7. Git & Deployment State
+- **Branch**: `main`
+- **Remote Origin**: `https://github.com/Roooted1776/Nodes.git`
+- **Auto-push Readiness**: Clean and ready for push via `./scripts/push-work.sh` or `npm run push`.
+
 
