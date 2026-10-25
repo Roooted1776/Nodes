@@ -9,6 +9,7 @@ import {
   githubToMemoryItems,
   parseRepoInput,
   testGitHubConnection,
+  type GitHubRelease,
   type GitHubRepoInfo,
 } from '../src/lib/github';
 
@@ -346,6 +347,26 @@ describe('GitHub Connector - Memory Items Conversion', () => {
     expect(commitItem).toBeDefined();
     expect(commitItem?.type).toBe('workstream');
     expect(commitItem?.note).toContain('Claude');
+  });
+
+  it('converts GitHub releases into workstream memory items', () => {
+    const releases: GitHubRelease[] = [
+      {
+        tagName: 'v2.4.0',
+        name: 'Brain v2.4.0 Neural Connectors',
+        body: 'Added GitHub repository connector and multi-repo switcher.',
+        htmlUrl: 'https://github.com/Roooted1776/Brain/releases/tag/v2.4.0',
+        publishedAt: '2026-10-25T02:00:00Z',
+        prerelease: false,
+      },
+    ];
+
+    const items = githubToMemoryItems({ repoInfo, releases }, 'Brain');
+    const releaseItem = items.find(it => it.title.includes('v2.4.0'));
+    expect(releaseItem).toBeDefined();
+    expect(releaseItem?.type).toBe('workstream');
+    expect(releaseItem?.note).toContain('Added GitHub repository connector');
+    expect(releaseItem?.sources[0].kind).toBe('github');
   });
 
   it('redacts sensitive tokens in GitHub content', () => {
