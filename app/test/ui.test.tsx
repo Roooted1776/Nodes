@@ -83,8 +83,6 @@ const dob = async (u: ReturnType<typeof userEvent.setup>, d = ADULT) => {
   await u.selectOptions(screen.getByLabelText('Month'), d.m);
   await u.type(screen.getByLabelText('Day'), d.d);
   await u.type(screen.getByLabelText('Year'), d.y);
-  const code = screen.queryByLabelText(/^Setup code/);
-  if (code) await u.type(code, 'fake-test-code-only');
 };
 async function makeAdmin(u: ReturnType<typeof userEvent.setup>) {
   await u.clear(screen.getByLabelText('Name'));

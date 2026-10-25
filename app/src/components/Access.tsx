@@ -41,7 +41,6 @@ export function Setup() {
   const [name, setName] = useState('Owner'),
     [pass, setPass] = useState(''),
     [pass2, setPass2] = useState(''),
-    [code, setCode] = useState(''),
     [dob, setDob] = useState(emptyDob()),
     [local, setLocal] = useState('');
   const blocked = ageBlocked();
@@ -49,7 +48,7 @@ export function Setup() {
     e.preventDefault();
     if (pass !== pass2) return setLocal('The two passcodes do not match.');
     setLocal('');
-    void setup({ name, passcode: pass, dob, code });
+    void setup({ name, passcode: pass, dob });
   };
   return (
     <Shell
@@ -94,11 +93,6 @@ export function Setup() {
               autoComplete="new-password"
               required
             />
-          </label>
-          <label className="field">
-            <span>Setup code</span>
-            <input type="password" value={code} onChange={e => setCode(e.target.value)} autoComplete="off" required />
-            <small>The one-time code given to the owner.</small>
           </label>
           <AgeFields value={dob} onChange={setDob} />
           {(local || error) && (

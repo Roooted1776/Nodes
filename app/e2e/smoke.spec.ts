@@ -29,7 +29,6 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   await page.getByLabel('Month').selectOption({ label: 'January' });
   await page.getByLabel('Day').fill('1');
   await page.getByLabel('Year').fill('1990');
-  await page.getByLabel(/^Setup code/).fill('FAKE-TEST-CODE-ONLY');
   await page.getByRole('button', { name: 'Create admin' }).click();
 
   const stage = page.getByRole('main', { name: 'Brain view' });

@@ -1,5 +1,5 @@
 // Brain accounts: the only way to create, change or remove a Brain account.
-// Public sign-up is never used. The first admin needs the one-time setup code; after that only admins act.
+// Public sign-up is never used. While Brain has no accounts, the first visitor creates the admin; after that only admins act.
 // Passwords arrive already stretched by the browser (PBKDF2 of the passcode), so the passcode itself never leaves it.
 // Dates of birth are checked here (18+) and never stored.
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -123,11 +123,9 @@ async function handle(req: Request) {
     case 'setup': {
       const name = checkName(b.name), password = checkPass(b.password);
       checkAdult(b.dob);
-      if (typeof b.code !== 'string' || b.code.replace(/[\s-]/g, '').length < 16) throw new Refuse('Enter the setup code.', 403);
       const wrap = checkWrap(b.wrap), envelope = checkEnvelope(b.envelope);
-      const hash = await sha256(b.code.replace(/[\s-]/g, '').toUpperCase()); // typed with or without dashes
-      const { data: ok } = await db.rpc('claim_setup', { code_sha256: hash });
-      if (ok !== true) throw new Refuse('That setup code is wrong or already used.', 403);
+      const { data: ok } = await db.rpc('claim_open_setup');
+      if (ok !== true) throw new Refuse('Brain is already set up. Sign in instead.', 409);
       let u;
       try {
         u = await makeUser(name, password, 'admin', wrap);
@@ -137,7 +135,7 @@ async function handle(req: Request) {
           throw new Refuse('Could not create encrypted memory.', 409);
         }
       } catch (e) {
-        await db.rpc('restore_setup', { code_sha256: hash }); // the code stays usable if the account could not be made
+        await db.rpc('release_open_setup');
         throw e;
       }
       await audit(u, 'Created the first admin');

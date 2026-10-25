@@ -37,7 +37,7 @@ interface AuthState {
   lastActive: number;
   ready: boolean;
   init(): Promise<void>;
-  setup(i: { name: string; passcode: string; dob: Dob; code?: string }): Promise<boolean>;
+  setup(i: { name: string; passcode: string; dob: Dob }): Promise<boolean>;
   login(name: string, pass: string): Promise<boolean>;
   logout(why?: string): void;
   addUser(i: { name: string; role: Role; passcode: string; dob: Dob }): Promise<boolean>;
@@ -286,7 +286,6 @@ export const useAuth = create<AuthState>()((set, get) => {
           name,
           password,
           dob: i.dob,
-          code: i.code,
           wrap: await sealFor(kek, sec, true),
           envelope: await encryptVault(sec, { mem: blankMem() }, 1),
         });
