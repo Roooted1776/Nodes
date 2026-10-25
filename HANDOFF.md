@@ -14,6 +14,24 @@
 
 ---
 
+# Handoff from Claude — Oct 25, 2026: constant memory sync + restore from database
+
+## What changed
+- `app/src/auth-store.ts` `startMirror`: while an admin is unlocked, the database copy updates 1.5s after any memory change, retries on failure with a growing wait (5s up to 60s), re-checks every 30s, and pushes when the tab is hidden.
+- `app/src/lib/cloud.ts`: `syncMemoryDatabase` now sends only rows that changed (`resetMirror` clears this on lock). New `loadMemoryDatabase` reads the tables back.
+- Restore: if an admin unlocks and the vault memory is empty, memory is rebuilt from the database tables (through `sanitizeMem`), then written back to the encrypted vault.
+- Tests: `app/test/sync.test.ts` (changed-only sends, round trip), fake in `app/test/ui.test.tsx` extended.
+
+## Limits to know
+- The mirror never deletes rows, and restore only runs when the vault is empty, so deletions do not come back and a non-empty vault is never overwritten.
+- Database rows are readable by admins and members (RLS); the encrypted vault stays the main copy.
+
+## Unfinished
+- Live site deploy needs the Hostinger connector reconnected (BUILD_URL/BUILD_SHA256 update for the new main commit).
+- Admin reset was approved by Owner but the Supabase delete is waiting on Owner's approval prompt.
+
+---
+
 # Handoff from Claude — Oct 25, 2026: memory database save made honest
 
 ## What changed

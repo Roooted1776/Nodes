@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { syncMemoryDatabase, type Db } from '../src/lib/cloud';
-import { blankMem as blank, mkEntry } from '../src/lib/memory';
+import { session } from './fixtures';
+import { loadMemoryDatabase, resetMirror, syncMemoryDatabase, type Db } from '../src/lib/cloud';
+import { blankMem as blank, mkEntry, sanitizeMem } from '../src/lib/memory';
 
 type Call = { name: string; args: Record<string, unknown> };
 function fake(failOn = '') {
   const calls: Call[] = [];
   const d = {
     from: (t: string) => ({
-      upsert: async (row: Record<string, unknown>) => (calls.push({ name: t, args: row }), { error: null }),
+      upsert: async (row: Record<string, unknown>) => {
+        calls.push({ name: t, args: row });
+        return { error: null };
+      },
     }),
     rpc: async (name: string, args: Record<string, unknown>) => {
       calls.push({ name, args });
@@ -39,5 +43,58 @@ describe('memory database sync', () => {
     const r = await syncMemoryDatabase(m, d);
     expect(r.failed).toBe(1);
     expect(r.firstError).toBe('denied');
+  });
+
+  it('sends only what changed, and a backup read returns the same memory', async () => {
+    resetMirror();
+    const m = blank();
+    m.entries.push(
+      mkEntry(m, { key: 'note:a', type: 'concept', title: 'Alpha', note: 'first', manual: true, project: 'Brain' }, 5),
+    );
+    m.sessions.push(session('s1'));
+    const rows: { memories: Record<string, unknown>[]; sessions: Record<string, unknown>[] } = {
+      memories: [],
+      sessions: [],
+    };
+    let sends = 0;
+    const d = {
+      from: (t: string) => ({
+        upsert: async () => ({ error: null }),
+        select: () => {
+          const q = {
+            eq: () => q,
+            order: () => q,
+            limit: async () => ({ data: rows[t as 'memories' | 'sessions'], error: null }),
+          };
+          return q;
+        },
+      }),
+      rpc: async (name: string, a: Record<string, unknown>) => {
+        sends++;
+        if (name === 'upsert_memory')
+          rows.memories.push({
+            id: a.p_id,
+            key: a.p_key,
+            type: a.p_type,
+            title: a.p_title,
+            note: a.p_note,
+            project: a.p_project,
+            body: a.p_body,
+          });
+        else rows.sessions.push({ body: a.p_body });
+        return { error: null };
+      },
+    } as unknown as Db;
+    expect((await syncMemoryDatabase(m, d)).failed).toBe(0);
+    expect(sends).toBe(2);
+    await syncMemoryDatabase(m, d);
+    expect(sends).toBe(2); // nothing changed, nothing sent
+    m.entries[0].note = 'changed';
+    await syncMemoryDatabase(m, d);
+    expect(sends).toBe(3);
+
+    const back = sanitizeMem(await loadMemoryDatabase(d));
+    expect(back?.entries.map(e => e.title)).toEqual(['Alpha']);
+    expect(back?.sessions.map(x => x.q)).toEqual([session('s1').q]);
   });
 });

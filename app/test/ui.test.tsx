@@ -65,7 +65,13 @@ vi.mock('../src/lib/cloud', () => ({
     return ++server.rev;
   },
   async writeAudit() {},
-  async syncMemoryDatabase() {},
+  async syncMemoryDatabase() {
+    return { saved: 0, failed: 0, firstError: '' };
+  },
+  async loadMemoryDatabase() {
+    return { entries: [], sessions: [] };
+  },
+  resetMirror() {},
   async readAudit() {
     return [];
   },

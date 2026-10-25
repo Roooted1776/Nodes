@@ -8,10 +8,12 @@ import {
   accountWrap,
   loadVault,
   saveVault,
+  loadMemoryDatabase,
+  resetMirror,
   syncMemoryDatabase,
   writeAudit,
 } from './lib/cloud';
-import { blankMem, sanitizeMem, type Mem } from './lib/memory';
+import { blankMem, sanitizeMem } from './lib/memory';
 import { mirror, openChannel, publish, type Hub } from './lib/share';
 import { VaultError, decryptVault, encryptVault, newSecrets, openFor, sealFor, type Secrets } from './lib/vault';
 import { openKeys, sealKeys } from './lib/keystore';
@@ -56,17 +58,62 @@ let secrets: Secrets | null = null,
   revision = 0;
 let chain: Promise<unknown> = Promise.resolve();
 let generation = 0;
-/** Mirror memory into the database and say so out loud if any row did not save. */
-async function reportSync(m: Mem) {
-  try {
-    const r = await syncMemoryDatabase(m);
-    if (r.failed)
-      useStore.setState({ status: `Memory: ${r.failed} item(s) not saved to the database (${r.firstError}).` });
-  } catch (e) {
-    useStore.setState({
-      status: `Memory could not reach the database: ${String((e as Error)?.message || e).slice(0, 120)}`,
-    });
-  }
+/**
+ * Keep the database copy of memory current for as long as an admin is unlocked.
+ * A moment after any change it sends only the rows that changed. If something fails it says so,
+ * tries again with a growing wait, and a 30 second check catches anything left over.
+ */
+function startMirror() {
+  let timer: ReturnType<typeof setTimeout> | undefined,
+    running = false,
+    dirty = true,
+    wait = 5000;
+  const run = async () => {
+    if (running) {
+      dirty = true;
+      return;
+    }
+    running = true;
+    dirty = false;
+    let failed = 0;
+    try {
+      const r = await syncMemoryDatabase(useStore.getState().mem);
+      failed = r.failed;
+      if (r.failed)
+        useStore.setState({ status: `Memory: ${r.failed} item(s) not saved to the database (${r.firstError}).` });
+    } catch (e) {
+      failed = 1;
+      useStore.setState({
+        status: `Memory could not reach the database: ${String((e as Error)?.message || e).slice(0, 120)}`,
+      });
+    }
+    running = false;
+    if (failed) {
+      dirty = true;
+      schedule(wait);
+      wait = Math.min(wait * 2, 60_000);
+    } else wait = 5000;
+  };
+  const schedule = (ms: number) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => void run(), ms);
+  };
+  const off = useStore.subscribe((st, prev) => {
+    if (st.rev !== prev.rev && st.role === 'admin') {
+      dirty = true;
+      schedule(1500);
+    }
+  });
+  const tick = setInterval(() => dirty && !running && void run(), 30_000);
+  const onHide = () => document.hidden && dirty && void run(); // push anything pending before the tab goes away
+  document.addEventListener('visibilitychange', onHide);
+  schedule(0);
+  stop.push(
+    off,
+    () => clearInterval(tick),
+    () => clearTimeout(timer),
+    () => document.removeEventListener('visibilitychange', onHide),
+  );
 }
 async function unlock(u: User, kek: CryptoKey) {
   secrets = await openFor(kek, await accountWrap(u.id));
@@ -77,8 +124,21 @@ async function unlock(u: User, kek: CryptoKey) {
     keys?: Partial<Record<ProviderId, string>>;
     deviceKeys?: string;
   };
-  const mem = sanitizeMem(data.mem);
+  let mem = sanitizeMem(data.mem);
   if (!mem) throw new VaultError('The encrypted memory has an invalid format.', 'format');
+  // The vault came back empty (wiped or new). The database copy is the backup: rebuild memory from it.
+  let restored = 0;
+  if (u.role === 'admin' && !mem.entries.length && !mem.sessions.length) {
+    try {
+      const back = sanitizeMem(await loadMemoryDatabase());
+      if (back && (back.entries.length || back.sessions.length)) {
+        mem = back;
+        restored = back.entries.length + back.sessions.length;
+      }
+    } catch {
+      /* the database copy is only a backup; an empty memory is still a valid start */
+    }
+  }
   counter = remote.envelope.n;
   revision = remote.rev;
   chain = Promise.resolve();
@@ -122,7 +182,6 @@ async function unlock(u: User, kek: CryptoKey) {
   }));
   setAuditSink((who, what) => writeAudit(u.id, who, what));
   if (s.priv) {
-    void reportSync(mem);
     const epoch = generation;
     setVault((m, keys) => {
       // Capture now: queued writes must never read a later mutable memory object.
@@ -133,7 +192,6 @@ async function unlock(u: User, kek: CryptoKey) {
         const envelope = await encryptVault(s, { mem: snapshot, keys: localKeys }, counter + 1);
         if (epoch !== generation) return false;
         revision = await saveVault(envelope, revision);
-        void reportSync(snapshot);
         counter = envelope.n;
         if (epoch !== generation) return false;
         await sealKeys(deviceStore, kek, u.id, localKeys);
@@ -148,6 +206,10 @@ async function unlock(u: User, kek: CryptoKey) {
     });
   } else setVault(null);
   enter(u);
+  if (restored) {
+    useStore.setState({ status: `Memory restored from the database backup (${restored} items).` });
+    useStore.getState().commit(); // write it back into the encrypted vault
+  }
 }
 // ---------- while signed in: live sharing, idle lock, panic lock, privacy blur ----------
 let stop: (() => void)[] = [];
@@ -204,6 +266,7 @@ function enter(u: User) {
     () => document.removeEventListener('visibilitychange', onVis),
     () => document.body.classList.remove('veiled'),
   );
+  if (u.role === 'admin') startMirror();
   const timer = setInterval(() => {
     if (useStore.getState().busy)
       useAuth.setState({ lastActive: Date.now() }); // a running task keeps the session open
@@ -218,6 +281,7 @@ function leave(keepKey = false) {
   stop = [];
   if (keepKey) return;
   secrets = null;
+  resetMirror();
   setAuditSink(null);
   setVault(null);
   if (useStore.getState().busy) useStore.getState().stop(); // a running task is cancelled on lock
