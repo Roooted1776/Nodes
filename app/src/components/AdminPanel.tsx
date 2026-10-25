@@ -459,8 +459,12 @@ function Accounts() {
   return (
     <Card title="Accounts" hint="Create logins connected to the database. Admins or Viewers.">
       <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-        <p className="pill ok" style={{ margin: 0 }}>Database connected</p>
-        <span className="mini">{db.users.length} login{db.users.length === 1 ? '' : 's'}</span>
+        <p className="pill ok" style={{ margin: 0 }}>
+          Database connected
+        </p>
+        <span className="mini">
+          {db.users.length} login{db.users.length === 1 ? '' : 's'}
+        </span>
       </div>
       <form
         className="addnote"
