@@ -26,4 +26,4 @@ Create or update `HANDOFF.md` in the project root with these exact sections:
    - `npm run build` (confirm single-file bundle generation)
    - `npm run e2e` (Chromium browser test duration)
 5. **How the Next AI Should Check It**: Exact CLI reproduction commands.
-6. **Git State**: Confirm working tree state; enforce the standing rule: NEVER `git push`.
+6. **Git State**: Confirm working tree state and verified push to main per Owner's Oct 24 auto-push rule.
