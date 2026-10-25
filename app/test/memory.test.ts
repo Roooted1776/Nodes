@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { blankMem, loadMem, sanitizeMem, saveMem } from '../src/lib/memory';
+import {
+  blankMem,
+  ensureProjectNode,
+  findMostWorkedNode,
+  loadMem,
+  sanitizeMem,
+  saveImportedListAsTask,
+  saveMem,
+} from '../src/lib/memory';
 import { fileMemories } from '../src/lib/ai-memory';
 import { tally } from '../src/lib/learn';
 import { redact } from '../src/lib/redact';
@@ -139,5 +147,103 @@ describe('memory storage', () => {
     correctEntry(m, e2.id, { note: 'Work completed.', status: 'stale' }, 3000);
     expect(e2.status).toBe('stale');
     expect(e2.note).toBe('Work completed.');
+  });
+
+  it('findMostWorkedNode returns project node when no sessions exist', () => {
+    const m = blankMem();
+    const projNode = ensureProjectNode(m, 'Robotics');
+    const mostWorked = findMostWorkedNode(m, 'Robotics');
+    expect(mostWorked.id).toBe(projNode.id);
+  });
+
+  it('findMostWorkedNode finds the node with the highest agent work score', () => {
+    const m = blankMem();
+    const projNode = ensureProjectNode(m, 'Robotics');
+    const concept1 = {
+      id: 'c1',
+      key: 'concept:vision',
+      type: 'concept' as const,
+      title: 'Computer Vision',
+      note: 'Camera processing',
+      sources: [],
+      links: [projNode.id],
+      strength: 2,
+      status: 'fresh' as const,
+      created: 1,
+      seen: 1,
+      corrected: false,
+      skill: false,
+      prog: null,
+      corpusId: null,
+      kws: ['robotics', 'vision'],
+      manual: false,
+    };
+    const concept2 = {
+      id: 'c2',
+      key: 'concept:actuators',
+      type: 'concept' as const,
+      title: 'Actuators',
+      note: 'Motor control',
+      sources: [],
+      links: [projNode.id],
+      strength: 1,
+      status: 'fresh' as const,
+      created: 1,
+      seen: 1,
+      corrected: false,
+      skill: false,
+      prog: null,
+      corpusId: null,
+      kws: ['robotics', 'actuators'],
+      manual: false,
+    };
+    m.entries.push(concept1, concept2);
+
+    // Add session where agents worked intensively on concept1
+    m.sessions.push({
+      id: 's1',
+      ts: 1000,
+      q: 'Calibrate computer vision cameras',
+      project: 'Robotics',
+      projectId: concept1.id,
+      kws: ['vision'],
+      accepted: [],
+      uncovered: [],
+      used: [concept1.id],
+      learned: true,
+      flow: [['gemini', 'grokbot', 350]],
+      msgs: [{ from: 'gemini', text: 'Vision calibrated.', tag: 'live' }],
+      cover: { gemini: { s: 'done' }, grokbot: { s: 'done' } },
+    });
+
+    const targetNode = findMostWorkedNode(m, 'Robotics');
+    expect(targetNode.id).toBe(concept1.id);
+    expect(targetNode.title).toBe('Computer Vision');
+  });
+
+  it('saveImportedListAsTask saves list under tasks under project and most-worked node', () => {
+    const m = blankMem();
+    ensureProjectNode(m, 'WebDev');
+
+    const items = [
+      { title: 'Responsive Layout', note: 'CSS grid and flexbox', type: 'concept' as const },
+      { title: 'Navigation Bug', note: 'Fixed mobile drawer', type: 'entity' as const },
+    ];
+
+    const sess = saveImportedListAsTask(m, items, 'WebDev', {
+      sourceKind: 'github',
+      repo: 'Roooted1776/WebDev',
+      summary: '1 concept, 1 entity',
+    });
+
+    expect(m.sessions).toHaveLength(1);
+    expect(sess.project).toBe('WebDev');
+    expect(sess.q).toContain('GitHub: Roooted1776/WebDev');
+    expect(sess.cover?.cursor?.s).toBe('done');
+    expect(sess.cover?.grokbot?.s).toBe('done');
+    expect(sess.msgs).toHaveLength(3);
+    expect(sess.msgs[0].from).toBe('cursor');
+    expect(sess.msgs[1].from).toBe('codex');
+    expect(sess.msgs[2].from).toBe('grokbot');
   });
 });

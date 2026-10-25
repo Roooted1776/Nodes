@@ -54,7 +54,17 @@ export default function AdminPanel() {
     [restore, setRestore] = useState(''),
     [phrase, setPhrase] = useState(''),
     [msg, setMsg] = useState(''),
-    [sure, setSure] = useState(false);
+    [sure, setSure] = useState(false),
+    [ghRepo, setGhRepo] = useState(s.githubRepo),
+    [ghToken, setGhToken] = useState(s.githubToken),
+    [ghTesting, setGhTesting] = useState(false),
+    [ghSyncing, setGhSyncing] = useState(false),
+    [ghResult, setGhResult] = useState('');
+
+  useEffect(() => {
+    setGhRepo(s.githubRepo);
+    setGhToken(s.githubToken);
+  }, [s.githubRepo, s.githubToken]);
 
   useEffect(() => {
     setKey(s.keys[live.provider] || '');
@@ -222,6 +232,108 @@ export default function AdminPanel() {
                 </div>
               );
             })}
+          </div>
+        </Card>
+        <Card
+          title="GitHub Connector"
+          hint="Connect GitHub repositories to import documentation, README files, issues, and recent commits into Brain's neural graph."
+          wide
+        >
+          <div className="gh-connector-box">
+            <div className="gh-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <label className="mini-field" style={{ flex: '1 1 240px' }}>
+                <span>Repository (owner/repo)</span>
+                <input
+                  type="text"
+                  value={ghRepo}
+                  placeholder="e.g. Roooted1776/Brain"
+                  onChange={e => {
+                    setGhRepo(e.target.value);
+                    s.setGithubConfig({ repo: e.target.value });
+                  }}
+                  aria-label="GitHub Repository"
+                />
+              </label>
+              <label className="mini-field" style={{ flex: '2 1 320px' }}>
+                <span>Personal Access Token</span>
+                <input
+                  type="password"
+                  value={ghToken}
+                  placeholder="Optional for public repos (ghp_... or github_pat_...)"
+                  autoComplete="off"
+                  onChange={e => {
+                    setGhToken(e.target.value);
+                    s.setGithubConfig({ token: e.target.value });
+                  }}
+                  aria-label="GitHub Personal Access Token"
+                />
+              </label>
+            </div>
+            <div className="row" style={{ marginTop: '8px', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                type="button"
+                className="sm"
+                disabled={ghTesting || !ghRepo.trim()}
+                onClick={async () => {
+                  setGhTesting(true);
+                  try {
+                    const r = await s.testGithub(ghRepo, ghToken);
+                    setGhResult(r.message);
+                  } catch (e: unknown) {
+                    const errMsg = e instanceof Error ? e.message : String(e);
+                    setGhResult(errMsg || 'Connection check failed.');
+                  } finally {
+                    setGhTesting(false);
+                  }
+                }}
+              >
+                {ghTesting ? 'Testing…' : 'Test Connection'}
+              </button>
+              <button
+                type="button"
+                className="sm primary"
+                disabled={ghSyncing || !ghRepo.trim()}
+                onClick={async () => {
+                  setGhSyncing(true);
+                  try {
+                    const res = await s.syncGithub();
+                    setGhResult(`✓ Synced ${res.total} items (${res.added} new, ${res.updated} updated).`);
+                  } catch (e: unknown) {
+                    const errMsg = e instanceof Error ? e.message : String(e);
+                    setGhResult(`Sync failed: ${errMsg}`);
+                  } finally {
+                    setGhSyncing(false);
+                  }
+                }}
+              >
+                {ghSyncing ? 'Syncing…' : 'Sync to Brain'}
+              </button>
+              <button
+                type="button"
+                className="sm"
+                disabled={!ghToken && !ghRepo}
+                onClick={() => {
+                  setGhToken('');
+                  s.setGithubConfig({ token: '' });
+                  setGhResult('Token cleared.');
+                }}
+              >
+                Clear Token
+              </button>
+              <a
+                className="btnlink sm"
+                href="https://github.com/settings/tokens/new?scopes=repo&description=Brain+Connector"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Get GitHub token ↗
+              </a>
+              {ghResult && (
+                <span className="mini" style={{ color: 'var(--txt)' }}>
+                  {ghResult}
+                </span>
+              )}
+            </div>
           </div>
         </Card>
         <Card title="Limits" hint="Per page load. Reload to reset.">
