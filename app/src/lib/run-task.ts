@@ -8,7 +8,7 @@ import { chainFor, runChain } from './chain';
 import { tally } from './learn';
 import { AI_KEY, MEMORY_SYSTEM, fileMemories, memoryPrompt, parseMemories } from './ai-memory';
 import { ensureProjectNode, type Cover, type Flow, type Msg, type Session } from './memory';
-import { PROV, PROVIDERS, ProviderError, callModel, type ProviderId } from './providers';
+import { PROV, PROVIDERS, ProviderError, callModel, isLimitError, type ProviderId } from './providers';
 import { redact } from './redact';
 import { contextBlock, relevant } from './retrieve';
 import { clip } from './text';
@@ -77,6 +77,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
     draft: null,
     timing: {},
     flow: [],
+    ranOn: {},
     stages: Object.fromEntries(LIVE_ORDER.map(b => [b, bots.includes(b) ? 'waiting' : 'skipped'])),
     notes: Object.fromEntries(
       LIVE_ORDER.filter(b => !bots.includes(b)).map(b => [
@@ -128,8 +129,13 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
           set({ draft: { from: bot, text: clean(t) } });
         }
       : undefined;
-    const botProv = bot && (AGENT[bot]?.provider as ProviderId | undefined);
-    const activeProv = botProv && st.keys[botProv] && !st.dead[botProv] ? botProv : pv;
+    // the bot's own company if there is a key for it, else its free service, else the main provider
+    const usable = (p?: string): p is ProviderId =>
+      !!p && p in PROV && !!st.keys[p as ProviderId] && !st.dead[p as ProviderId];
+    const own = bot ? AGENT[bot]?.provider : undefined,
+      free = bot ? AGENT[bot]?.free : undefined;
+    const activeProv: ProviderId = usable(own) ? own : usable(free) ? free : pv;
+    if (bot) set(x => ({ ranOn: { ...x.ranOn, [bot]: activeProv } }));
     const activeKey = st.keys[activeProv] || st.keys[pv] || '';
     const activeModel = st.live.models[activeProv] || PROV[activeProv].model;
     try {
@@ -143,10 +149,15 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
         signal: ctl.signal,
         onDelta,
       });
-      set(x => ({ tin: x.tin + res.tin, tout: x.tout + res.tout }));
+      set(x => ({
+        tin: x.tin + res.tin,
+        tout: x.tout + res.tout,
+        ...(bot && x.limited.includes(bot) ? { limited: x.limited.filter(b => b !== bot) } : {}),
+      }));
       return res;
     } catch (e) {
       if (e instanceof ProviderError && e.rejected) set(x => ({ dead: { ...x.dead, [activeProv]: true } }));
+      if (bot && isLimitError(e)) set(x => ({ limited: x.limited.includes(bot) ? x.limited : [...x.limited, bot] }));
       throw e;
     } finally {
       ctls.delete(ctl);

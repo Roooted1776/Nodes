@@ -52,6 +52,17 @@ export const KEY_GUIDE: Record<ProviderId, KeyGuide> = {
       'Add credits, or calls are refused',
     ],
   },
+  groq: {
+    site: 'GroqCloud',
+    url: 'https://console.groq.com/keys',
+    prefix: 'gsk_',
+    steps: [
+      'Sign in at console.groq.com (free, no card)',
+      'Open API Keys and press Create API Key',
+      'Copy the key. It is shown only once',
+      'The free plan has daily limits; nothing is charged',
+    ],
+  },
 };
 
 /** Which provider a pasted key most likely belongs to, from its prefix. */
@@ -59,6 +70,7 @@ export function guessProvider(key: string): ProviderId | null {
   const k = key.trim();
   if (k.startsWith('sk-ant-')) return 'anthropic';
   if (k.startsWith('xai-')) return 'xai';
+  if (k.startsWith('gsk_')) return 'groq';
   if (k.startsWith('AIza')) return 'google';
   if (k.startsWith('sk-')) return 'openai';
   return null;
