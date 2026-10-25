@@ -85,10 +85,10 @@ export default function KeyGuide({ wide }: { wide?: boolean }) {
           className="primary"
           disabled={!key.trim() || busy}
           onClick={() => {
-            setKey(key);
+            setKey(key, live.provider);
             setK('');
             setTested(true);
-            void test();
+            void test(live.provider);
           }}
         >
           Save and test

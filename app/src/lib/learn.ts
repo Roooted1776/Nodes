@@ -104,7 +104,7 @@ export function addNote(m: Mem, o: { type: EntryType; title: string; note: strin
     note = redact(o.note.trim()).text.slice(0, 600);
   if (!title) return null;
   const key = `note:${o.type}:${title.toLowerCase()}`;
-  if (byKey(m, key) || m.entries.length >= 400) return null;
+  if (byKey(m, key) || m.entries.length >= MAX_ENTRIES) return null;
   const e = mkEntry(
     m,
     {

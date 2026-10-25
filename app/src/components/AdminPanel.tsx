@@ -11,6 +11,7 @@ import { AGENTS } from '../data/team';
 import { useMem, useStore } from '../store';
 import { AgeFields, emptyDob } from './AgeFields';
 import KeyGuide from './KeyGuide';
+import { downloadFile } from '../lib/file-import';
 
 /** One small box: a short title, one line of help, then its controls. */
 function Card({
@@ -349,6 +350,37 @@ export default function AdminPanel() {
             </button>
             <button
               type="button"
+              disabled={phrase.length < 10}
+              onClick={() => {
+                void s
+                  .backup(phrase)
+                  .then(t => downloadFile(`brain-backup-${new Date().toISOString().slice(0, 10)}.json`, t))
+                  .then(
+                    () => setMsg('Encrypted backup downloaded.'),
+                    e => setMsg(e?.message || 'Backup failed.'),
+                  );
+              }}
+            >
+              Download file
+            </button>
+            <label className="btn-file">
+              Load file
+              <input
+                type="file"
+                accept=".json,.txt"
+                style={{ display: 'none' }}
+                onChange={async e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const text = await file.text();
+                  setRestore(text);
+                  setMsg(`Loaded backup file (${(text.length / 1024).toFixed(1)} KB)`);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+            <button
+              type="button"
               disabled={!restore.trim() || !phrase}
               onClick={() => {
                 void s.restore(restore, phrase).then(setMsg);
@@ -361,7 +393,7 @@ export default function AdminPanel() {
             rows={2}
             value={restore}
             onChange={e => setRestore(e.target.value)}
-            placeholder="Paste a backup to restore"
+            placeholder="Paste a backup or load file to restore"
             aria-label="Backup text"
           />
           <p className="mini">{msg || (s.storageOk ? '' : 'This browser is blocking storage.')}</p>

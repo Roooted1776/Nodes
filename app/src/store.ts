@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AgentId } from './data/team';
+import { AGENT, type AgentId } from './data/team';
 import { addNote, correctEntry, deleteEntry } from './lib/learn';
 import {
   blankMem,
@@ -19,6 +19,7 @@ import { MODEL_RE, PROV, PROVIDERS, ProviderError, callModel, type ProviderId, R
 import { redact } from './lib/redact';
 import { transitMs } from './lib/geometry';
 import { NOT_ADMIN, runTask } from './lib/run-task';
+import { importMemoryItems, type RawMemoryItem } from './lib/file-import';
 
 const LKEY = 'brain.live.v1';
 /** Saves memory and remembered keys into the encrypted vault. Set by the sign-in code while an admin is unlocked. */
@@ -101,6 +102,7 @@ export interface State {
   stop(): void;
   testProvider(provider?: ProviderId): Promise<void>;
   note(o: { type: EntryType; title: string; note: string }): string | null;
+  importItems(items: RawMemoryItem[], defaultProject?: string): { added: number; updated: number; total: number };
   correct(id: string, fix: { title?: string; note: string }): void;
   remove(id: string): void;
   setSetting(p: Partial<Mem['settings']>): void;
@@ -241,6 +243,7 @@ export const useStore = create<State>()((set, get) => {
     timing: {},
     flow: [],
     inactiveBots: [],
+    autoUpdateBots: true,
     activeProject: 'Brain',
     setActiveProject: p => set({ activeProject: p.trim() || 'Brain' }),
 
@@ -279,31 +282,54 @@ export const useStore = create<State>()((set, get) => {
         on: true,
       }; /* Brain only uses real AI (Owner, Oct 2026): there is no off switch */
       if (p.provider && p.provider !== get().live.provider) {
-        set({ keys: {}, dead: {} });
+        set({ dead: {} });
       }
       set({ live });
       saveLive(live, get().keys);
       if ('remember' in p || p.provider) get().commit();
     },
-    setKey(k) {
+    setKey(k, prov) {
       if (!admin()) {
         set({ status: NOT_ADMIN });
         return;
       }
-      const keys = { [get().live.provider]: k.trim().slice(0, 300) };
-      set({ keys, dead: {} });
+      const p = prov || get().live.provider;
+      const val = k.trim().slice(0, 300);
+      const keys = { ...get().keys };
+      if (val) {
+        keys[p] = val;
+      } else {
+        delete keys[p];
+      }
+      const dead = { ...get().dead };
+      delete dead[p];
+      set(s => ({
+        keys,
+        dead,
+        ...(s.autoUpdateBots && val ? { inactiveBots: s.inactiveBots.filter(b => AGENT[b]?.provider !== p) } : {}),
+      }));
       saveLive(get().live, keys);
       if (get().live.remember) get().commit();
     },
-    forgetKey() {
+    forgetKey(prov) {
       if (!admin()) {
         set({ status: NOT_ADMIN });
         return;
       }
-      set({ keys: {} });
-      saveLive({ ...get().live, remember: false }, {});
-      set(s => ({ live: { ...s.live, remember: false } }));
-      get().commit();
+      if (prov) {
+        const keys = { ...get().keys };
+        delete keys[prov];
+        const dead = { ...get().dead };
+        delete dead[prov];
+        set({ keys, dead });
+        saveLive(get().live, keys);
+        get().commit();
+      } else {
+        set({ keys: {}, dead: {} });
+        saveLive({ ...get().live, remember: false }, {});
+        set(s => ({ live: { ...s.live, remember: false } }));
+        get().commit();
+      }
     },
 
     async send(raw) {
@@ -318,22 +344,22 @@ export const useStore = create<State>()((set, get) => {
       ctls.forEach(c => c.abort());
       ctls.clear();
     },
-    async testProvider() {
+    async testProvider(prov) {
       if (!admin()) {
         set({ status: NOT_ADMIN });
         return;
       }
       const s = get(),
-        pv = s.live.provider,
+        pv = prov || s.live.provider,
         key = s.keys[pv];
-      if (!key) return set({ status: 'Add a key first.' });
+      if (!key) return set({ status: `Add a ${PROV[pv].label} key first.` });
       if (s.calls >= s.live.callCap) return set({ status: 'The call budget for this page load is used.' });
-      set({ calls: s.calls + 1, status: 'Testing… (uses one call)' });
+      set({ calls: s.calls + 1, status: `Testing ${PROV[pv].label}… (uses one call)` });
       try {
         const r = await callModel({
           provider: pv,
           key,
-          model: s.live.models[pv],
+          model: s.live.models[pv] || PROV[pv].model,
           system: 'Reply with the single word OK.',
           user: 'Connection test.',
           maxTokens: 20,
@@ -341,11 +367,12 @@ export const useStore = create<State>()((set, get) => {
         set(x => ({
           tin: x.tin + r.tin,
           tout: x.tout + r.tout,
-          status: `Connected to ${PROV[pv].label} · ${s.live.models[pv]}. Reply: ${clean(r.text).slice(0, 40) || '(empty)'}`,
+          status: `Connected to ${PROV[pv].label} · ${s.live.models[pv] || PROV[pv].model}. Reply: ${clean(r.text).slice(0, 40) || '(empty)'}`,
+          ...(x.autoUpdateBots ? { inactiveBots: x.inactiveBots.filter(b => AGENT[b]?.provider !== pv) } : {}),
         }));
       } catch (e: any) {
         if (e instanceof ProviderError && e.rejected) set(x => ({ dead: { ...x.dead, [pv]: true } }));
-        set({ status: 'Test failed: ' + clean(e.message) });
+        set({ status: `Test failed for ${PROV[pv].label}: ` + clean(e.message) });
       }
     },
     note(o) {
@@ -358,6 +385,22 @@ export const useStore = create<State>()((set, get) => {
         id = addNote(m, o, Date.now())?.id ?? null;
       });
       return id;
+    },
+    importItems(items, defaultProject) {
+      if (!admin()) {
+        set({ status: NOT_ADMIN });
+        return { added: 0, updated: 0, total: 0 };
+      }
+      const proj = (defaultProject || get().activeProject || 'Brain').trim();
+      let result = { added: 0, updated: 0, total: 0 };
+      get().commit(m => {
+        result = importMemoryItems(m, items, proj, Date.now());
+      });
+      set({
+        status: `Imported ${result.added} new and updated ${result.updated} memories into project "${proj}".`,
+      });
+      if (ls) audit(ls, get().who, `Imported ${result.total} memory items into project "${proj}"`);
+      return result;
     },
     correct(id, fix) {
       if (!admin()) {
@@ -438,24 +481,39 @@ export const useStore = create<State>()((set, get) => {
     viewSession(id) {
       set({ viewing: id ? get().mem.sessions.find(x => x.id === id) || null : null, tab: 'chat' });
     },
-    autoUpdateBots: true,
-    setAutoUpdateBots(auto) {
-      set({ autoUpdateBots: auto });
-    },
-    updateAllBots() {
-      set({ status: 'All bot stages and credits synchronized.' });
-    },
     setBotActive(id, active) {
       set(s => ({
-        inactiveBots: active ? s.inactiveBots.filter(b => b !== id) : Array.from(new Set([...s.inactiveBots, id])),
+        inactiveBots: active
+          ? s.inactiveBots.filter(b => b !== id)
+          : s.inactiveBots.includes(id)
+            ? s.inactiveBots
+            : [...s.inactiveBots, id],
       }));
     },
     toggleBotActive(id) {
-      set(s => {
-        const isInactive = s.inactiveBots.includes(id);
-        return {
-          inactiveBots: isInactive ? s.inactiveBots.filter(b => b !== id) : [...s.inactiveBots, id],
-        };
+      set(s => ({
+        inactiveBots: s.inactiveBots.includes(id) ? s.inactiveBots.filter(b => b !== id) : [...s.inactiveBots, id],
+      }));
+    },
+    setAutoUpdateBots(auto) {
+      set({
+        autoUpdateBots: auto,
+        ...(auto ? { inactiveBots: [] } : {}),
+      });
+    },
+    updateAllBots() {
+      const s = get();
+      const updatedModels = { ...s.live.models };
+      for (const p of PROVIDERS) {
+        if (!updatedModels[p] || RETIRED.has(updatedModels[p])) {
+          updatedModels[p] = PROV[p].model;
+        }
+      }
+      set({
+        inactiveBots: [],
+        autoUpdateBots: true,
+        live: { ...s.live, models: updatedModels },
+        status: 'Auto update enabled: all bots refreshed and active.',
       });
     },
   };

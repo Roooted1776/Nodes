@@ -8,7 +8,7 @@ import { chainFor, runChain } from './chain';
 import { tally } from './learn';
 import { AI_KEY, MEMORY_SYSTEM, fileMemories, memoryPrompt, parseMemories } from './ai-memory';
 import { ensureProjectNode, type Cover, type Flow, type Msg, type Session } from './memory';
-import { PROV, ProviderError, callModel } from './providers';
+import { PROV, PROVIDERS, ProviderError, callModel, type ProviderId } from './providers';
 import { redact } from './redact';
 import { contextBlock, relevant } from './retrieve';
 import { clip } from './text';
@@ -45,20 +45,27 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       m.filtered += r.n;
     });
   }
-  if (!s.keys[s.live.provider])
+  const pv: ProviderId = (s.keys[s.live.provider] && !s.dead[s.live.provider])
+    ? s.live.provider
+    : (PROVIDERS.find(p => !!s.keys[p] && !s.dead[p]) || s.live.provider);
+  if (!s.keys[pv])
     return set({ status: `Add your ${PROV[s.live.provider].label} key in Settings. Nothing was sent.` });
-  if (s.dead[s.live.provider])
-    return set({ status: `${PROV[s.live.provider].label} rejected the key. Reload to try again.` });
+  if (s.dead[pv])
+    return set({ status: `${PROV[pv].label} rejected the key. Reload to try again.` });
   if (s.tasks >= 1) return set({ status: 'One live task per page load. Reload to start another.' });
   if (s.calls >= s.live.callCap)
     return set({ status: 'The call budget for this page load is used. Reload to reset it.' });
   if (s.busy) return;
   if (ls) audit(ls, s.who, 'Sent a task to the team');
-  const pv = s.live.provider,
-    model = s.live.models[pv],
+  const model = s.live.models[pv] || PROV[pv].model,
     tag = `live · ${PROV[pv].label} · ${model} · unverified`,
     color = PROV[pv].color;
-  const bots = chainFor(q);
+  let inactive = s.inactiveBots;
+  if (s.autoUpdateBots && s.keys[pv] && !s.dead[pv] && inactive.length > 0) {
+    inactive = [];
+    set({ inactiveBots: [] });
+  }
+  const bots = chainFor(q, inactive);
   set({
     busy: true,
     stopped: false,
@@ -73,7 +80,10 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
     flow: [],
     stages: Object.fromEntries(LIVE_ORDER.map(b => [b, bots.includes(b) ? 'waiting' : 'skipped'])),
     notes: Object.fromEntries(
-      LIVE_ORDER.filter(b => !bots.includes(b)).map(b => [b, IOS_RE.test(q) ? 'Not used' : 'Not an iOS task']),
+      LIVE_ORDER.filter(b => !bots.includes(b)).map(b => [
+        b,
+        s.inactiveBots.includes(b) ? 'Inactive / no credits' : IOS_RE.test(q) ? 'Not used' : 'Not an iOS task',
+      ]),
     ),
     status: `Live: ${PROV[pv].label} · ${model}`,
     autoRotate: false,
@@ -101,7 +111,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
     ctxBlock = contextBlock(hits.map(h => h.e));
     notes.push(hits.length ? `${hits.length} memories sent as context` : 'no memory matched');
   }
-  const callAs = async (system: string, user: string, recordReplyTime = true) => {
+  const callAs = async (system: string, user: string, isStage = true) => {
     const st = get();
     if (st.calls >= st.live.callCap) throw new Error(`the page call budget (${st.live.callCap}) is used`);
     set({ calls: st.calls + 1 });
@@ -119,11 +129,15 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
           set({ draft: { from: bot, text: clean(t) } });
         }
       : undefined;
+    const botProv = bot && (AGENT[bot]?.provider as ProviderId | undefined);
+    const activeProv = (botProv && st.keys[botProv] && !st.dead[botProv]) ? botProv : pv;
+    const activeKey = st.keys[activeProv] || st.keys[pv] || '';
+    const activeModel = st.live.models[activeProv] || PROV[activeProv].model;
     try {
       const res = await callModel({
-        provider: pv,
-        key: st.keys[pv]!,
-        model,
+        provider: activeProv,
+        key: activeKey,
+        model: activeModel,
         system,
         user,
         maxTokens: st.live.maxTokens,
@@ -133,15 +147,13 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       set(x => ({ tin: x.tin + res.tin, tout: x.tout + res.tout }));
       return res;
     } catch (e) {
-      if (e instanceof ProviderError && e.rejected) set(x => ({ dead: { ...x.dead, [pv]: true } }));
+      if (e instanceof ProviderError && e.rejected) set(x => ({ dead: { ...x.dead, [activeProv]: true } }));
       throw e;
     } finally {
       ctls.delete(ctl);
-      if (bot)
-        set(x => ({
-          ...(recordReplyTime ? { timing: { ...x.timing, [bot]: Math.round(performance.now() - t0) } } : {}),
-          draft: null,
-        }));
+      if (bot && isStage)
+        set(x => ({ timing: { ...x.timing, [bot]: Math.round(performance.now() - t0) }, draft: null }));
+      else if (bot) set({ draft: null });
     }
   };
   if (notes.length) set({ status: `Live: ${PROV[pv].label} · ${model} · ${notes.join(' · ')}` });

@@ -5,7 +5,7 @@ import { clip } from './text';
 // Same storage format as the earlier single-file page (brain.mem.v2), so saved memory carries over.
 export const KEY = 'brain.mem.v2';
 export const STALE_DAYS = 30,
-  MAX_ENTRIES = 400,
+  MAX_ENTRIES = 10000,
   MAX_SESSIONS = 25;
 export type EntryType = 'concept' | 'entity' | 'workstream';
 export const TYPES: EntryType[] = ['concept', 'entity', 'workstream'];
