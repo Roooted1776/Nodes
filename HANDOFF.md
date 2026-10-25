@@ -14,6 +14,26 @@
 
 ---
 
+# Handoff from Claude — Oct 25, 2026: memory database save made honest
+
+## What changed
+- `app/src/lib/cloud.ts` `syncMemoryDatabase`: the database returns errors as values, not throws, so the old code hid every failed save. It now checks each row, counts saved/failed, and returns the first error.
+- Long titles, notes and tasks are cut to the table limits (80 / 600 / 300) so they stop being refused.
+- Each memory row now keeps its full detail (dates, sources, keywords, flags). Each session row keeps its full body.
+- `app/src/auth-store.ts`: new `reportSync` shows a status message if any row did not save.
+- `app/test/sync.test.ts`: new tests for saving and for a refused save.
+
+## Checks
+- format, typecheck, test (120 pass), build: pass. Lint: warnings only.
+- e2e: fails in this sandbox only (browser file missing); it fails the same without my change. Unverified here.
+
+## Unfinished / for the next AI
+- Run `npm run e2e` on a machine with Playwright browsers.
+- Confirm migration `20261024210000_persistent_memory.sql` is applied on the live Supabase project (not checked from here).
+- Encrypted vault stays the main store; database rows are a mirror.
+
+---
+
 # Comprehensive Team Handoff to Claude — Oct 25, 2026 (02:30 EDT)
 
 ## 1. What Changed
