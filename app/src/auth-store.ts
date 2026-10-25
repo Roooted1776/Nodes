@@ -15,6 +15,7 @@ import { blankMem, sanitizeMem } from './lib/memory';
 import { mirror, openChannel, publish, type Hub } from './lib/share';
 import { VaultError, decryptVault, encryptVault, newSecrets, openFor, sealFor, type Secrets } from './lib/vault';
 import { openKeys, sealKeys } from './lib/keystore';
+import type { ProviderId } from './lib/providers';
 import { setVault, useStore } from './store';
 
 export const VAULT_KEY = 'brain.vault.v1',
@@ -59,18 +60,26 @@ async function unlock(u: User, kek: CryptoKey) {
   secrets = await openFor(kek, await accountWrap(u.id));
   const s = secrets,
     remote = await loadVault();
-  const data = (await decryptVault(s, remote.envelope)) as { mem?: unknown };
+  const data = (await decryptVault(s, remote.envelope)) as {
+    mem?: unknown;
+    keys?: Partial<Record<ProviderId, string>>;
+    deviceKeys?: string;
+  };
   const mem = sanitizeMem(data.mem);
   if (!mem) throw new VaultError('The encrypted memory has an invalid format.', 'format');
   counter = remote.envelope.n;
   revision = remote.rev;
   chain = Promise.resolve();
-  // Account-specific sealed provider keys stay inside the signed local vault and never enter the database.
-  let deviceKeys = '{}';
+  // Provider keys are encrypted inside the database vault (AES-256-GCM) for persistent cross-device restore.
+  // Device keys from local cache are also merged as a local fallback:
+  let deviceKeys = typeof data.deviceKeys === 'string' ? data.deviceKeys : '{}';
   try {
     const cached = JSON.parse(ls.getItem(VAULT_KEY) || 'null');
     if (cached) {
-      const local = (await decryptVault(s, cached)) as { deviceKeys?: string };
+      const local = (await decryptVault(s, cached)) as {
+        deviceKeys?: string;
+        keys?: Partial<Record<ProviderId, string>>;
+      };
       if (typeof local.deviceKeys === 'string') deviceKeys = local.deviceKeys;
     }
   } catch {
@@ -85,15 +94,18 @@ async function unlock(u: User, kek: CryptoKey) {
       deviceKeys = '{}';
     },
   };
-  const saved = s.priv ? await openKeys(deviceStore, kek, u.id) : {};
-  if (s.priv) ls.setItem(VAULT_KEY, JSON.stringify(await encryptVault(s, { mem, deviceKeys }, counter)));
+  const deviceSaved = s.priv ? await openKeys(deviceStore, kek, u.id) : {};
+  const remoteKeys = data.keys && typeof data.keys === 'object' ? data.keys : {};
+  const saved: Partial<Record<ProviderId, string>> = s.priv ? { ...deviceSaved, ...remoteKeys } : {};
+  if (s.priv) ls.setItem(VAULT_KEY, JSON.stringify(await encryptVault(s, { mem, keys: saved, deviceKeys }, counter)));
   else if (!ls.getItem(VAULT_KEY)) ls.setItem(VAULT_KEY, JSON.stringify(remote.envelope));
   useStore.setState(st => ({
     role: u.role,
     who: u.name,
     mem,
     rev: st.rev + 1,
-    keys: st.live.remember ? saved : {},
+    keys: u.role === 'admin' ? saved : {},
+    live: u.role === 'admin' && Object.keys(saved).length > 0 ? { ...st.live, remember: true } : st.live,
     storageOk: true,
   }));
   setAuditSink((who, what) => writeAudit(u.id, who, what));
@@ -106,14 +118,14 @@ async function unlock(u: User, kek: CryptoKey) {
         localKeys = { ...keys };
       const job = chain.then(async () => {
         if (epoch !== generation) return false;
-        const envelope = await encryptVault(s, { mem: snapshot }, counter + 1);
+        const envelope = await encryptVault(s, { mem: snapshot, keys: localKeys }, counter + 1);
         if (epoch !== generation) return false;
         revision = await saveVault(envelope, revision);
         void syncMemoryDatabase(snapshot);
         counter = envelope.n;
         if (epoch !== generation) return false;
         await sealKeys(deviceStore, kek, u.id, localKeys);
-        const local = await encryptVault(s, { mem: snapshot, deviceKeys }, envelope.n);
+        const local = await encryptVault(s, { mem: snapshot, keys: localKeys, deviceKeys }, envelope.n);
         if (epoch !== generation) return false;
         ls.setItem(VAULT_KEY, JSON.stringify(local));
         return true;
@@ -296,7 +308,7 @@ export const useAuth = create<AuthState>()((set, get) => {
           name,
           password,
           wrap: await sealFor(kek, sec, true),
-          envelope: await encryptVault(sec, { mem: blankMem() }, 1),
+          envelope: await encryptVault(sec, { mem: blankMem(), keys: {} }, 1),
         });
         return await login(name, i.passcode);
       } catch (e) {

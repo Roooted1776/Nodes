@@ -161,7 +161,7 @@ describe('setup and login', () => {
 
 describe('who can do what', () => {
   /** Accounts and an encrypted vault made the way the app makes them, then a real sign-in through the store. */
-  async function asRole(role: 'admin' | 'viewer', seed?: object) {
+  async function asRole(role: 'admin' | 'viewer', seed?: object, vaultKeys?: object) {
     vi.resetModules();
     localStorage.clear();
     sessionStorage.clear();
@@ -183,7 +183,7 @@ describe('who can do what', () => {
         wrap: await sealFor(kek, sec, accountRole === 'admin'),
       });
     }
-    server.vault = await encryptVault(sec, { mem: { ...blankMem(), ...seed } }, 1);
+    server.vault = await encryptVault(sec, { mem: { ...blankMem(), ...seed }, keys: vaultKeys || {} }, 1);
     if (role === 'admin') server.users = server.users.filter(u => u.role === 'admin');
     server.rev = 1;
     const m = await boot();
@@ -316,5 +316,32 @@ describe('who can do what', () => {
     expect(isLimitError(new ProviderError('HTTP 402', false, true))).toBe(true);
     expect(isLimitError(new ProviderError('HTTP 401: invalid key', true))).toBe(false);
     expect(isLimitError(new Error('network down'))).toBe(false);
+  });
+
+  it('restores API keys from the encrypted database vault upon admin unlock', async () => {
+    const { store } = await asRole('admin', {}, { openai: 'sk-test-openai-persisted' });
+    expect(store.useStore.getState().keys.openai).toBe('sk-test-openai-persisted');
+  });
+
+  it('displays past session where bots worked on a task and were talking when opening Brain', async () => {
+    const pastSession = {
+      id: 's1',
+      ts: Date.now() - 3600000,
+      q: 'Build the orbital station',
+      msgs: [
+        { from: 'claude', tag: 'live · Anthropic · test', text: 'Analyzing requirements for the station.' },
+        { from: 'cursor', tag: 'live · Anthropic · test', text: 'Implemented propulsion module in code.' },
+        { from: 'grokbot', tag: 'live · Anthropic · test', text: 'All integration checks passed. PASS.' },
+      ],
+      cover: { claude: { s: 'done' }, cursor: { s: 'done' }, grokbot: { s: 'done' } },
+    };
+    const { App } = await asRole('admin', { sessions: [pastSession] });
+    render(<App />);
+    expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
+    const chat = screen.getByRole('region', { name: 'Live chat' });
+    expect(within(chat).getByText(/Build the orbital station/)).toBeTruthy();
+    expect(within(chat).getByText('Analyzing requirements for the station.')).toBeTruthy();
+    expect(within(chat).getByText('Implemented propulsion module in code.')).toBeTruthy();
+    expect(within(chat).getByText('All integration checks passed. PASS.')).toBeTruthy();
   });
 });

@@ -142,7 +142,7 @@ function loadLive(): { live: LiveCfg; keys: Partial<Record<ProviderId, string>> 
     models: Object.fromEntries(PROVIDERS.map(p => [p, PROV[p].model])) as Record<ProviderId, string>,
     maxTokens: 120,
     callCap: 9,
-    remember: false,
+    remember: true,
   };
   const keys: Partial<Record<ProviderId, string>> = {};
   try {
@@ -185,7 +185,13 @@ const lv = loadLive();
 
 export const useStore = create<State>()((set, get) => {
   const keyList = () => Object.values(get().keys).filter(Boolean) as string[];
-  const clean = (t: string) => redact(t, keyList()).text;
+  const clean = (t: string) => {
+    const r = redact(t, keyList()).text;
+    return r.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_m, code) => {
+      const trimmed = code.trim().replace(/\s+/g, ' ');
+      return trimmed ? `[${trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed}]` : '';
+    });
+  };
   const say = (m: Msg & { cls?: 'warn' }) =>
     set(s => ({ log: [...s.log, { ...m, text: clean(m.text), id: ++logN }].slice(-200) }));
   const admin = () => get().role === 'admin';
@@ -280,7 +286,7 @@ export const useStore = create<State>()((set, get) => {
       const st = get();
       if (!vaultSave && ls) saveMem(ls, m);
       if (vaultSave)
-        void vaultSave(m, st.live.remember ? st.keys : {}).then(
+        void vaultSave(m, st.live.remember !== false ? st.keys : {}).then(
           ok => set({ storageOk: ok }),
           () => set({ storageOk: false }),
         );
@@ -323,7 +329,7 @@ export const useStore = create<State>()((set, get) => {
         ...(s.autoUpdateBots && val ? { inactiveBots: s.inactiveBots.filter(b => AGENT[b]?.provider !== p) } : {}),
       }));
       saveLive(get().live, keys);
-      if (get().live.remember) get().commit();
+      get().commit();
     },
     forgetKey(prov) {
       if (!admin()) {
