@@ -18,6 +18,7 @@ type Card = {
   line: string;
   tone: 'run' | 'ok' | 'bad' | 'stop';
   pill: string;
+  grokFinalReview?: string;
 };
 
 const wordsPassed = (f?: Flow[]) => (f || []).reduce((n, x) => n + x[2], 0);
@@ -74,6 +75,7 @@ function fromSession(s: Session, mem?: Mem): Card {
     tone: 'ok',
     pill: `${sm.done} of ${sm.inChain}${ios ? ' · iOS' : ''}`,
     line: `Saved · ${s.msgs.length} messages${w ? ` · ${w} words passed` : ''}`,
+    grokFinalReview: s.grokFinalReview,
   };
 }
 
