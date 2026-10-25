@@ -1,15 +1,6 @@
-/* Minecraft by Craftron Gaming (DaFont, listed 100% Free); see assets/Minecraft-FONT.txt. Its pixel grid is 1/16 em,
-   so every size here is 16px (1 font pixel per screen pixel) or 32px (2 per pixel), which keeps the letters sharp. */
-@font-face {
-  font-family: "Minecraft";
-  src: url("./assets/Minecraft.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: block;
-}
 :root {
   --px:
-    "Minecraft", ui-monospace, Menlo, monospace; /* the only typeface (Owner, Oct 2026); symbols it lacks fall back */
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; /* modern system sans (Owner, Oct 2026) */
   --mono: var(--px);
   --band: 22px;
   --bg: #04050b;

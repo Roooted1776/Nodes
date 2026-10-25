@@ -1,6 +1,0 @@
-Minecraft.ttf — "Minecraft" by Craftron Gaming, version 001.000.
-Downloaded 2026-10-24 from https://www.dafont.com/minecraft.font (file https://dl.dafont.com/dl/?f=minecraft).
-DaFont lists its licence as "100% Free". The download contained no separate licence text.
-Not affiliated with or endorsed by Mojang or Microsoft.
-Covers ASCII and a few Latin-1 symbols (107 characters). Other characters (✓ ✕ · → …) fall back to the system monospace font.
-Pixel grid: 1/16 em, so text is sharpest at 16px (1 font pixel = 1 screen pixel) and 32px (2 screen pixels).
