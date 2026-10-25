@@ -93,9 +93,15 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
     ch.close();
   });
   await expect(viewer.getByText('Fake transport verification only', { exact: true })).toBeVisible();
+  // GitHub's runners draw the 3D brain in software, a few frames a second. Both windows share one CPU,
+  // so close the admin window (all its errors are already collected) and give the phone steps room.
+  await page.close();
   await viewer.setViewportSize({ width: 390, height: 844 });
-  await expect(viewer.getByRole('main', { name: 'Brain view' })).toBeVisible();
-  await info.attach('phone-viewer.png', { body: await viewer.screenshot(), contentType: 'image/png' });
+  await expect(viewer.getByRole('main', { name: 'Brain view' })).toBeVisible({ timeout: 30_000 });
+  await info.attach('phone-viewer.png', {
+    body: await viewer.screenshot({ timeout: 30_000 }),
+    contentType: 'image/png',
+  });
   expect(await viewer.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await viewer.close();
 
