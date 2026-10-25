@@ -370,9 +370,10 @@ export const useStore = create<State>()((set, get) => {
           status: `Connected to ${PROV[pv].label} · ${s.live.models[pv] || PROV[pv].model}. Reply: ${clean(r.text).slice(0, 40) || '(empty)'}`,
           ...(x.autoUpdateBots ? { inactiveBots: x.inactiveBots.filter(b => AGENT[b]?.provider !== pv) } : {}),
         }));
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (e instanceof ProviderError && e.rejected) set(x => ({ dead: { ...x.dead, [pv]: true } }));
-        set({ status: `Test failed for ${PROV[pv].label}: ` + clean(e.message) });
+        const msg = e instanceof Error ? e.message : String(e);
+        set({ status: `Test failed for ${PROV[pv].label}: ` + clean(msg) });
       }
     },
     note(o) {
@@ -447,8 +448,8 @@ export const useStore = create<State>()((set, get) => {
       let d: unknown;
       try {
         d = await importBackup(passphrase, text);
-      } catch (e: any) {
-        return e?.message || 'That backup could not be opened.';
+      } catch (e: unknown) {
+        return e instanceof Error ? e.message : 'That backup could not be opened.';
       }
       const m = sanitizeMem(d, true);
       if (!m) return 'That is not Brain memory.';
