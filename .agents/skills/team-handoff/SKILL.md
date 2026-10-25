@@ -5,7 +5,14 @@ description: >-
   Use when completing tasks, before handing off to Cursor, Gemini, Muse, and Grok Bot.
 ---
 
-# Team Handoff Runbook
+# Team Workflow & Handoff Runbook
+
+## Standard Team Workflow (For Everyone, Every Task)
+1. **Audit the folder**: Check repository status, file cleanliness, boundaries (RedMed stays untouched), and ensure zero secrets/credentials are leaked.
+2. **Review**: Inspect existing code, diffs, and context before touching anything.
+3. **Revise**: Plan precise surgical changes with no extra moving parts.
+4. **Edit**: Implement minimal necessary modifications and verify all 6 checks (`npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e`).
+5. **Push**: Document in `HANDOFF.md`, push verified work to `origin/main` via `./scripts/push-work.sh`, and follow the review sequence below.
 
 ## Review Sequence
 1. Claude builds, verifies, and records the handoff.

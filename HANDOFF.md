@@ -726,4 +726,57 @@ npm run build
 npm run e2e
 ```
 
+---
+
+# Standard Team Workflow Codification — Oct 25, 2026
+
+## 1. Directive & Intent
+- **User Directive**: "thats your and everyones workflow"
+- **Intent**:
+  - Permanently establish and codify the universal 5-step workflow for all bots, agents, and tools on this team across all documentation and agent skill files:
+    1. **Audit the folder**
+    2. **Review**
+    3. **Revise**
+    4. **Edit**
+    5. **Push** (verified with all 6 checks + multi-agent handoff)
+
+## 2. Changes Made
+1. **CLAUDE.md**:
+   - Added `Standard Team Workflow (For You and Everyone)` defining the 5 steps clearly.
+2. **AGENTS.md**:
+   - Added `Standard Team Workflow (For Every AI and Tool)` section establishing the 5 steps as mandatory for all AI teammates across every task.
+3. **.agents/skills/team-handoff/SKILL.md**:
+   - Updated runbook to include the 5-step standard workflow ahead of the multi-agent review sequence.
+
+## 3. Files Touched
+| File | Type | Changes Made |
+| :--- | :--- | :--- |
+| `CLAUDE.md` | Configuration | Codified 5-step workflow for Claude. |
+| `AGENTS.md` | Core Documentation | Codified 5-step workflow for all agents and tools. |
+| `.agents/skills/team-handoff/SKILL.md` | Skill Runbook | Updated handoff runbook with universal workflow. |
+| `HANDOFF.md` | Documentation | This handoff log entry. |
+
+## 4. Verification & Real Results
+- All 6 checks verified:
+  1. `npm run format`: `Formatted 75 files in 31ms. No fixes applied.`
+  2. `npm run lint`: `Checked 76 files in 29ms. Found 29 warnings, 0 errors.`
+  3. `npm run typecheck`: `tsc --noEmit` exited code 0 (0 errors).
+  4. `npm test`: `18 passed (18) files, 92 passed (92) tests` in 2.75s.
+  5. `npm run build`: Single-file bundle written to `index.html` (1580 KB).
+  6. `npm run e2e`: `1 passed (35.2s)` in Chromium.
+
+## 5. Review Sequence Handoff
+1. **Claude (Anthropic)**: Codified the 5-step team workflow across repository configurations and documentation. (COMPLETED)
+2. **Cursor**: Inspect repo diffs and clean file structure.
+3. **Gemini**: Review cross-bot documentation alignment.
+4. **ChatGPT**: Review team instruction consistency.
+5. **Muse**: Review boundary integrity (RedMed untouched; zero secrets).
+6. **Grok Bot (Lead)**: Verify real execution output and issue final PASS/FAIL verdict.
+
+## 6. How the Next AI Should Check It
+```bash
+git diff HEAD~1
+cd app && npm test
+```
+
 

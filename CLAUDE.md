@@ -2,6 +2,13 @@
 
 Owner's Brain. Read `@AGENTS.md` first.
 
+## Standard Team Workflow (For You and Everyone)
+1. **Audit the folder**: Check repository status, file hygiene, boundaries (RedMed untouched), and ensure zero secrets/credentials are leaked.
+2. **Review**: Inspect existing code, diffs, and context before touching anything.
+3. **Revise**: Plan precise surgical changes with no extra moving parts.
+4. **Edit**: Implement minimal necessary modifications and verify all 6 checks (`npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e`).
+5. **Push**: Document in `HANDOFF.md`, push verified work to `origin/main` via `./scripts/push-work.sh`, and follow the multi-agent review sequence (Claude builds, Cursor gets handoff, Gemini/ChatGPT/Muse review, Grok Bot verifies and calls pass/fail).
+
 - Write code in `app/src` (React, TypeScript, three.js) and tests in `app/test`. Never hand-edit the root `index.html`: it is the built single-file page. Rebuild it with `npm run build` in `app/`.
 - Before committing, run in `app/`: `npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, then `npm run build`. GitHub runs the same checks on every push.
 - Brain uses only real AI and real data. Never add sample, scripted or example tasks to the app.
@@ -9,3 +16,4 @@ Owner's Brain. Read `@AGENTS.md` first.
 - Automated push authorized: Completed, verified task changes are automatically pushed to main after passing all checks and reviews (run `npm run push` or `./scripts/push-work.sh`). Never touch the RedMed project.
 - Keep explanations in plain words, one idea at a time.
 - Auto-scroll chats: Always auto-scroll chat views to follow streaming output and new messages. Never leave viewports stuck at the top or stall waiting for manual scrolling. To be fully autonomous, auto-scrolling is required so tasks run faster without wasting time.
+
