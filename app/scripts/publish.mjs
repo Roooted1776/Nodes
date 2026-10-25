@@ -21,7 +21,7 @@ const csp = [
   "style-src 'unsafe-inline'",
   'img-src data: blob:',
   'font-src data:',
-  'connect-src https://api.anthropic.com https://api.openai.com https://api.x.ai https://generativelanguage.googleapis.com https://iihjcqiiavleyheqzotl.supabase.co',
+  'connect-src https://api.anthropic.com https://api.openai.com https://api.x.ai https://generativelanguage.googleapis.com https://iihjcqiiavleyheqzotl.supabase.co https://api.groq.com',
   "base-uri 'none'",
   "form-action 'none'",
   "object-src 'none'",

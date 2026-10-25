@@ -1,6 +1,6 @@
 import { redact } from './redact';
 
-export type ProviderId = 'anthropic' | 'openai' | 'google' | 'xai';
+export type ProviderId = 'anthropic' | 'openai' | 'google' | 'xai' | 'groq';
 export interface Provider {
   label: string;
   model: string;
@@ -12,6 +12,8 @@ export const PROV: Record<ProviderId, Provider> = {
   openai: { label: 'OpenAI', model: 'gpt-4o-mini', hint: 'key starts with sk-', color: '#79cbb2' },
   google: { label: 'Google', model: 'gemini-3.1-flash-lite', hint: 'key starts with AIza', color: '#8bb7ff' },
   xai: { label: 'xAI', model: 'grok-4.3', hint: 'key starts with xai-', color: '#d7b3ff' },
+  /** Free plan (no card), real open models. Checked Oct 2026: about 1,000 requests a day on gpt-oss-120b. */
+  groq: { label: 'Groq (free)', model: 'openai/gpt-oss-120b', hint: 'key starts with gsk_', color: '#f55036' },
 };
 export const PROVIDERS = Object.keys(PROV) as ProviderId[];
 /** Model ids the providers have shut down or redirected (checked Oct 2026). A saved setting with one of these moves to the current default. */
@@ -29,6 +31,15 @@ export const MODEL_RE = /^[A-Za-z0-9._:-]{1,80}$/;
 export function isCreditOrQuotaError(msg: string, status?: number): boolean {
   if (status === 402) return true;
   return /credit|quota|billing|balance|payment|insufficient|exhausted|unpaid/i.test(msg);
+}
+
+/** A token, rate or credit limit (as opposed to a bad key or a network problem). */
+export function isLimitError(e: unknown): boolean {
+  if (e instanceof ProviderError && e.outOfCredits) return true;
+  const m = e instanceof Error ? e.message : String(e);
+  return /HTTP 429|rate.?limit|too many requests|tokens? (per|limit)|context (length|window)|maximum context|max_tokens|resource.?exhausted|overloaded|HTTP 529/i.test(
+    m,
+  );
 }
 
 export class ProviderError extends Error {
@@ -93,6 +104,25 @@ export function buildRequest(
       },
     };
   }
+  if (o.provider === 'groq') {
+    headers.authorization = 'Bearer ' + o.key;
+    // gpt-oss thinks before it answers; the thinking counts toward the limit, so it gets room and is kept short
+    const reasoning = /gpt-oss/i.test(o.model);
+    return {
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      headers,
+      body: {
+        model: o.model,
+        messages: [
+          { role: 'system', content: o.system },
+          { role: 'user', content: o.user },
+        ],
+        max_completion_tokens: reasoning ? o.maxTokens + 1024 : o.maxTokens,
+        ...(reasoning ? { reasoning_effort: 'low' } : {}),
+        ...(stream ? { stream: true } : {}),
+      },
+    };
+  }
   if (o.provider === 'openai' || o.provider === 'xai') {
     headers.authorization = 'Bearer ' + o.key;
     const body: Record<string, unknown> = {
@@ -137,6 +167,15 @@ export function parseReply(provider: ProviderId, data: any): CallResult {
       tin: +data.usage?.input_tokens || 0,
       tout: +data.usage?.output_tokens || 0,
     };
+  if (provider === 'groq') {
+    const c = (data.choices || [])[0] || {};
+    return {
+      text: typeof c.message?.content === 'string' ? c.message.content : '',
+      why: c.finish_reason === 'length' ? 'max_tokens' : '',
+      tin: +data.usage?.prompt_tokens || 0,
+      tout: +data.usage?.completion_tokens || 0,
+    };
+  }
   if (provider === 'google') {
     const c = (data.candidates || [])[0] || {};
     return {
@@ -172,6 +211,17 @@ export function foldEvent(provider: ProviderId, acc: CallResult, ev: any): CallR
       return { ...acc, why: ev.delta?.stop_reason || acc.why, tout: +ev.usage?.output_tokens || acc.tout };
     if (ev.type === 'error') throw new ProviderError(String(ev.error?.message || 'stream error').slice(0, 160));
     return acc;
+  }
+  if (provider === 'groq') {
+    if (ev.error) throw new ProviderError(String(ev.error.message || 'stream error').slice(0, 160));
+    const c = (ev.choices || [])[0] || {};
+    const u = ev.x_groq?.usage || ev.usage;
+    return {
+      text: acc.text + (typeof c.delta?.content === 'string' ? c.delta.content : ''),
+      why: c.finish_reason === 'length' ? 'max_tokens' : acc.why,
+      tin: +u?.prompt_tokens || acc.tin,
+      tout: +u?.completion_tokens || acc.tout,
+    };
   }
   if (provider === 'google') {
     const r = parseReply('google', ev);

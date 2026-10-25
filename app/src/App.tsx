@@ -5,13 +5,8 @@ import Home from './components/Home';
 
 const BrainScene = lazy(() => import('./components/BrainScene'));
 
-/** Shown at the top and bottom of every screen. Brain's own marking, not a government classification. */
-export const Banner = ({ at }: { at: 'top' | 'bottom' }) => (
-  <div className={'banner ' + at} role={at === 'top' ? 'banner' : undefined}>
-    <span className="banner-full">RESTRICTED · AUTHORIZED PERSONNEL ONLY · PROJECT BRAIN</span>
-    <span className="banner-short">RESTRICTED · PROJECT BRAIN</span>
-  </div>
-);
+/** The old RESTRICTED banners are gone (Owner: no text outside the live chat). Kept as a no-op so callers stay simple. */
+export const Banner = (_: { at: 'top' | 'bottom' }) => null;
 
 export default function App() {
   const phase = useAuth(s => s.phase);
@@ -24,9 +19,7 @@ export default function App() {
         <Banner at="top" />
         <Home />
         <Banner at="bottom" />
-        <div className="veil" aria-hidden="true">
-          Screen hidden
-        </div>
+        <div className="veil" aria-hidden="true" />
       </>
     );
   return (

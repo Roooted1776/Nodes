@@ -13,6 +13,8 @@ export interface Agent {
   skills: string[];
   company: string;
   provider?: string;
+  /** The free service this bot runs on when there is no key for its own company (Owner wants free bots, Oct 2026). */
+  free?: 'groq' | 'google';
 }
 
 export const AGENTS: Agent[] = [
@@ -27,6 +29,7 @@ export const AGENTS: Agent[] = [
     skills: ['sets review order', 'collects findings', 'final pass or fail'],
     company: 'xAI',
     provider: 'xai',
+    free: 'groq',
   },
   {
     id: 'grok',
@@ -39,6 +42,7 @@ export const AGENTS: Agent[] = [
     skills: ['strategy', 'contrarian review', 'risk spotting'],
     company: 'xAI',
     provider: 'xai',
+    free: 'groq',
   },
   {
     id: 'claude',
@@ -51,6 +55,7 @@ export const AGENTS: Agent[] = [
     skills: ['step-by-step plans', 'clear writing', 'building'],
     company: 'Anthropic',
     provider: 'anthropic',
+    free: 'google',
   },
   {
     id: 'xcode',
@@ -62,6 +67,7 @@ export const AGENTS: Agent[] = [
     specialty: 'Builds and tests iPhone apps',
     skills: ['iOS builds', 'device testing', 'archives'],
     company: 'Apple',
+    free: 'groq',
   },
   {
     id: 'gemini',
@@ -74,6 +80,7 @@ export const AGENTS: Agent[] = [
     skills: ['long documents', 'images', 'cross-checking'],
     company: 'Google',
     provider: 'google',
+    free: 'google',
   },
   {
     id: 'cursor',
@@ -85,6 +92,7 @@ export const AGENTS: Agent[] = [
     specialty: 'Edits code in the repo and reviews changes',
     skills: ['editing files', 'merging work', 'code review'],
     company: 'Anysphere',
+    free: 'groq',
   },
   {
     id: 'chatgpt',
@@ -97,6 +105,7 @@ export const AGENTS: Agent[] = [
     skills: ['tool use', 'coding', 'planning', 'synthesis'],
     company: 'OpenAI',
     provider: 'openai',
+    free: 'groq',
   },
   {
     id: 'perplexity',
@@ -108,6 +117,7 @@ export const AGENTS: Agent[] = [
     specialty: 'Checks sources and citations',
     skills: ['source quality', 'citations', 'fact checking'],
     company: 'Perplexity',
+    free: 'groq',
   },
   {
     id: 'muse',
@@ -119,6 +129,7 @@ export const AGENTS: Agent[] = [
     specialty: 'Audits everyone and finds what is wrong',
     skills: ['audits', 'finding bugs', 'honesty checks'],
     company: 'Independent',
+    free: 'groq',
   },
 ];
 
