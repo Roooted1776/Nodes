@@ -92,6 +92,8 @@ export interface State {
   timing: Partial<Record<AgentId, number>>;
   flow: Flow[];
   inactiveBots: AgentId[];
+  /** Bots that hit a token, rate or credit limit. Their name shows red in the chat until they answer again. */
+  limited: AgentId[];
   autoUpdateBots: boolean;
   inspectedBot: AgentId | null;
   promptDraft: string;
@@ -247,6 +249,7 @@ export const useStore = create<State>()((set, get) => {
     timing: {},
     flow: [],
     inactiveBots: [],
+    limited: [],
     autoUpdateBots: true,
     inspectedBot: null,
     inspectBot: (id: AgentId | null) => set({ inspectedBot: id }),

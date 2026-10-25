@@ -4,6 +4,7 @@ import App from './App';
 import './styles.css';
 import './tidal.css';
 import './access.css';
+import './chat.css';
 import './tidal-bg';
 
 // Guard against Drei Html unmount race condition where React 19 detaches DOM before Drei finishes unmount

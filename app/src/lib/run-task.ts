@@ -8,7 +8,7 @@ import { chainFor, runChain } from './chain';
 import { tally } from './learn';
 import { AI_KEY, MEMORY_SYSTEM, fileMemories, memoryPrompt, parseMemories } from './ai-memory';
 import { ensureProjectNode, type Cover, type Flow, type Msg, type Session } from './memory';
-import { PROV, PROVIDERS, ProviderError, callModel, type ProviderId } from './providers';
+import { PROV, PROVIDERS, ProviderError, callModel, isLimitError, type ProviderId } from './providers';
 import { redact } from './redact';
 import { contextBlock, relevant } from './retrieve';
 import { clip } from './text';
@@ -143,10 +143,15 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
         signal: ctl.signal,
         onDelta,
       });
-      set(x => ({ tin: x.tin + res.tin, tout: x.tout + res.tout }));
+      set(x => ({
+        tin: x.tin + res.tin,
+        tout: x.tout + res.tout,
+        ...(bot && x.limited.includes(bot) ? { limited: x.limited.filter(b => b !== bot) } : {}),
+      }));
       return res;
     } catch (e) {
       if (e instanceof ProviderError && e.rejected) set(x => ({ dead: { ...x.dead, [activeProv]: true } }));
+      if (bot && isLimitError(e)) set(x => ({ limited: x.limited.includes(bot) ? x.limited : [...x.limited, bot] }));
       throw e;
     } finally {
       ctls.delete(ctl);
