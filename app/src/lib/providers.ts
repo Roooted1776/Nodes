@@ -31,6 +31,15 @@ export function isCreditOrQuotaError(msg: string, status?: number): boolean {
   return /credit|quota|billing|balance|payment|insufficient|exhausted|unpaid/i.test(msg);
 }
 
+/** A token, rate or credit limit (as opposed to a bad key or a network problem). */
+export function isLimitError(e: unknown): boolean {
+  if (e instanceof ProviderError && e.outOfCredits) return true;
+  const m = e instanceof Error ? e.message : String(e);
+  return /HTTP 429|rate.?limit|too many requests|tokens? (per|limit)|context (length|window)|maximum context|max_tokens|resource.?exhausted|overloaded|HTTP 529/i.test(
+    m,
+  );
+}
+
 export class ProviderError extends Error {
   constructor(
     msg: string,
