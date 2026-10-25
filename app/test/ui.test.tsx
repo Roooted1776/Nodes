@@ -249,14 +249,13 @@ describe('who can do what', () => {
     expect(screen.queryAllByRole('tab')).toEqual([]);
     expect(screen.getByLabelText('Task for the team')).toBeTruthy();
     const bar = screen.getByRole('region', { name: 'Admin panel' });
-    const guide = within(bar).getByRole('region', { name: 'Connect real AI' }); // no key yet: steps, the provider's own key page, and a paste box
+    const keys = within(bar).getByText('API keys').closest('section')!; // the one place to paste a key
     expect(
-      within(guide)
-        .getByRole('link', { name: /Open OpenAI Platform/ })
+      within(keys as HTMLElement)
+        .getAllByRole('link', { name: /Get key/ })[1]
         .getAttribute('href'),
     ).toBe('https://platform.openai.com/api-keys');
-    await u.type(within(guide).getByLabelText('Paste API key'), 'sk-ant-api03-test');
-    expect(within(guide).getByText(/looks like an Anthropic key/)).toBeTruthy();
+    expect(within(bar).queryByRole('region', { name: 'Connect real AI' })).toBeNull();
     expect((screen.getByLabelText('Task for the team') as HTMLTextAreaElement).disabled).toBe(true);
     const acc = within(bar).getByText('Accounts').closest('section')!;
     expect(within(acc as HTMLElement).getByText('Owner')).toBeTruthy();
