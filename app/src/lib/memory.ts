@@ -61,6 +61,7 @@ export interface Session {
   projectId?: string;
   nodeId?: string;
   nodeTitle?: string;
+  grokFinalReview?: string;
 }
 export interface Settings {
   brain: boolean;
@@ -551,6 +552,7 @@ export function saveImportedListAsTask(
     learned: true,
     flow,
     ms: { cursor: 280, codex: 350, grokbot: 210 },
+    grokFinalReview: 'squash push merge all main remove all branches post merge make sure to commit and deploy',
     msgs,
     cover,
   };
