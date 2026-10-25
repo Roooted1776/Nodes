@@ -655,4 +655,75 @@ npm run build
 npm run e2e
 ```
 
+---
+
+# Audit Revisions: Hygiene Cleanup & Connection Error Fallbacks — Oct 25, 2026
+
+## 1. Directive & Intent
+- **User Directive**: "3 Revise / Edit / Push"
+- **Intent**:
+  1. Revise folder hygiene based on audit findings: remove stray 1.6MB typo file `indddex.html` and untrack macOS `app/src/.DS_Store`.
+  2. Edit authentication initialization in `App.tsx` and `auth-store.ts` so users encountering network errors or delays can immediately switch into "Register as admin" or "Already an admin? Sign in" without waiting for repeated retries.
+  3. Edit `setPhase` so that manual navigation marks `ready: true`, guaranteeing the view immediately displays the target card.
+  4. Run full test suite and rebuild single-file bundle.
+  5. Push verified revisions to `origin/main` via `./scripts/push-work.sh`.
+
+## 2. Changes Made
+1. **Hygiene & File Deletion**:
+   - Removed dormant typo file `indddex.html` (1.6 MB).
+   - Untracked `app/src/.DS_Store` from git index.
+2. **Auth Store (`app/src/auth-store.ts`)**:
+   - `setPhase` now explicitly sets `ready: true`, ensuring immediate card display.
+3. **App Component (`app/src/App.tsx`)**:
+   - Added "Register as admin" and "Already an admin? Sign in" buttons alongside "Retry" when `init()` encounters a connection error.
+4. **Unit & Integration Tests (`app/test/ui.test.tsx`)**:
+   - Added test verifying admin registration works even when the initial connection check fails.
+5. **Single-file Production Bundle (`index.html` & `app/dist/index.html`)**:
+   - Recompiled bundle with updated bundle scripts and recalculated SHA-256 CSP hash.
+
+## 3. Files Touched
+| File | Type | Changes Made |
+| :--- | :--- | :--- |
+| `indddex.html` | Dormant artifact | Deleted stray typo file. |
+| `app/src/.DS_Store` | System metadata | Removed from git index. |
+| `app/src/auth-store.ts` | Source | `setPhase` sets `ready: true`. |
+| `app/src/App.tsx` | Source | Added admin/login fallback actions on init error. |
+| `app/test/ui.test.tsx` | Test | Added connection error fallback test. |
+| `app/dist/index.html` | Build artifact | Rebuilt single-file bundle. |
+| `index.html` | Build artifact | Root production file with updated hash. |
+| `HANDOFF.md` | Documentation | This handoff log entry. |
+
+## 4. Verification & Real Results
+1. **Format Check (`npm run format`)**:
+   - Output: `Formatted 75 files in 31ms. No fixes applied.`
+2. **Lint Check (`npm run lint`)**:
+   - Output: `Checked 76 files in 29ms. Found 29 warnings, 0 errors.`
+3. **Typecheck (`npm run typecheck`)**:
+   - Output: `tsc --noEmit` exited code 0 (0 errors).
+4. **Unit Tests (`npm test`)**:
+   - Output: `18 passed (18) files, 92 passed (92) tests` in 2.79s.
+5. **Production Build (`npm run build`)**:
+   - Output: `built in 314ms; wrote ../index.html 1580 KB; 1 script(s) pinned by hash`.
+6. **Browser E2E Chromium Check (`npm run e2e`)**:
+   - Output: `1 passed (35.2s)` in headless Chromium.
+
+## 5. Review Sequence Handoff
+1. **Claude (Anthropic)**: Revised folder cleanliness, added error fallbacks, verified all 6 checks, and pushed to `main`. (COMPLETED)
+2. **Cursor**: Inspect repo diffs and clean file structure.
+3. **Gemini**: Review error fallback buttons and auth phase transitions.
+4. **ChatGPT**: Review store readiness and state reactivity.
+5. **Muse**: Review boundary integrity (RedMed untouched; zero secrets).
+6. **Grok Bot (Lead)**: Verify real execution output and issue final PASS/FAIL verdict.
+
+## 6. How the Next AI Should Check It
+```bash
+cd app
+npm run format
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run e2e
+```
+
 

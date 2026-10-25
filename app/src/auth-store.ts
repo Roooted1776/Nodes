@@ -264,7 +264,7 @@ export const useAuth = create<AuthState>()((set, get) => {
     session: '',
     lastActive: Date.now(),
     ready: false,
-    setPhase: (phase: Phase) => set({ phase, error: '', notice: '' }),
+    setPhase: (phase: Phase) => set({ phase, error: '', notice: '', ready: true }),
     async init() {
       if (get().ready || get().busy) return;
       set({ busy: true, error: '' });
