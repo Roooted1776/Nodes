@@ -114,7 +114,9 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
   }
   const callAs = async (system: string, user: string, isStage = true) => {
     const st = get();
-    if (st.calls >= st.live.callCap) throw new Error(`the page call budget (${st.live.callCap}) is used`);
+    // Filing memory gets one call of its own on top of the cap, so a full nine-bot task can still be remembered
+    const cap = st.live.callCap + (isStage ? 0 : 1);
+    if (st.calls >= cap) throw new Error(`the page call budget (${st.live.callCap}) is used`);
     set({ calls: st.calls + 1 });
     const ctl = new AbortController();
     ctls.add(ctl);
@@ -171,7 +173,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
   /** One more real AI call: Grok Bot files what the team should remember. Counted in the call limit. */
   const fileByAi = async (sess: Session, msgs: Msg[]) => {
     const st = get();
-    if (!liveReady() || st.calls >= st.live.callCap) {
+    if (!liveReady() || st.calls >= st.live.callCap + 1) {
       set({ status: 'Grok Bot: no AI call left for memory this page load, so nothing new was remembered.' });
       return;
     }

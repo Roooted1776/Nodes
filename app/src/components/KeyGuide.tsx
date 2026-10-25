@@ -62,7 +62,13 @@ export default function KeyGuide({ wide }: { wide?: boolean }) {
           type="password"
           aria-label="Paste API key"
           value={key}
-          placeholder={ready ? 'A key is set. Paste to replace it' : 'Starts with ' + g.prefix}
+          placeholder={
+            ready
+              ? 'A key is set. Paste to replace it'
+              : g.prefix
+                ? 'Starts with ' + g.prefix
+                : PROV[live.provider].hint
+          }
           autoComplete="off"
           spellCheck={false}
           onChange={e => {
@@ -108,7 +114,8 @@ export default function KeyGuide({ wide }: { wide?: boolean }) {
           <b>Sent only to {PROV[live.provider].label}</b>Brain calls the provider directly. No other server sees it.
         </li>
         <li>
-          <b>Set a spend limit</b>Use the provider's billing page. Each task makes at most {live.callCap} calls.
+          <b>Set a spend limit</b>Use the provider's billing page. Each task makes at most {live.callCap} calls, plus
+          one to save memory.
         </li>
         <li>
           <b>Never in chat</b>Do not paste a key into a task. Revoke it at the provider if it leaks.

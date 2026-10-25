@@ -44,12 +44,10 @@ export default function AdminPanel() {
   const s = useStore(),
     mem = useMem(),
     { live } = s;
-  const [key, setKey] = useState(s.keys[live.provider] || ''),
-    [modelText, setModelText] = useState(live.models[live.provider] || PROV[live.provider].model),
+  const [modelText, setModelText] = useState(live.models[live.provider] || PROV[live.provider].model),
     [maxTokensText, setMaxTokensText] = useState(String(live.maxTokens)),
     [callCapText, setCallCapText] = useState(String(live.callCap)),
     [focusText, setFocusText] = useState(mem.settings.instructions || ''),
-    [compKeys, setCompKeys] = useState<Partial<Record<ProviderId, string>>>({}),
     [restore, setRestore] = useState(''),
     [phrase, setPhrase] = useState(''),
     [msg, setMsg] = useState(''),
@@ -68,9 +66,8 @@ export default function AdminPanel() {
   }, [s.githubRepo, s.githubToken]);
 
   useEffect(() => {
-    setKey(s.keys[live.provider] || '');
     setModelText(live.models[live.provider] || PROV[live.provider].model);
-  }, [live.provider, s.keys[live.provider], live.models[live.provider]]);
+  }, [live.provider, live.models[live.provider]]);
 
   useEffect(() => {
     setMaxTokensText(String(live.maxTokens));
@@ -139,11 +136,10 @@ export default function AdminPanel() {
           <input
             aria-label="API key"
             type="password"
-            value={key}
+            value={s.keys[live.provider] || ''}
             placeholder={ready ? 'Key is set for this tab' : PROV[live.provider].hint}
             autoComplete="off"
             onChange={e => {
-              setKey(e.target.value);
               s.setKey(e.target.value, live.provider);
             }}
           />
@@ -160,7 +156,6 @@ export default function AdminPanel() {
               type="button"
               onClick={() => {
                 s.forgetKey(live.provider);
-                setKey('');
               }}
             >
               Forget
@@ -185,15 +180,7 @@ export default function AdminPanel() {
                   <div className="company-key-head">
                     <span className="company-tag" style={{ borderLeftColor: PROV[p].color }}>
                       <b style={{ color: PROV[p].color }}>{PROV[p].label}</b>
-                      <small>
-                        {p === 'anthropic'
-                          ? 'Claude, Artifact'
-                          : p === 'openai'
-                            ? 'Codex, ChatGPT, Canvas, Muse'
-                            : p === 'google'
-                              ? 'Gemini'
-                              : 'Grok, Grok Bot'}
-                      </small>
+                      <small>{PROV[p].roles}</small>
                     </span>
                     <span className={`pill ${has ? (isDead ? 'warn' : 'ok') : ''}`}>
                       {isDead ? 'Key rejected' : has ? 'Key set' : 'Not set'}
@@ -203,13 +190,11 @@ export default function AdminPanel() {
                     <input
                       type="password"
                       aria-label={`${PROV[p].label} key`}
-                      value={compKeys[p] ?? (s.keys[p] || '')}
-                      placeholder={has ? 'Key is set (encrypted)' : `Starts with ${g.prefix}`}
+                      value={s.keys[p] || ''}
+                      placeholder={has ? 'Key is set (encrypted)' : g.prefix ? `Starts with ${g.prefix}` : PROV[p].hint}
                       autoComplete="off"
                       onChange={e => {
-                        const val = e.target.value;
-                        setCompKeys(prev => ({ ...prev, [p]: val }));
-                        s.setKey(val, p);
+                        s.setKey(e.target.value, p);
                       }}
                     />
                     <button type="button" className="sm" disabled={!s.keys[p]} onClick={() => void s.testProvider(p)}>
@@ -221,7 +206,6 @@ export default function AdminPanel() {
                       disabled={!s.keys[p]}
                       onClick={() => {
                         s.forgetKey(p);
-                        setCompKeys(prev => ({ ...prev, [p]: '' }));
                       }}
                     >
                       Clear

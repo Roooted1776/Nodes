@@ -1,19 +1,69 @@
 import { redact } from './redact';
 
-export type ProviderId = 'anthropic' | 'openai' | 'google' | 'xai' | 'groq';
+export type ProviderId = 'anthropic' | 'openai' | 'google' | 'xai' | 'groq' | 'cerebras' | 'freebuff' | 'muse';
 export interface Provider {
   label: string;
   model: string;
   hint: string;
   color: string;
+  /** Which bots use it first. */
+  roles: string;
 }
 export const PROV: Record<ProviderId, Provider> = {
-  anthropic: { label: 'Anthropic', model: 'claude-haiku-4-5', hint: 'key starts with sk-ant-', color: '#f2a67a' },
-  openai: { label: 'OpenAI', model: 'gpt-4o-mini', hint: 'key starts with sk-', color: '#79cbb2' },
-  google: { label: 'Google', model: 'gemini-3.1-flash-lite', hint: 'key starts with AIza', color: '#8bb7ff' },
-  xai: { label: 'xAI', model: 'grok-4.3', hint: 'key starts with xai-', color: '#d7b3ff' },
+  anthropic: {
+    label: 'Anthropic',
+    model: 'claude-haiku-4-5',
+    hint: 'key starts with sk-ant-',
+    color: '#f2a67a',
+    roles: 'Claude, Artifact',
+  },
+  openai: {
+    label: 'OpenAI',
+    model: 'gpt-4o-mini',
+    hint: 'key starts with sk-',
+    color: '#79cbb2',
+    roles: 'Codex, ChatGPT, Canvas',
+  },
+  google: {
+    label: 'Google',
+    model: 'gemini-3.1-flash-lite',
+    hint: 'key starts with AIza',
+    color: '#8bb7ff',
+    roles: 'Gemini',
+  },
+  xai: { label: 'xAI', model: 'grok-4.3', hint: 'key starts with xai-', color: '#d7b3ff', roles: 'Grok, Grok Bot' },
   /** Free plan (no card), real open models. Checked Oct 2026: about 1,000 requests a day on gpt-oss-120b. */
-  groq: { label: 'Groq (free)', model: 'openai/gpt-oss-120b', hint: 'key starts with gsk_', color: '#f55036' },
+  groq: {
+    label: 'Groq (free)',
+    model: 'openai/gpt-oss-120b',
+    hint: 'key starts with gsk_',
+    color: '#f55036',
+    roles: 'Free backup for every bot',
+  },
+  /** Free tier, very fast open models. Limits per Cerebras' pricing page, Oct 2026. */
+  cerebras: {
+    label: 'Cerebras (free)',
+    model: 'gpt-oss-120b',
+    hint: 'key starts with csk-',
+    color: '#ffa24d',
+    roles: 'Any bot you pick as the main one',
+  },
+  /** Freebuff has no official public API. This address and model name are unverified: change the Model box if it fails. */
+  freebuff: {
+    label: 'Freebuff (free)',
+    model: 'z-ai/glm-4.6',
+    hint: 'paste your Freebuff token',
+    color: '#7dd3fc',
+    roles: 'Any bot you pick as the main one',
+  },
+  /** Meta's Model API (api.meta.ai). Model name is unverified: check dev.meta.ai and change the Model box if needed. */
+  muse: {
+    label: 'Muse (Meta)',
+    model: 'muse-spark',
+    hint: 'paste your key from dev.meta.ai',
+    color: '#ff5fb8',
+    roles: 'Muse',
+  },
 };
 export const PROVIDERS = Object.keys(PROV) as ProviderId[];
 /** Model ids the providers have shut down or redirected (checked Oct 2026). A saved setting with one of these moves to the current default. */
@@ -26,6 +76,14 @@ export const RETIRED = new Set([
   'grok-3-mini',
   'grok-3',
 ]);
+/** Providers that speak the common "chat completions" format. */
+const CHAT_URL: Partial<Record<ProviderId, string>> = {
+  groq: 'https://api.groq.com/openai/v1/chat/completions',
+  cerebras: 'https://api.cerebras.ai/v1/chat/completions',
+  freebuff: 'https://freebuff.com/api/v1/chat/completions',
+  muse: 'https://api.meta.ai/v1/chat/completions',
+};
+const isChat = (p: ProviderId) => p in CHAT_URL;
 export const MODEL_RE = /^[A-Za-z0-9._:-]{1,80}$/;
 
 export function isCreditOrQuotaError(msg: string, status?: number): boolean {
@@ -104,12 +162,12 @@ export function buildRequest(
       },
     };
   }
-  if (o.provider === 'groq') {
+  if (isChat(o.provider)) {
     headers.authorization = 'Bearer ' + o.key;
     // gpt-oss thinks before it answers; the thinking counts toward the limit, so it gets room and is kept short
-    const reasoning = /gpt-oss/i.test(o.model);
+    const reasoning = (o.provider === 'groq' || o.provider === 'cerebras') && /gpt-oss/i.test(o.model);
     return {
-      url: 'https://api.groq.com/openai/v1/chat/completions',
+      url: CHAT_URL[o.provider]!,
       headers,
       body: {
         model: o.model,
@@ -167,7 +225,7 @@ export function parseReply(provider: ProviderId, data: any): CallResult {
       tin: +data.usage?.input_tokens || 0,
       tout: +data.usage?.output_tokens || 0,
     };
-  if (provider === 'groq') {
+  if (isChat(provider)) {
     const c = (data.choices || [])[0] || {};
     return {
       text: typeof c.message?.content === 'string' ? c.message.content : '',
@@ -212,7 +270,7 @@ export function foldEvent(provider: ProviderId, acc: CallResult, ev: any): CallR
     if (ev.type === 'error') throw new ProviderError(String(ev.error?.message || 'stream error').slice(0, 160));
     return acc;
   }
-  if (provider === 'groq') {
+  if (isChat(provider)) {
     if (ev.error) throw new ProviderError(String(ev.error.message || 'stream error').slice(0, 160));
     const c = (ev.choices || [])[0] || {};
     const u = ev.x_groq?.usage || ev.usage;
