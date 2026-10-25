@@ -1,3 +1,82 @@
+# Brain — Handoff Log
+
+## Core Ethos (standing rules for every entry below)
+> **"We are all one team of people and bots. Never hide information out of emotion: complete the task and push across the desk to the next person."** — Owner, Oct 2026
+
+1. **Zero Concealment / Zero Emotional Filtering**:
+   - Never downplay, sugarcoat, or hide errors, risks, failed stages, or credit exhaustion out of fear, pride, or emotion.
+   - Report raw facts and blockers directly so the team acts on truth.
+2. **Complete the Task Fully**:
+   - Complete every assigned task start to finish without passing back half-done steps.
+3. **Push Across the Desk**:
+   - Package clean, structured handoffs and slide them across the desk so the next teammate can pick up and continue immediately.
+
+
+---
+
+# Working Website Fields, Multi-Company Keys & Dynamic Filtering — date not recorded (merged from Jerk.md)
+
+## 1. AI Companies: Where To Get Keys & What They Power
+| Company | Key Format | Portal / URL | Bots Powered Directly | Specialty in Brain |
+| :--- | :--- | :--- | :--- | :--- |
+| **Anthropic** | `sk-ant-...` | [console.anthropic.com](https://console.anthropic.com) | Claude, Artifact | Reasoning, structured building, clear writing |
+| **OpenAI** | `sk-...` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | Codex, ChatGPT, Canvas, Muse | Tool usage, synthesis, code edits |
+| **Google** | `AIza...` | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) | Gemini | Large context, long documents, cross-checking |
+| **xAI** | `xai-...` | [console.x.ai](https://console.x.ai) | Grok Bot (Lead), Grok | Strategic challenges, reviews, final pass/fail call, memory filing |
+
+*Note*: Secondary tool/editor roles (Cursor/Anysphere, Xcode/Apple, Perplexity) participate in the team handoff chain and run through your configured AI keys. You can connect any one company, or connect all four for native multi-company execution!
+
+## 2. What Was Fixed in Website Fields
+1. **Multi-Company Key Management**:
+   - In `AdminPanel.tsx`, added a new **"All Company API Keys"** card displaying independent inputs, status pills, Test buttons, Clear buttons, and console links for each of the 4 companies.
+   - Fixed `store.ts` so setting or clearing a key for one company preserves all other company keys instead of wiping them.
+   - Fixed `store.ts` so switching the default provider dropdown preserves all keys.
+2. **Model Input Box**:
+   - Converted to controlled input with `onBlur` persistence so users can backspace, delete all text, paste, and type custom model names without regex rejection during keystrokes.
+3. **Limits Number Fields (`Tokens per reply`, `Calls`)**:
+   - Converted to controlled inputs with `onBlur` clamping so users can type numbers like "50" or "8" without premature keystroke clamping.
+4. **Focus Textarea**:
+   - Converted to controlled input syncing with `mem.settings.instructions` on load and saving to memory on blur.
+5. **Backup Passphrase**:
+   - Added live character length counter (`${phrase.length}/10 characters minimum`) so users immediately see when the button becomes active.
+6. **Composer Activation**:
+   - Fixed `Composer.tsx` so the prompt box activates as soon as ANY company key is set (not blocked if the default provider has no key).
+7. **Per-Bot Native Execution**:
+   - In `run-task.ts`, each bot dynamically uses its native company provider if that company's key is configured, or seamlessly falls back to whichever provider has a key.
+
+## 3. How to Check It
+1. Run typecheck in `app/`:
+   ```bash
+   cd app && npm run typecheck
+   ```
+2. Run test suite in `app/`:
+   ```bash
+   cd app && npm test
+   ```
+   (17 test suites, 93 tests pass)
+3. Build single-file `index.html`:
+   ```bash
+   cd app && npm run build
+   ```
+4. Verify in browser (`index.html`):
+   - Open `index.html` and go to the Admin tab.
+   - In "All Company API Keys", enter keys for Anthropic, OpenAI, Google, or xAI.
+   - Verify all keys remain saved, testable, and persistent.
+
+## 4. Multi-Bot Sign-Off (as recorded in Jerk.md)
+- **Claude**: Built the multi-company key management, fixed all input fields, and updated tests.
+- **Cursor**: Handoff recipient ready to inspect local `main`.
+- **Gemini**: Verified company key formats, portals, and field behaviors.
+- **ChatGPT**: Verified Composer activation and fallback provider routing.
+- **Muse**: Integrity checked; RedMed preserved.
+- **Grok Bot (in charge)**: Verified real results (17/17 test suites, 93/93 tests passing, production single-file build verified). Result: **PASS**.
+
+## 5. Open Items For The Next Person
+- No date, branch, head commit, or deploy state was recorded for this work. Confirm whether it is in the build currently live at `https://redeemed.live`.
+- Test counts don't line up with the other entries: this one says 17 suites / 93 tests; the deployment entry below says 18 files / 88 tests. Re-run `npm test` and record the real numbers.
+
+---
+
 # Personal Collection of Memories, Work Tracker, Team Inspector & Merged Deployment — 2026-10-24
 
 ## 1. Directive & Summary
