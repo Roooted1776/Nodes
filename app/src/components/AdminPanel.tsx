@@ -138,6 +138,11 @@ export default function AdminPanel() {
           hint="Paste a key for any company, then press Test. Each bot uses its own company's key when there is one. Keys are saved encrypted."
           wide
         >
+          {s.status && (
+            <p className="mini key-status" role="status">
+              {s.status}
+            </p>
+          )}
           <div className="company-keys-list">
             {PROVIDERS.map(p => {
               const has = !!s.keys[p];

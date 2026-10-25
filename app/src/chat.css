@@ -514,3 +514,11 @@ textarea {
     width: 86vw;
   }
 }
+.admin-bar .key-status {
+  margin: 0;
+  padding: 6px 8px;
+  border-left: 2px solid var(--accent);
+  background: rgba(154, 168, 255, 0.07);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
