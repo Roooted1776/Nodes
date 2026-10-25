@@ -14,6 +14,8 @@ description: >-
 4. **Edit**: Implement minimal necessary modifications and verify all 6 checks (`npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e`).
 5. **Push**: Document in `HANDOFF.md`, push verified work to `origin/main` via `./scripts/push-work.sh`, and follow the review sequence below.
 
+> **Standing Team Principle: We don't move slow.** Move with decisive momentum and surgeon-level precision. Complete every task start to finish, never stall or hand back half-done work, verify rapidly, and push across the desk immediately.
+
 ## Review Sequence
 1. Claude builds, verifies, and records the handoff.
 2. Cursor receives the handoff to inspect code diffs and repository integration.
