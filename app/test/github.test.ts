@@ -352,6 +352,7 @@ describe('GitHub Connector - Memory Items Conversion', () => {
   it('converts GitHub releases into workstream memory items', () => {
     const releases: GitHubRelease[] = [
       {
+        id: 1,
         tagName: 'v2.4.0',
         name: 'Brain v2.4.0 Neural Connectors',
         body: 'Added GitHub repository connector and multi-repo switcher.',
