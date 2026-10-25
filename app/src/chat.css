@@ -418,32 +418,6 @@
   margin-left: auto;
 }
 
-/* Lighter text (Owner, Oct 2026): same pixel font and layout, no fake bold, softer colour, no heavy glow */
-:root {
-  --fg: #d4d8ee;
-  --muted: #8a92b8;
-}
-html,
-body,
-button,
-input,
-select,
-textarea {
-  font-synthesis: none;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-*,
-*::before,
-*::after {
-  font-weight: 400 !important;
-}
-.agent-tag,
-.mem-tag,
-.task-node-tag {
-  text-shadow: 0 0 3px #000;
-}
-
 /* Bottom bar: taller, cards of equal height that scroll inside themselves, neat sideways scrolling */
 .home.single.with-admin {
   grid-template-rows: minmax(0, 1fr) clamp(260px, 38vh, 360px);
