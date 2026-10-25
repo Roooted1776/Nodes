@@ -1,0 +1,296 @@
+/* Modern theme (Owner, Oct 2026): calm charcoal, one soft indigo accent, a clean sans and sentence case.
+   Loaded last, so it only restyles; layout and behaviour live in the other sheets. */
+:root {
+  --bg: #09090b;
+  --bg2: #111114;
+  --panel: rgba(17, 17, 20, 0.86);
+  --surface: #131317;
+  --surface2: #1a1a1f;
+  --line: rgba(255, 255, 255, 0.07);
+  --line2: rgba(255, 255, 255, 0.12);
+  --fg: #e4e4e7;
+  --muted: #a1a1aa;
+  --faint: #71717a;
+  --accent: #a5b4fc;
+  --accent-strong: #818cf8;
+  --accent2: #c4b5fd;
+  --live: #5eead4;
+  --bad: #f87171;
+  --good: #4ade80;
+  --warn: #fbbf24;
+  --concept: #93c5fd;
+  --entity: #5eead4;
+  --workstream: #fdba74;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+body {
+  background: radial-gradient(1200px 800px at 35% 30%, #16161b 0%, var(--bg) 60%);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* calm type: sentence case, normal tracking, real weights */
+h1,
+h2,
+h3,
+h4,
+.group,
+.card .field > span,
+.card .field > legend,
+.card h1 {
+  text-transform: none !important;
+  letter-spacing: -0.01em !important;
+}
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  color: #f4f4f5;
+}
+b,
+strong {
+  font-weight: 600;
+}
+::selection {
+  background: rgba(129, 140, 248, 0.35);
+}
+
+/* controls */
+button,
+.btnlink {
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line2);
+  background: var(--surface2);
+  color: var(--fg);
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+button:hover:not(:disabled),
+.btnlink:hover {
+  background: #232329;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+button.primary,
+.card button[type="submit"] {
+  background: var(--fg);
+  color: #09090b;
+  border-color: var(--fg);
+}
+button.primary:hover:not(:disabled),
+.card button[type="submit"]:hover:not(:disabled) {
+  background: #fff;
+}
+button:disabled {
+  opacity: 0.4;
+}
+input,
+select,
+textarea {
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line2);
+  background: #0c0c0f;
+  color: var(--fg);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--faint);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.18);
+}
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+/* pills */
+.pill {
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 2px 9px;
+  border: 1px solid var(--line2);
+  background: var(--surface2);
+  color: var(--muted);
+}
+.pill.ok {
+  color: var(--good);
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(74, 222, 128, 0.08);
+}
+.pill.warn {
+  color: var(--warn);
+  border-color: rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+/* sign-in card */
+.card {
+  background: rgba(17, 17, 20, 0.92);
+  border: 1px solid var(--line2);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+}
+.card h1 {
+  font-size: 22px !important;
+}
+.card .field > span,
+.card .field > legend {
+  font-size: 12px !important;
+  font-weight: 500;
+  color: var(--muted);
+}
+.access::before {
+  display: none;
+}
+
+/* bottom bar */
+.admin-bar {
+  background: var(--bg) !important;
+  border-top: 1px solid var(--line) !important;
+}
+.admin-bar .panel.admin {
+  background: transparent !important;
+}
+.admin-bar .panel.admin > .group {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--faint);
+  opacity: 1;
+}
+.admin-bar .card2 {
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius) !important;
+  font-size: 13px;
+}
+.admin-bar .card2 h3 {
+  text-transform: none !important;
+  font-size: 13px !important;
+  font-weight: 600;
+  color: #f4f4f5 !important;
+  background: var(--surface) !important;
+  border-bottom: 1px solid var(--line) !important;
+}
+.admin-bar .card2 .hint2,
+.admin .mini,
+.admin small {
+  color: var(--muted) !important;
+  font-size: 12px;
+}
+.admin-bar .key-status {
+  border-left-color: var(--accent-strong);
+  background: rgba(129, 140, 248, 0.08);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.admin .company-key-card {
+  background: #0f0f12 !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+}
+.admin .company-tag {
+  border-left-width: 2px !important;
+}
+.admin .company-tag b {
+  font-weight: 600;
+}
+.admin .stat {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* chat and handoff panes */
+.home.single .side,
+.home.single .flow-side {
+  background: #0b0b0e !important;
+  border-color: var(--line) !important;
+}
+
+/* thin, quiet scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+/* labels on the 3D brain */
+.agent-tag,
+.mem-tag {
+  font-size: 12px !important;
+  font-weight: 500;
+  letter-spacing: 0 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9) !important;
+}
+.agent-tag {
+  border-radius: 6px !important;
+  padding: 1px 7px !important;
+  background: rgba(9, 9, 11, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* sign-in box */
+.access .card.minimal {
+  width: min(360px, 100%);
+  padding: 28px;
+  background: rgba(17, 17, 20, 0.88);
+  border: 1px solid var(--line2);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.access .card.minimal input,
+.access .card.minimal input:hover,
+.access .card.minimal input:focus,
+.access .card.minimal input:focus-visible {
+  background: #0c0c0f;
+  height: 42px;
+}
+.access .card.minimal button.primary {
+  height: 42px;
+  font-size: 14px;
+  letter-spacing: 0;
+  border-radius: 10px;
+}
+.access .card.minimal .toggle-mode {
+  color: var(--muted);
+  text-decoration: none;
+}
+.access .card.minimal .toggle-mode:hover {
+  color: var(--fg);
+  background: transparent;
+}
+
+/* even padding in the bottom cards */
+.admin-bar .panel.admin .card2 {
+  padding: 12px 14px;
+}
+.admin-bar .panel.admin .card2 h3 {
+  position: static;
+  margin: 0 0 2px;
+  padding: 0 0 8px;
+}
+.access .card.minimal input:focus {
+  border-color: var(--accent-strong);
+}

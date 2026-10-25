@@ -44,8 +44,6 @@ export default function AdminPanel() {
     mem = useMem(),
     { live } = s;
   const [modelText, setModelText] = useState(live.models[live.provider] || PROV[live.provider].model),
-    [maxTokensText, setMaxTokensText] = useState(String(live.maxTokens)),
-    [callCapText, setCallCapText] = useState(String(live.callCap)),
     [focusText, setFocusText] = useState(mem.settings.instructions || ''),
     [restore, setRestore] = useState(''),
     [phrase, setPhrase] = useState(''),
@@ -67,14 +65,6 @@ export default function AdminPanel() {
   useEffect(() => {
     setModelText(live.models[live.provider] || PROV[live.provider].model);
   }, [live.provider, live.models[live.provider]]);
-
-  useEffect(() => {
-    setMaxTokensText(String(live.maxTokens));
-  }, [live.maxTokens]);
-
-  useEffect(() => {
-    setCallCapText(String(live.callCap));
-  }, [live.callCap]);
 
   useEffect(() => {
     setFocusText(mem.settings.instructions || '');
@@ -357,46 +347,6 @@ export default function AdminPanel() {
             </div>
           </div>
         </Card>
-        <Card title="Limits" hint="Per page load. Reload to reset.">
-          <label className="mini-field">
-            <span>Tokens per reply</span>
-            <input
-              type="number"
-              min={20}
-              max={150}
-              value={maxTokensText}
-              onChange={e => {
-                setMaxTokensText(e.target.value);
-                const n = +e.target.value;
-                if (Number.isFinite(n) && n >= 20 && n <= 150) s.setLive({ maxTokens: n });
-              }}
-              onBlur={() => {
-                const n = Math.max(20, Math.min(150, Math.round(+maxTokensText || 120)));
-                setMaxTokensText(String(n));
-                s.setLive({ maxTokens: n });
-              }}
-            />
-          </label>
-          <label className="mini-field">
-            <span>Calls</span>
-            <input
-              type="number"
-              min={1}
-              max={9}
-              value={callCapText}
-              onChange={e => {
-                setCallCapText(e.target.value);
-                const n = +e.target.value;
-                if (Number.isFinite(n) && n >= 1 && n <= 9) s.setLive({ callCap: n });
-              }}
-              onBlur={() => {
-                const n = Math.max(1, Math.min(9, Math.round(+callCapText || 9)));
-                setCallCapText(String(n));
-                s.setLive({ callCap: n });
-              }}
-            />
-          </label>
-        </Card>
         <Card
           title="Bots & Credits"
           hint="Dynamically filters out bots whose providers have no credits, rearranging the 3D brain and live handoff chain so work continues autonomously."
@@ -565,22 +515,10 @@ export default function AdminPanel() {
       <div className="cards">
         <SystemCheck />
         <AccessLog />
-        {SECURITY.map(([t, h]) => (
-          <Card key={t} title={t} hint={h} />
-        ))}
       </div>
     </section>
   );
 }
-
-/** What the security does and does not do, one short box each. */
-const SECURITY: [string, string][] = [
-  ['Encrypted', 'Memory and remembered keys are stored only as AES-256-GCM ciphertext.'],
-  ['Admin-signed', 'Every save is signed with a key only admins hold. A changed copy is refused.'],
-  ['Locked down', 'Only the page script runs. Connections are limited to Brain’s database and the four AI providers.'],
-  ['Auto-lock', 'After 15 idle minutes, a minute hidden, or Esc twice.'],
-  ['Limits', 'No certification. No memory recovery if every admin password is lost.'],
-];
 
 function Accounts() {
   const { db, user, addUser, dropUser, resetPasscode, busy, error } = useAuth();
