@@ -10,6 +10,8 @@ const SHOW = 5;
 type Card = {
   id: string | null;
   q: string;
+  project: string;
+  projectId?: string;
   ts: number;
   states: Partial<Record<AgentId, StageState>>;
   line: string;
@@ -19,6 +21,8 @@ type Card = {
 
 const wordsPassed = (f?: Flow[]) => (f || []).reduce((n, x) => n + x[2], 0);
 function fromSession(s: Session): Card {
+  const project = s.project || 'Brain';
+  const projectId = s.projectId;
   const states: Card['states'] = {};
   for (const [k, v] of Object.entries(s.cover || {})) if (isAgent(k)) states[k] = v.s;
   const sm = summary(states),
@@ -34,6 +38,8 @@ function fromSession(s: Session): Card {
     return {
       id: s.id,
       q: s.q,
+      project,
+      projectId,
       ts: s.ts,
       states,
       tone: 'bad',
@@ -44,6 +50,8 @@ function fromSession(s: Session): Card {
     return {
       id: s.id,
       q: s.q,
+      project,
+      projectId,
       ts: s.ts,
       states,
       tone: 'stop',
@@ -53,6 +61,8 @@ function fromSession(s: Session): Card {
   return {
     id: s.id,
     q: s.q,
+    project,
+    projectId,
     ts: s.ts,
     states,
     tone: 'ok',
@@ -78,6 +88,7 @@ export default function Tasks() {
         {
           id: null,
           q: task,
+          project: useStore.getState().activeProject || 'Brain',
           ts: Date.now(),
           states: stages,
           tone: 'run',
@@ -105,11 +116,24 @@ export default function Tasks() {
           type="button"
           key={c.id || 'now'}
           className={'task ' + c.tone + (viewing && viewing.id === c.id ? ' on' : '')}
-          onClick={() => c.id && viewSession(viewing?.id === c.id ? null : c.id)}
+          onClick={() => {
+            if (c.projectId) {
+              useStore.setState(st => ({
+                sceneFocus: { kind: 'memory', id: c.projectId!, sequence: (st.sceneFocus?.sequence || 0) + 1 },
+                selected: c.projectId!,
+              }));
+            }
+            c.id && viewSession(viewing?.id === c.id ? null : c.id);
+          }}
           disabled={!c.id}
           aria-label={'Task: ' + c.q}
         >
-          <span className="tq">{c.q}</span>
+          <span className="tq">
+            <strong className="tproj" title={`Project: ${c.project}`}>
+              [{c.project}]
+            </strong>
+            {c.q}
+          </span>
           <time>{c.id ? fmtDate(c.ts) : 'now'}</time>
           <span className="tdots" aria-hidden="true">
             {LIVE_ORDER.map(id => (

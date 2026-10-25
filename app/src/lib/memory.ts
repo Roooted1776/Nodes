@@ -1,5 +1,6 @@
 import { isAgent } from '../data/team';
 import { redact } from './redact';
+import { clip } from './text';
 
 // Same storage format as the earlier single-file page (brain.mem.v2), so saved memory carries over.
 export const KEY = 'brain.mem.v2';
@@ -55,6 +56,8 @@ export interface Session {
   cover?: Record<string, { s: Cover; why?: string }>;
   flow?: Flow[];
   ms?: Record<string, number>;
+  project?: string;
+  projectId?: string;
 }
 export interface Settings {
   brain: boolean;
@@ -236,6 +239,8 @@ export function sanitizeMem(d: any, fromBackup = false): Mem | null {
       cover: cleanCover(s.cover),
       flow: cleanFlow(s.flow),
       ms: cleanMs(s.ms),
+      project: typeof s.project === 'string' ? scrub(s.project.slice(0, 80)) : undefined,
+      projectId: typeof s.projectId === 'string' ? scrub(s.projectId.slice(0, 40)) : undefined,
       used: Array.isArray(s.used)
         ? s.used.filter((u: unknown) => typeof u === 'string' && ids.has(u as string)).slice(0, 12)
         : [],
@@ -343,4 +348,40 @@ export function mkEntry(
     kws: o.kws || null,
     manual: !!o.manual,
   };
+}
+
+/** Ensures a project exists as a workstream node in the Brain graph, and links any session to it. */
+export function ensureProjectNode(m: Mem, projectName: string, s?: Session, now = Date.now()): Entry {
+  const name = projectName.trim() || 'Brain';
+  const key = `project:${name.toLowerCase()}`;
+  let node = m.entries.find(
+    e => (e.type === 'workstream' && e.title.toLowerCase() === name.toLowerCase()) || e.key === key,
+  );
+  if (!node) {
+    node = mkEntry(
+      m,
+      {
+        key,
+        type: 'workstream',
+        title: name,
+        note: `Project ${name}. Tasks and workstreams in Brain.`,
+        sources: s ? [{ kind: 'session', label: `Task: ${clip(s.q, 40)}`, ref: s.id }] : [],
+        kws: [name.toLowerCase(), 'project', 'workstream'],
+      },
+      now,
+    );
+    m.entries.push(node);
+  } else {
+    node.seen = now;
+    node.strength = Math.min(9, node.strength + 1);
+    if (s && !node.sources.some(src => src.ref === s.id)) {
+      node.sources.push({ kind: 'session', label: `Task: ${clip(s.q, 40)}`, ref: s.id });
+      if (node.sources.length > 8) node.sources.shift();
+    }
+  }
+  if (s) {
+    s.project = node.title;
+    s.projectId = node.id;
+  }
+  return node;
 }

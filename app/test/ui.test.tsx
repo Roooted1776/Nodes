@@ -61,6 +61,7 @@ vi.mock('../src/lib/cloud', () => ({
     return ++server.rev;
   },
   async writeAudit() {},
+  async syncMemoryDatabase() {},
   async readAudit() {
     return [];
   },
@@ -257,5 +258,20 @@ describe('who can do what', () => {
     await u.click(screen.getByRole('button', { name: 'Add account' }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/adults only/i));
     expect(server.users.map(u => u.name)).toEqual(['Owner']);
+  }, 30000);
+
+  it('chat panel has auto-scroll enabled by default and can toggle off and on', async () => {
+    const { u, App } = await asRole('admin');
+    render(<App />);
+    expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
+    const autoScrollBtn = screen.getByRole('button', { name: /Auto-scroll/i });
+    expect(autoScrollBtn.textContent).toBe('Auto-scroll on');
+    expect(autoScrollBtn.getAttribute('aria-pressed')).toBe('true');
+    await u.click(autoScrollBtn);
+    expect(autoScrollBtn.textContent).toBe('Auto-scroll off');
+    expect(autoScrollBtn.getAttribute('aria-pressed')).toBe('false');
+    await u.click(autoScrollBtn);
+    expect(autoScrollBtn.textContent).toBe('Auto-scroll on');
+    expect(autoScrollBtn.getAttribute('aria-pressed')).toBe('true');
   }, 30000);
 });

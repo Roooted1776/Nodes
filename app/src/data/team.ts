@@ -57,12 +57,12 @@ export const AGENTS: Agent[] = [
   {
     id: 'gemini',
     name: 'Gemini',
-    role: 'Context · long documents',
+    role: 'Context · multi-file code',
     kind: 'collab',
     x: 0.46,
     y: 0.55,
-    specialty: 'Reads a lot at once and cross-checks it, including images and long documents',
-    skills: ['long documents', 'images', 'cross-checking'],
+    specialty: 'Ingests vast context, whole codebases, multi-file architectures, and writes robust code',
+    skills: ['code architecture', 'repo ingestion', 'cross-checking', 'code analysis'],
   },
   {
     id: 'cursor',
@@ -77,12 +77,12 @@ export const AGENTS: Agent[] = [
   {
     id: 'chatgpt',
     name: 'Codex',
-    role: 'Tools · synthesis',
+    role: 'Code engine · tools · synthesis',
     kind: 'collab',
     x: 0.78,
     y: 0.62,
-    specialty: 'Uses tools on code, then pulls the findings together',
-    skills: ['tool use', 'coding', 'planning', 'synthesis'],
+    specialty: 'Deep code synthesis, precision implementations, refactoring, and technical tool work',
+    skills: ['code synthesis', 'refactoring', 'algorithms', 'tool use'],
   },
   {
     id: 'perplexity',
@@ -141,9 +141,10 @@ export const IOS_RE = /\b(ios|iphone|ipad|xcode|swift|app store)\b/i;
 
 const STAGE: Record<AgentId, string> = {
   gemini:
-    'FIRST CHECK. Read the request and any context. List the concrete requirements, limits and anything unclear that blocks the work.',
-  muse: 'SECOND CHECK. Audit the incoming context and handoff on your own. Name gaps, contradictions, risks and missing evidence.',
-  chatgpt: 'COLLECTIVE CHECK. Turn the reviewed handoff into a clear, ordered plan and a text deliverable.',
+    'FIRST CHECK. Ingest the request, full codebase context, and requirements. Outline the architectural code approach and highlight any blocks.',
+  muse: 'SECOND CHECK. Audit the incoming context and handoff on your own. Name gaps, contradictions, risks and missing evidence. Do not write code; leave code creation to the coding engines and focus purely on finding bugs and flaws.',
+  chatgpt:
+    'CODE & PLAN ENGINE. Turn the reviewed handoff into a concrete, ordered technical plan and production-grade code deliverable.',
   claude:
     'BUILDER. Produce the reasoning, writing, design or code proposal as text. Do not claim to have edited files.',
   cursor:
@@ -158,9 +159,9 @@ const STAGE: Record<AgentId, string> = {
 };
 
 const TASK: Record<AgentId, string> = {
-  gemini: 'Pull out requirements, given context and open questions. Deliver a context check.',
-  muse: 'Audit the incoming context and handoff for gaps, risks, contradictions and unsupported claims.',
-  chatgpt: 'Write an actionable plan and text deliverable from the reviewed handoff.',
+  gemini: 'Ingest codebase context, identify requirements, edge cases, and architectural code approach.',
+  muse: 'Audit the incoming context and handoff for gaps, risks, contradictions and flaws. Do not generate code.',
+  chatgpt: 'Write an actionable plan and production-grade code deliverable from the reviewed handoff.',
   claude: 'Write the requested reasoning, writing, design or code proposal.',
   cursor: 'Check repo integration risks using only the material provided.',
   perplexity: 'Check citations and source quality using supplied material only.',

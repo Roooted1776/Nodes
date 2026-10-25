@@ -60,8 +60,10 @@ describe('a real task, streamed', () => {
     const sess = s.mem.sessions.at(-1)!;
     expect(sess.flow).toEqual(s.flow);
     expect(sess.ms).toEqual(s.timing);
+    expect(sess.project).toBe('Brain');
     expect(s.log.filter(m => m.from === 'gemini')[0].text).toBe('one two three');
-    expect(s.mem.entries.map(e => e.key)).toEqual(['ai:concept:plan first']); // the only memory is the one the AI wrote
+    expect(s.mem.entries.map(e => e.key)).toContain('project:brain');
+    expect(s.mem.entries.map(e => e.key)).toContain('ai:concept:plan first');
     expect(s.log.at(-1)).toMatchObject({
       from: 'grokbot',
       text: 'Filed to memory:\nPlan first: The team plans before building.',

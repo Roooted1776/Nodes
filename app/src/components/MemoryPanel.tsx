@@ -153,6 +153,22 @@ function Detail({ e, onSession }: { e: Entry; onSession(id: string): void }) {
           )}
         </div>
       )}
+      {e.type === 'workstream' &&
+        (() => {
+          const projTasks = mem.sessions.filter(
+            s => s.projectId === e.id || s.project?.toLowerCase() === e.title.toLowerCase(),
+          );
+          return projTasks.length > 0 ? (
+            <div className="srcs">
+              <b>Tasks in Project ({projTasks.length})</b>
+              {projTasks.map(s => (
+                <button type="button" key={s.id} className="link" onClick={() => onSession(s.id)}>
+                  {s.q}
+                </button>
+              ))}
+            </div>
+          ) : null;
+        })()}
       {e.links.length > 0 && (
         <div className="srcs">
           <b>Linked</b>

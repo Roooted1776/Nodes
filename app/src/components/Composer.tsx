@@ -16,7 +16,21 @@ export default function Composer() {
     live = useStore(s => s.live),
     send = useStore(s => s.send),
     stop = useStore(s => s.stop),
+    activeProject = useStore(s => s.activeProject),
+    setActiveProject = useStore(s => s.setActiveProject),
+    mem = useStore(s => s.mem),
     ready = useStore(s => !!s.keys[s.live.provider]);
+  const [showNew, setShowNew] = useState(false);
+  const [newProj, setNewProj] = useState('');
+
+  const projects = Array.from(
+    new Set([
+      'Brain',
+      ...mem.entries.filter(e => e.type === 'workstream').map(e => e.title),
+      ...mem.sessions.map(s => s.project).filter((p): p is string => Boolean(p)),
+    ]),
+  );
+
   const go = () => {
     if (!q.trim() || busy || !ready) return;
     void send(q);
@@ -30,6 +44,80 @@ export default function Composer() {
         go();
       }}
     >
+      <div className="composer-proj-row">
+        {showNew ? (
+          <>
+            <label htmlFor="new-project-input">New Project:</label>
+            <input
+              id="new-project-input"
+              value={newProj}
+              onChange={e => setNewProj(e.target.value)}
+              placeholder="Project name"
+              disabled={busy}
+              maxLength={60}
+              aria-label="New Project Name"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (newProj.trim()) {
+                    setActiveProject(newProj.trim());
+                    setShowNew(false);
+                    setNewProj('');
+                  }
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btnlink sm"
+              onClick={() => {
+                if (newProj.trim()) {
+                  setActiveProject(newProj.trim());
+                  setShowNew(false);
+                  setNewProj('');
+                }
+              }}
+              disabled={!newProj.trim()}
+            >
+              Set
+            </button>
+            <button
+              type="button"
+              className="link"
+              onClick={() => {
+                setShowNew(false);
+                setNewProj('');
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <label htmlFor="composer-project">Project Node:</label>
+            <select
+              id="composer-project"
+              value={activeProject}
+              onChange={e => {
+                if (e.target.value === '__new__') {
+                  setShowNew(true);
+                } else {
+                  setActiveProject(e.target.value);
+                }
+              }}
+              disabled={busy}
+              aria-label="Active Project"
+            >
+              {projects.map(p => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+              <option value="__new__">+ New project…</option>
+            </select>
+          </>
+        )}
+      </div>
       {ready && !q && !busy && (
         <section className="prompts" aria-label="Example tasks">
           {PROMPTS.map(p => (
