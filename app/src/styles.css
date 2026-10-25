@@ -2621,7 +2621,18 @@ legend {
   z-index: 1000;
   padding: 16px;
 }
+.import-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  cursor: default;
+}
 .import-modal {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 580px;
   max-height: 90vh;
