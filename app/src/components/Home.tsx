@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import AdminPanel from './AdminPanel';
 import AgentInspector from './AgentInspector';
 import ChatPanel from './ChatPanel';
+import FlowPane from './FlowPane';
 
 const BrainScene = lazy(() => import('./BrainScene'));
 
@@ -48,6 +49,9 @@ export default function Home() {
           </button>
         </main>
       </section>
+      <aside className="flow-side">
+        <FlowPane />
+      </aside>
       <aside className="side">
         <ChatPanel />
       </aside>

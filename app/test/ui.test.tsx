@@ -260,6 +260,26 @@ describe('who can do what', () => {
     expect(within(dialog).getByText(/Anthropic/)).toBeTruthy();
   }, 30000);
 
+  it('the handoff pane beside the chat shows starting point → the bot it goes to', async () => {
+    const { App, store } = await asRole('admin');
+    render(<App />);
+    expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
+    act(() => {
+      store.useStore.setState({
+        flow: [
+          ['owner', 'grok', 12],
+          ['grok', 'claude', 80],
+        ],
+      });
+    });
+    const pane = screen.getByRole('region', { name: 'Handoffs' });
+    const rows = within(pane)
+      .getAllByRole('listitem')
+      .map(li => li.textContent);
+    expect(rows[0]).toMatch(/You.*goes to.*Grok/);
+    expect(rows[1]).toMatch(/Grok.*goes to.*Claude/);
+  }, 30000);
+
   it('knows a token or rate limit from other failures', async () => {
     const { isLimitError, ProviderError } = await import('../src/lib/providers');
     expect(isLimitError(new ProviderError('HTTP 429: Too Many Requests'))).toBe(true);
