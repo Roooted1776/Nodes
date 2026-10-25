@@ -1,0 +1,144 @@
+/* Tidal wave background canvas (see tidal-bg.ts) */
+#tidal-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  display: block;
+  pointer-events: none;
+}
+html {
+  background: #000;
+}
+/* let the wave canvas show through: body must not paint over it */
+body {
+  background: transparent !important;
+}
+/* login page: hide the Adults only / Logged / Real AI boxes */
+.card .tiles {
+  display: none !important;
+}
+/* login page: monochrome look to match the wave background (sizes stay 16/32px so the pixel font stays sharp) */
+.access .card {
+  width: min(380px, 100%);
+  padding: 28px 26px 26px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(14px) saturate(0.6);
+  -webkit-backdrop-filter: blur(14px) saturate(0.6);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 40px 120px rgba(0, 0, 0, 0.8);
+  position: relative;
+}
+.access .card::before {
+  /* thin bright rule across the top edge */
+  content: "";
+  position: absolute;
+  left: 26px;
+  right: 26px;
+  top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+}
+.access .card .terminal {
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 2px;
+  margin: 0 0 14px;
+}
+.access .card h1 {
+  color: #fff;
+  font-size: 32px;
+  line-height: 1.15;
+  margin: 0 0 6px;
+}
+.access .card .lead {
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0 0 22px;
+}
+.access .card form {
+  gap: 14px;
+}
+.access .card .field {
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 0;
+  gap: 6px;
+}
+.access .card .field > span,
+.access .card .field > legend {
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 1px;
+}
+.access .card input,
+.access .card select {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  padding: 10px 12px;
+  color: #fff;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.access .card input:hover,
+.access .card select:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.access .card input:focus,
+.access .card select:focus,
+.access .card input:focus-visible,
+.access .card select:focus-visible {
+  outline: none;
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+.access .card button.primary {
+  margin-top: 6px;
+  padding: 11px 12px;
+  background: #fff;
+  color: #000;
+  border: 1px solid #fff;
+  border-radius: 3px;
+  letter-spacing: 1px;
+  filter: none;
+}
+.access .card button.primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.86);
+  filter: none;
+}
+.access .card button.primary:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+.access .card button:not(.primary) {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: 3px;
+}
+.access .card button.link {
+  border: 0;
+  color: rgba(255, 255, 255, 0.7);
+}
+.access .card .error,
+.access .card .notice {
+  background: rgba(255, 255, 255, 0.03);
+  border: 0;
+  border-left: 2px solid currentColor;
+  border-radius: 0;
+  padding: 8px 12px;
+}
+.access .card .error {
+  color: #ff9b9b;
+}
+.access .card .notice {
+  color: #bdf5d6;
+}
+.access .card small {
+  color: rgba(255, 255, 255, 0.45);
+}
