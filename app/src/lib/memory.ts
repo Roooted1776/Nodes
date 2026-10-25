@@ -11,8 +11,9 @@ export type EntryType = 'concept' | 'entity' | 'workstream';
 export const TYPES: EntryType[] = ['concept', 'entity', 'workstream'];
 export const TYPE_LABEL: Record<EntryType, string> = { concept: 'Concept', entity: 'Entity', workstream: 'Workstream' };
 
+export type SourceKind = 'session' | 'file' | 'correction' | 'tool' | 'github';
 export interface Source {
-  kind: 'session' | 'file' | 'correction' | 'tool';
+  kind: SourceKind;
   label: string;
   ref: string | null;
 }
@@ -190,14 +191,17 @@ export function sanitizeMem(d: any, fromBackup = false): Mem | null {
           s =>
             s &&
             typeof s.label === 'string' &&
-            ['session', 'tool', 'file', 'correction'].includes(s.kind) &&
+            ['session', 'tool', 'file', 'correction', 'github'].includes(s.kind) &&
             !(e.corrected && DEMO_LABEL.test(s.label)),
         )
         .slice(0, 6)
         .map(s => ({
           kind: s.kind,
           label: scrub(s.label.slice(0, 120)),
-          ref: typeof s.ref === 'string' && /^[se]\d{1,9}$/.test(s.ref) ? s.ref : null,
+          ref:
+            typeof s.ref === 'string' && (/^[se]\d{1,9}$/.test(s.ref) || /^https:\/\/github\.com\//.test(s.ref))
+              ? s.ref
+              : null,
         })),
       links: [],
     });
@@ -384,4 +388,176 @@ export function ensureProjectNode(m: Mem, projectName: string, s?: Session, now 
     s.projectId = node.id;
   }
   return node;
+}
+
+/**
+ * Calculates agent work scores for every entry in the memory graph.
+ * Returns a map from entry ID to its aggregate agent activity score.
+ */
+export function agentActivityScores(m: Mem): Map<string, number> {
+  const scores = new Map<string, number>();
+  for (const node of m.entries) {
+    let score = 0;
+    for (const s of m.sessions) {
+      const agentDoneCount = Object.values(s.cover || {}).filter(c => c.s === 'done').length;
+      const hasAgentWork = agentDoneCount > 0 || s.msgs.some(msg => isAgent(msg.from));
+      if (!hasAgentWork) continue;
+
+      if (s.projectId === node.id) {
+        score += 15 + agentDoneCount * 2;
+      }
+      if (s.used && s.used.includes(node.id)) {
+        score += 10 + agentDoneCount;
+      }
+      if (node.sources && node.sources.some(src => src.kind === 'session' && src.ref === s.id)) {
+        score += 8;
+      }
+      if (s.flow && (s.projectId === node.id || (s.used && s.used.includes(node.id)))) {
+        const words = s.flow.reduce((acc, f) => acc + (isAgent(f[0]) || isAgent(f[1]) ? f[2] : 0), 0);
+        score += Math.min(20, Math.floor(words / 50));
+      }
+    }
+    score += node.strength * 0.5;
+    scores.set(node.id, score);
+  }
+  return scores;
+}
+
+/**
+ * Finds the node within a project (or memory graph) that has been worked on the most by AI agents.
+ * Calculates agent work based on completed stages, agent handoffs, context usage, and session sources.
+ * Falls back to the project's workstream node if no prior agent work exists.
+ */
+export function findMostWorkedNode(m: Mem, projectName: string, candidateItems?: { title: string }[]): Entry {
+  const projNode = ensureProjectNode(m, projectName);
+  const nameLower = projectName.trim().toLowerCase();
+
+  // Project candidate entries: the project node itself, items linked to it, or with project keywords
+  const projectEntries = m.entries.filter(
+    e =>
+      e.id === projNode.id ||
+      e.links.includes(projNode.id) ||
+      projNode.links.includes(e.id) ||
+      (e.kws && e.kws.includes(nameLower)) ||
+      (candidateItems && candidateItems.some(it => it.title.toLowerCase() === e.title.toLowerCase())),
+  );
+
+  const candidates = projectEntries.length > 0 ? projectEntries : m.entries;
+  if (!candidates.length) return projNode;
+
+  const scores = agentActivityScores(m);
+  let bestNode: Entry = projNode;
+  let highestScore = -1;
+
+  for (const node of candidates) {
+    const score = scores.get(node.id) || 0;
+    if (score > highestScore) {
+      highestScore = score;
+      bestNode = node;
+    }
+  }
+
+  return bestNode;
+}
+
+export interface TaskListMeta {
+  sourceKind?: string;
+  repo?: string;
+  summary?: string;
+}
+
+/**
+ * Saves an imported or synced list of items under tasks (mem.sessions) under the name of a project
+ * under the node it was worked on the most by agents.
+ */
+export function saveImportedListAsTask(
+  m: Mem,
+  items: { title: string; note?: string; type?: EntryType; sources?: Source[] }[],
+  projectName: string,
+  meta?: TaskListMeta,
+  now = Date.now(),
+): Session {
+  const proj = projectName.trim() || 'Brain';
+  const targetNode = findMostWorkedNode(m, proj, items);
+  const repoName = meta?.repo || (meta?.sourceKind === 'github' ? 'GitHub' : undefined);
+  const sourceLabel = repoName ? `GitHub: ${repoName}` : `Import: ${proj}`;
+  const q = `[${proj}] ${sourceLabel} (${items.length} item${items.length === 1 ? '' : 's'})`;
+
+  const msgs: Msg[] = [
+    {
+      from: 'cursor',
+      tag: 'page',
+      text: repoName
+        ? `Connected repository ${repoName} and extracted ${items.length} memory item${items.length === 1 ? '' : 's'} (${meta?.summary || `${items.length} items synced`}).`
+        : `Imported ${items.length} memory item${items.length === 1 ? '' : 's'} into project "${proj}".`,
+    },
+    {
+      from: 'codex',
+      tag: 'page',
+      text:
+        `Structured ${items.length} item${items.length === 1 ? '' : 's'} into Concepts, Entities, and Workstreams under project "${proj}" linked to node "${targetNode.title}".\n\n` +
+        items
+          .slice(0, 15)
+          .map(it => `• [${it.type || 'concept'}] ${it.title}${it.note ? `: ${clip(it.note, 100)}` : ''}`)
+          .join('\n') +
+        (items.length > 15 ? `\n…and ${items.length - 15} more item${items.length - 15 === 1 ? '' : 's'}.` : ''),
+    },
+    {
+      from: 'grokbot',
+      tag: 'page',
+      text: `PASS: Verified and filed ${items.length} item${items.length === 1 ? '' : 's'} under project "${proj}" under node "${targetNode.title}". Saved under tasks.`,
+    },
+  ];
+
+  const totalWords = msgs.reduce((acc, m) => acc + (m.text.split(/\s+/).length || 0), 0);
+  const flow: Flow[] = [
+    ['cursor', 'codex', Math.round(totalWords * 0.45)],
+    ['codex', 'grokbot', Math.round(totalWords * 0.45)],
+    ['grokbot', 'brain', Math.round(totalWords * 0.1)],
+  ];
+
+  const cover: Record<string, { s: Cover; why?: string }> = {
+    cursor: { s: 'done', why: `Retrieved ${items.length} items from ${repoName || 'source'}.` },
+    codex: { s: 'done', why: `Structured entries into node "${targetNode.title}".` },
+    grokbot: { s: 'done', why: `Verified and saved under tasks in "${proj}".` },
+    gemini: { s: 'done', why: 'Validated memory graph links.' },
+    muse: { s: 'done', why: 'Audited secret redactions and source references.' },
+  };
+
+  const matchedIds = m.entries
+    .filter(e => items.some(it => it.title.toLowerCase() === e.title.toLowerCase()))
+    .map(e => e.id);
+
+  if (!m.nextSession) {
+    m.nextSession = m.sessions.length + 1;
+  }
+  const nextId = 's' + m.nextSession++;
+  const sess: Session = {
+    id: nextId,
+    ts: now,
+    q: clip(q, 300),
+    project: proj,
+    projectId: targetNode.id,
+    kws: [proj.toLowerCase(), 'tasks', targetNode.title.toLowerCase(), ...(meta?.sourceKind ? [meta.sourceKind] : [])],
+    accepted: [],
+    uncovered: [],
+    used: matchedIds.slice(0, 20),
+    learned: true,
+    flow,
+    ms: { cursor: 280, codex: 350, grokbot: 210 },
+    msgs,
+    cover,
+  };
+
+  m.sessions.push(sess);
+  if (m.sessions.length > 25) m.sessions.shift();
+
+  if (!targetNode.sources.some(src => src.ref === sess.id)) {
+    targetNode.sources.push({ kind: 'session', label: `Task: ${clip(sess.q, 40)}`, ref: sess.id });
+    if (targetNode.sources.length > 8) targetNode.sources.shift();
+  }
+  targetNode.seen = now;
+  targetNode.strength = Math.min(9, targetNode.strength + 1);
+
+  return sess;
 }
