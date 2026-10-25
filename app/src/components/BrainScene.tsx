@@ -892,7 +892,7 @@ function Rig() {
       autoRotate={auto}
       autoRotateSpeed={0.55}
       minDistance={3}
-      maxDistance={24}
+      maxDistance={32}
       target={HEAD_CENTER}
       enablePan={false}
     />
@@ -909,7 +909,7 @@ export default function BrainScene({ locked = false }: { locked?: boolean }) {
   const select = useStore(s => s.select);
   return (
     <Canvas
-      camera={{ position: [2.8, 0.4, 14], fov: 40 }}
+      camera={{ position: [3.8, 0.9, 18.5], fov: 40 }}
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true, stencil: true, powerPreference: 'high-performance' }}
       onPointerMissed={() => select(null)}
