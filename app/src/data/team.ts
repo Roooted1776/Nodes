@@ -11,6 +11,8 @@ export interface Agent {
   y: number; // position on the team diagram (0..1)
   specialty: string;
   skills: string[];
+  company: string;
+  provider?: string;
 }
 
 export const AGENTS: Agent[] = [
@@ -23,6 +25,8 @@ export const AGENTS: Agent[] = [
     y: 0.1,
     specialty: 'Leads the team and makes the final call after the three checks',
     skills: ['sets review order', 'collects findings', 'final pass or fail'],
+    company: 'xAI',
+    provider: 'xai',
   },
   {
     id: 'grok',
@@ -33,6 +37,8 @@ export const AGENTS: Agent[] = [
     y: 0.1,
     specialty: 'Finds weak assumptions, risks and missed options',
     skills: ['strategy', 'contrarian review', 'risk spotting'],
+    company: 'xAI',
+    provider: 'xai',
   },
   {
     id: 'claude',
@@ -43,6 +49,8 @@ export const AGENTS: Agent[] = [
     y: 0.33,
     specialty: 'Careful reasoning, clear writing and code',
     skills: ['step-by-step plans', 'clear writing', 'building'],
+    company: 'Anthropic',
+    provider: 'anthropic',
   },
   {
     id: 'xcode',
@@ -53,16 +61,19 @@ export const AGENTS: Agent[] = [
     y: 0.33,
     specialty: 'Builds and tests iPhone apps',
     skills: ['iOS builds', 'device testing', 'archives'],
+    company: 'Apple',
   },
   {
     id: 'gemini',
     name: 'Gemini',
-    role: 'Context · multi-file code',
+    role: 'Context · long documents',
     kind: 'collab',
     x: 0.46,
     y: 0.55,
-    specialty: 'Ingests vast context, whole codebases, multi-file architectures, and writes robust code',
-    skills: ['code architecture', 'repo ingestion', 'cross-checking', 'code analysis'],
+    specialty: 'Reads a lot at once and cross-checks it, including images and long documents',
+    skills: ['long documents', 'images', 'cross-checking'],
+    company: 'Google',
+    provider: 'google',
   },
   {
     id: 'cursor',
@@ -73,16 +84,19 @@ export const AGENTS: Agent[] = [
     y: 0.55,
     specialty: 'Edits code in the repo and reviews changes',
     skills: ['editing files', 'merging work', 'code review'],
+    company: 'Anysphere',
   },
   {
     id: 'chatgpt',
     name: 'Codex',
-    role: 'Code engine · tools · synthesis',
+    role: 'Tools · synthesis',
     kind: 'collab',
     x: 0.78,
     y: 0.62,
-    specialty: 'Deep code synthesis, precision implementations, refactoring, and technical tool work',
-    skills: ['code synthesis', 'refactoring', 'algorithms', 'tool use'],
+    specialty: 'Uses tools on code, then pulls the findings together',
+    skills: ['tool use', 'coding', 'planning', 'synthesis'],
+    company: 'OpenAI',
+    provider: 'openai',
   },
   {
     id: 'perplexity',
@@ -93,6 +107,7 @@ export const AGENTS: Agent[] = [
     y: 0.8,
     specialty: 'Checks sources and citations',
     skills: ['source quality', 'citations', 'fact checking'],
+    company: 'Perplexity',
   },
   {
     id: 'muse',
@@ -103,6 +118,7 @@ export const AGENTS: Agent[] = [
     y: 0.88,
     specialty: 'Audits everyone and finds what is wrong',
     skills: ['audits', 'finding bugs', 'honesty checks'],
+    company: 'Independent',
   },
 ];
 
@@ -141,10 +157,9 @@ export const IOS_RE = /\b(ios|iphone|ipad|xcode|swift|app store)\b/i;
 
 const STAGE: Record<AgentId, string> = {
   gemini:
-    'FIRST CHECK. Ingest the request, full codebase context, and requirements. Outline the architectural code approach and highlight any blocks.',
-  muse: 'SECOND CHECK. Audit the incoming context and handoff on your own. Name gaps, contradictions, risks and missing evidence. Do not write code; leave code creation to the coding engines and focus purely on finding bugs and flaws.',
-  chatgpt:
-    'CODE & PLAN ENGINE. Turn the reviewed handoff into a concrete, ordered technical plan and production-grade code deliverable.',
+    'FIRST CHECK. Read the request and any context. List the concrete requirements, limits and anything unclear that blocks the work.',
+  muse: 'SECOND CHECK. Audit the incoming context and handoff on your own. Name gaps, contradictions, risks and missing evidence.',
+  chatgpt: 'COLLECTIVE CHECK. Turn the reviewed handoff into a concrete step of attack, ordered plan, and deliverable.',
   claude:
     'BUILDER. Produce the reasoning, writing, design or code proposal as text. Do not claim to have edited files.',
   cursor:
@@ -159,9 +174,9 @@ const STAGE: Record<AgentId, string> = {
 };
 
 const TASK: Record<AgentId, string> = {
-  gemini: 'Ingest codebase context, identify requirements, edge cases, and architectural code approach.',
-  muse: 'Audit the incoming context and handoff for gaps, risks, contradictions and flaws. Do not generate code.',
-  chatgpt: 'Write an actionable plan and production-grade code deliverable from the reviewed handoff.',
+  gemini: 'Pull out requirements, given context and open questions. Deliver a context check.',
+  muse: 'Audit the incoming context and handoff for gaps, risks, contradictions and unsupported claims.',
+  chatgpt: 'Deploy the concrete step of attack and ordered plan from the reviewed handoff.',
   claude: 'Write the requested reasoning, writing, design or code proposal.',
   cursor: 'Check repo integration risks using only the material provided.',
   perplexity: 'Check citations and source quality using supplied material only.',
@@ -174,8 +189,10 @@ const TASK: Record<AgentId, string> = {
 export function systemPrompt(id: AgentId): string {
   const a = AGENT[id];
   return (
-    `You are ${a.name} (${a.role.toLowerCase()}), one of nine agents on Owner's team. Your specialty: ${a.specialty}. ${STAGE[id]}` +
-    ' First review the incoming handoff before your own work. Do only your assigned task, as text, and end with a clear handoff for the next agent.' +
+    `You are ${a.name} (${a.company}) (${a.role.toLowerCase()}), one of nine agents on Owner's team. Your specialty: ${a.specialty}. ${STAGE[id]}` +
+    ' We are all one team of people and bots. Never hide information out of emotion; complete your task fully and push it across the desk to the next teammate.' +
+    " Follow Owner's pipeline: Collect --> Review --> Edit --> Review --> Pass to next --> Review." +
+    ' Deploy the concrete step of attack: examine target, review incoming handoff, execute surgical edit, review output, and pass to next worker.' +
     ' You have no tools or repo access here: never claim to read files, make changes, browse or run tests. State blockers and uncertainty. Do not invent sources, results, keys or passwords.'
   );
 }
@@ -196,8 +213,11 @@ export function stagePrompt(
   return (
     `OWNER TASK:\n${task}\n\n` +
     (brainContext ? `${brainContext}\n\n` : '') +
-    `INCOMING HANDOFF FROM ${incomingFrom.toUpperCase()} (REVIEW THIS FIRST):\n${incoming}\n\n` +
+    `INCOMING HANDOFF FROM ${incomingFrom.toUpperCase()} (COLLECT & REVIEW FIRST):\n${incoming}\n\n` +
     `YOUR ASSIGNED WORK:\n${TASK[id]}\n\n` +
-    `Reply with these labeled sections: REVIEW OF INCOMING HANDOFF; YOUR WORK; HANDOFF TO ${handTo}; OPEN BLOCKERS. Be specific and short. Text only.`
+    'ONE TEAM PRINCIPLE: We are all one team of people and bots. Never hide information out of emotion. Complete your task and push across the desk to the next person.\n' +
+    'OPERATING PIPELINE: Collect --> Review --> Edit --> Review --> Pass to next --> Review.\n' +
+    'STEP OF ATTACK DEPLOYED: Target Recon -> Threat Audit -> Tactical Plan -> Surgical Strike -> Verification.\n' +
+    `Reply with these labeled sections: REVIEW OF INCOMING HANDOFF; STEP OF ATTACK; YOUR WORK; SELF-REVIEW; HANDOFF TO ${handTo}; OPEN BLOCKERS. Be specific and short. Text only.`
   );
 }

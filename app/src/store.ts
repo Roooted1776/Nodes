@@ -90,14 +90,16 @@ export interface State {
   draft: { from: AgentId; text: string } | null;
   timing: Partial<Record<AgentId, number>>;
   flow: Flow[];
+  inactiveBots: AgentId[];
+  autoUpdateBots: boolean;
   // actions
   commit(fn?: (m: Mem) => void): void;
   setLive(p: Partial<LiveCfg>): void;
-  setKey(k: string): void;
-  forgetKey(): void;
+  setKey(k: string, provider?: ProviderId): void;
+  forgetKey(provider?: ProviderId): void;
   send(q: string): Promise<void>;
   stop(): void;
-  testProvider(): Promise<void>;
+  testProvider(provider?: ProviderId): Promise<void>;
   note(o: { type: EntryType; title: string; note: string }): string | null;
   correct(id: string, fix: { title?: string; note: string }): void;
   remove(id: string): void;
@@ -108,6 +110,10 @@ export interface State {
   select(id: string | null): void;
   setView(v: View): void;
   setTab(t: Tab): void;
+  setBotActive(id: AgentId, active: boolean): void;
+  toggleBotActive(id: AgentId): void;
+  setAutoUpdateBots(auto: boolean): void;
+  updateAllBots(): void;
   set(p: Partial<State>): void;
   viewSession(id: string | null): void;
   activeProject: string;
@@ -234,6 +240,7 @@ export const useStore = create<State>()((set, get) => {
     draft: null,
     timing: {},
     flow: [],
+    inactiveBots: [],
     activeProject: 'Brain',
     setActiveProject: p => set({ activeProject: p.trim() || 'Brain' }),
 
@@ -430,6 +437,26 @@ export const useStore = create<State>()((set, get) => {
     },
     viewSession(id) {
       set({ viewing: id ? get().mem.sessions.find(x => x.id === id) || null : null, tab: 'chat' });
+    },
+    autoUpdateBots: true,
+    setAutoUpdateBots(auto) {
+      set({ autoUpdateBots: auto });
+    },
+    updateAllBots() {
+      set({ status: 'All bot stages and credits synchronized.' });
+    },
+    setBotActive(id, active) {
+      set(s => ({
+        inactiveBots: active ? s.inactiveBots.filter(b => b !== id) : Array.from(new Set([...s.inactiveBots, id])),
+      }));
+    },
+    toggleBotActive(id) {
+      set(s => {
+        const isInactive = s.inactiveBots.includes(id);
+        return {
+          inactiveBots: isInactive ? s.inactiveBots.filter(b => b !== id) : [...s.inactiveBots, id],
+        };
+      });
     },
   };
 });

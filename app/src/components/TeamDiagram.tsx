@@ -12,7 +12,8 @@ export default function TeamDiagram() {
     stages = useStore(s => s.stages),
     active = useStore(s => s.active),
     pulses = useStore(s => s.pulses),
-    live = useStore(s => s.live);
+    live = useStore(s => s.live),
+    inactiveBots = useStore(s => s.inactiveBots || []);
   const [pos, setPos] = useState<Record<string, { x: number; y: number }>>(() =>
     Object.fromEntries(AGENTS.map(a => [a.id, { x: a.x, y: a.y }])),
   );
@@ -58,6 +59,9 @@ export default function TeamDiagram() {
           </marker>
         </defs>
         {TEAM_EDGES.map(([a, b], i) => {
+          const isAInactive = inactiveBots.includes(a),
+            isBInactive = inactiveBots.includes(b),
+            isInactiveEdge = isAInactive || isBInactive;
           const p = spot(a)!,
             q = spot(b)!,
             dx = q.x - p.x,
@@ -71,12 +75,20 @@ export default function TeamDiagram() {
               y1={p.y + dy * k}
               x2={q.x - dx * k}
               y2={q.y - dy * k}
-              className={'edge' + (a === 'muse' && b === 'claude' ? ' audit' : '')}
-              markerEnd="url(#arr)"
+              className={
+                'edge' + (a === 'muse' && b === 'claude' ? ' audit' : '') + (isInactiveEdge ? ' edge-inactive' : '')
+              }
+              markerEnd={isInactiveEdge ? undefined : 'url(#arr)'}
             />
           );
         })}
         {pulses.map(pl => {
+          if (
+            (pl.from !== 'owner' && isAgent(pl.from) && inactiveBots.includes(pl.from)) ||
+            (pl.to !== 'brain' && isAgent(pl.to) && inactiveBots.includes(pl.to))
+          ) {
+            return null;
+          }
           const a = spot(pl.from === 'owner' ? pl.to : pl.from),
             b = spot(pl.to === 'brain' ? pl.from : pl.to);
           if (!a || !b || a === b) return null;
@@ -144,31 +156,41 @@ export default function TeamDiagram() {
       {AGENTS.map(a => {
         const st = stages[a.id],
           on = active === a.id,
+          isInactive = inactiveBots.includes(a.id),
           p = pos[a.id];
         return (
           <div
             key={a.id}
-            className={`tnode ${a.kind}${on ? ' on' : ''}${st === 'skipped' ? ' off' : ''}`}
+            className={`tnode ${a.kind}${on ? ' on' : ''}${st === 'skipped' || isInactive ? ' off' : ''}${isInactive ? ' inactive' : ''}`}
             style={{ left: p.x * 100 + '%', top: p.y * 100 + '%', '--c': colorOf(a.id) } as React.CSSProperties}
             onPointerDown={e => {
               drag.current = a.id;
               (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
             }}
-            title={a.specialty}
+            title={
+              isInactive
+                ? `${a.name} (${a.company}) · Inactive / No Credits`
+                : `${a.name} (${a.company}) · ${a.specialty}`
+            }
           >
             <b>
               <i className="sw8" aria-hidden="true" />
               {a.name}
+              {a.company && <small className="bot-co">{a.company}</small>}
             </b>
             <span>{a.role}</span>
-            {st && (
+            {isInactive && <span className="badge-nocredit">No Credits</span>}
+            {st && !isInactive && (
               <i className="dot" style={{ background: on ? 'var(--live)' : DOT[st] }} role="img" aria-label={st} />
             )}
             {on && <em>{live.models[live.provider]}</em>}
           </div>
         );
       })}
-      <p className="hint">Drag a node to move it. Solid arrows show who hands work to whom.</p>
+      <p className="hint">
+        Pipeline: Collect → Review → Edit → Review → Pass to next → Review. Drag a node to move it. Solid arrows show
+        handoffs.
+      </p>
     </div>
   );
 }
