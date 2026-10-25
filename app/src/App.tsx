@@ -10,6 +10,8 @@ export const Banner = (_: { at: 'top' | 'bottom' }) => null;
 
 export default function App() {
   const phase = useAuth(s => s.phase);
+  const ready = useAuth(s => s.ready);
+  const error = useAuth(s => s.error);
   useEffect(() => {
     void useAuth.getState().init();
   }, []);
@@ -31,7 +33,29 @@ export default function App() {
           <BrainScene locked />
         </Suspense>
       </div>
-      {phase === 'setup' ? <Setup /> : <Login />}
+      {!ready ? (
+        <main className="access">
+          <section className="card minimal">
+            <p className="notice" style={{ textAlign: 'center', margin: 0 }}>
+              {error ? error : 'Connecting to Brain…'}
+            </p>
+            {error && (
+              <button
+                type="button"
+                className="primary"
+                style={{ marginTop: '0.75rem' }}
+                onClick={() => void useAuth.getState().init()}
+              >
+                Retry
+              </button>
+            )}
+          </section>
+        </main>
+      ) : phase === 'setup' ? (
+        <Setup />
+      ) : (
+        <Login />
+      )}
     </>
   );
 }

@@ -574,4 +574,85 @@ npm run e2e
 - **Remote Origin**: `https://github.com/Roooted1776/Nodes.git`
 - **Auto-push Readiness**: Clean and ready for push via `./scripts/push-work.sh` or `npm run push`.
 
+---
+
+# Register as Admin Mode Toggle & Admin Role Check — Oct 25, 2026
+
+## 1. Directive & Intent
+- **User Directive**: "i need to registeras an  admin when its not there"
+- **Intent**:
+  1. When a user is on the Login card (e.g. if initialization landed on sign-in or after signing out/locking), provide an explicit path to create an admin account if no admin is present.
+  2. Allow bidirectional switching between "Sign in to Brain" and "Set up Brain" ("Register as admin" <-> "Already an admin? Sign in").
+  3. Ensure database RPCs (`setup_needed` and `claim_open_setup`) check specifically for the presence of an account with `role = 'admin'` rather than any profile, allowing admin registration whenever an admin is missing.
+  4. Preserve all strict black/white minimalism and aesthetic rules.
+
+## 2. Changes Made
+1. **Auth Store (`app/src/auth-store.ts`)**:
+   - Added `setPhase(phase: Phase)` to `AuthState` interface and implementation.
+   - Clears existing notices and errors when switching phases.
+2. **Access Component (`app/src/components/Access.tsx`)**:
+   - Added `<button type="button" className="toggle-mode" onClick={() => setPhase('setup')}>Register as admin</button>` to `Login`.
+   - Added `<button type="button" className="toggle-mode" onClick={() => setPhase('login')}>Already an admin? Sign in</button>` to `Setup`.
+3. **App Component (`app/src/App.tsx`)**:
+   - Handles connection loading state gracefully during initialization while keeping the minimal shell style.
+4. **Access Styling (`app/src/access.css`)**:
+   - Added `.access .card.minimal .toggle-mode` rule with transparent background, subtle neutral text (`#888`), underline decoration, and hover state (`#fff`) honoring the black/white background constraint.
+5. **Database Migration (`supabase/migrations/20261025030000_open_first_setup.sql`)**:
+   - Updated `claim_open_setup()` to check `if exists (select 1 from public.profiles where role = 'admin') then return false; end if;`.
+   - Updated `setup_needed()` to check `select not exists (select 1 from public.profiles where role = 'admin')`.
+   - Updated security permissions revoking anon/authenticated and granting service_role execution.
+6. **Edge Function (`supabase/functions/accounts/index.ts`)**:
+   - Changed `db.from('vaults').insert(...)` to `db.from('vaults').upsert(...)` to allow re-creating an admin cleanly even if a vault entry exists.
+7. **Unit & Integration Tests (`app/test/ui.test.tsx`)**:
+   - Added test verifying toggling between "Sign in to Brain" and "Set up Brain" via the respective action buttons.
+8. **Single-file Production Bundle (`index.html` & `app/dist/index.html`)**:
+   - Recompiled bundle with updated toggle buttons, CSS, and recalculated script integrity hash.
+
+## 3. Files Touched
+| File | Type | Changes Made |
+| :--- | :--- | :--- |
+| `app/src/auth-store.ts` | Source | Added `setPhase(phase)` action to state store. |
+| `app/src/components/Access.tsx` | Source | Added "Register as admin" and "Already an admin? Sign in" toggle buttons. |
+| `app/src/App.tsx` | Source | Graceful initialization state rendering. |
+| `app/src/access.css` | Styles | Styled `.toggle-mode` under minimal theme rules. |
+| `supabase/migrations/20261025030000_open_first_setup.sql` | Migration | Checked `where role = 'admin'` for `claim_open_setup` and `setup_needed`. |
+| `supabase/functions/accounts/index.ts` | Edge Function | Used `upsert` on `vaults` table during admin creation. |
+| `app/test/ui.test.tsx` | Test | Added toggle test between Login and Setup. |
+| `app/dist/index.html` | Build artifact | Rebuilt single-file production artifact. |
+| `index.html` | Build artifact | Root production file with updated hash. |
+| `HANDOFF.md` | Documentation | This handoff log entry. |
+
+## 4. Verification & Real Results
+1. **Format Check (`npm run format`)**:
+   - Output: `Formatted 75 files in 31ms. No fixes applied.`
+2. **Lint Check (`npm run lint`)**:
+   - Output: `Checked 76 files in 40ms. Found 29 warnings, 0 errors.`
+3. **Typecheck (`npm run typecheck`)**:
+   - Output: `tsc --noEmit` exited code 0 (0 errors).
+4. **Unit Tests (`npm test`)**:
+   - Output: `18 passed (18) files, 91 passed (91) tests` in 2.96s.
+5. **Production Build (`npm run build`)**:
+   - Output: `built in 292ms; wrote ../index.html 1580 KB; 1 script(s) pinned by hash`.
+6. **Browser E2E Chromium Check (`npm run e2e`)**:
+   - Output: `1 passed (32.9s)` in headless Chromium.
+
+## 5. Review Sequence Handoff
+1. **Claude (Anthropic)**: Built and verified admin toggle and migration. All 6 verification checks passed. (COMPLETED)
+2. **Cursor**: Inspect repo diffs and code structure.
+3. **Gemini**: Review UI toggle and access state handling.
+4. **ChatGPT**: Verify migration logic and authentication store transitions.
+5. **Muse**: Verify clean system boundaries and security invariants (RedMed untouched).
+6. **Grok Bot (Lead)**: Verify real execution output and issue final PASS/FAIL verdict.
+
+## 6. How the Next AI Should Check It
+```bash
+cd app
+npm run format
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run e2e
+```
+
 
