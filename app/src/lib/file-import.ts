@@ -1,4 +1,4 @@
-import { ensureProjectNode, link, mkEntry, type EntryType, type Mem } from './memory';
+import { ensureProjectNode, link, mkEntry, type EntryType, type Mem, type Source } from './memory';
 import { redact } from './redact';
 import { keywords } from './text';
 
@@ -8,6 +8,7 @@ export interface RawMemoryItem {
   type?: EntryType;
   project?: string;
   kws?: string[];
+  sources?: Source[];
 }
 
 const VALID_TYPES = new Set<EntryType>(['concept', 'entity', 'workstream']);
@@ -234,6 +235,14 @@ export function importMemoryItems(
       if (!existing.note.includes(note)) {
         existing.note = `${existing.note}\n\n${note}`.slice(0, 1200);
       }
+      if (it.sources) {
+        for (const s of it.sources) {
+          if (!existing.sources.some(x => x.label === s.label && x.ref === s.ref)) {
+            existing.sources.push(s);
+            if (existing.sources.length > 6) existing.sources.shift();
+          }
+        }
+      }
       if (!existing.links.includes(projNode.id)) {
         link(existing, projNode);
       }
@@ -248,7 +257,10 @@ export function importMemoryItems(
           note,
           manual: true,
           kws: it.kws || keywords(`${title} ${note}`).slice(0, 8),
-          sources: [{ kind: 'file', label: `Imported file: ${title}`, ref: null }],
+          sources:
+            it.sources && it.sources.length > 0
+              ? it.sources
+              : [{ kind: 'file', label: `Imported file: ${title}`, ref: null }],
         },
         now,
       );
