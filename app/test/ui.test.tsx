@@ -130,6 +130,17 @@ describe('setup and login', () => {
     await u.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
   }, 30000);
+
+  it('allows toggling between sign in and register as admin', async () => {
+    const { App } = await boot(),
+      u = userEvent.setup();
+    render(<App />);
+    expect(screen.getByRole('heading', { name: 'Set up Brain' })).toBeTruthy();
+    await u.click(screen.getByRole('button', { name: 'Already an admin? Sign in' }));
+    expect(screen.getByRole('heading', { name: 'Sign in to Brain' })).toBeTruthy();
+    await u.click(screen.getByRole('button', { name: 'Register as admin' }));
+    expect(screen.getByRole('heading', { name: 'Set up Brain' })).toBeTruthy();
+  });
 });
 
 describe('who can do what', () => {

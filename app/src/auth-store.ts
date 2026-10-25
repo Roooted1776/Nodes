@@ -36,6 +36,7 @@ interface AuthState {
   lastActive: number;
   ready: boolean;
   init(): Promise<void>;
+  setPhase(phase: Phase): void;
   setup(i: { name: string; passcode: string }): Promise<boolean>;
   login(name: string, pass: string): Promise<boolean>;
   logout(why?: string): void;
@@ -263,11 +264,23 @@ export const useAuth = create<AuthState>()((set, get) => {
     session: '',
     lastActive: Date.now(),
     ready: false,
+    setPhase: (phase: Phase) => set({ phase, error: '', notice: '' }),
     async init() {
       if (get().ready || get().busy) return;
-      set({ busy: true });
+      set({ busy: true, error: '' });
       try {
         const r = await accounts<{ setupNeeded: boolean }>('status');
+        if (r.setupNeeded) {
+          try {
+            ls.removeItem(VAULT_KEY);
+            for (let i = ls.length - 1; i >= 0; i--) {
+              const k = ls.key(i);
+              if (k && (k.startsWith('sb-') || k.includes('supabase.auth.token'))) ls.removeItem(k);
+            }
+          } catch {
+            /* ignore */
+          }
+        }
         set({ phase: r.setupNeeded ? 'setup' : 'login', ready: true, busy: false });
       } catch (e) {
         fail(e);

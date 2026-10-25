@@ -27,7 +27,7 @@ function useCountdown(until: number) {
 
 /** First run: whoever opens Brain first picks the admin username and password. */
 export function Setup() {
-  const { setup, busy, error } = useAuth();
+  const { setup, busy, error, setPhase } = useAuth();
   const [name, setName] = useState(''),
     [pass, setPass] = useState('');
   const submit = (e: FormEvent) => {
@@ -61,13 +61,16 @@ export function Setup() {
         <button type="submit" className="primary" disabled={busy}>
           {busy ? 'Working…' : 'Create admin'}
         </button>
+        <button type="button" className="toggle-mode" onClick={() => setPhase('login')}>
+          Already an admin? Sign in
+        </button>
       </form>
     </Shell>
   );
 }
 
 export function Login() {
-  const { login, busy, error, notice, db } = useAuth();
+  const { login, busy, error, notice, db, setPhase } = useAuth();
   const [name, setName] = useState(''),
     [pass, setPass] = useState('');
   const wait = useCountdown(db.lockedUntil);
@@ -107,6 +110,9 @@ export function Login() {
         )}
         <button type="submit" className="primary" disabled={busy || wait > 0}>
           {wait > 0 ? `Wait ${wait}s` : busy ? 'Checking…' : 'Sign in'}
+        </button>
+        <button type="button" className="toggle-mode" onClick={() => setPhase('setup')}>
+          Register as admin
         </button>
       </form>
     </Shell>

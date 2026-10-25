@@ -110,7 +110,7 @@ async function handle(req: Request) {
       let u;
       try {
         u = await makeUser(name, password, 'admin', wrap);
-        const { error: ve } = await db.from('vaults').insert({ id: 1, envelope });
+        const { error: ve } = await db.from('vaults').upsert({ id: 1, envelope });
         if (ve) {
           await db.auth.admin.deleteUser(u.id);
           throw new Refuse('Could not create encrypted memory.', 409);
