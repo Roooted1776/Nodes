@@ -655,4 +655,204 @@ npm run build
 npm run e2e
 ```
 
+---
+
+# GitHub Connector — Integration & Sync Engine
+
+## 1. Overview & Request
+- **User Directive**: "add github connector"
+- **Purpose**: Enable Brain to connect to any GitHub repository (public or private via personal access token), test rate limits and access, and sync README documentation, issues, and recent commits into Brain's neural graph as concept, entity, and workstream entries.
+- **Audience / Access**: Accessible to Admins via the Admin Settings Panel (`AdminPanel.tsx`) and within Memory Management (`MemoryPanel.tsx`) via an `🐙 GitHub` tab in `ImportModal` and toolbar button.
+
+## 2. What Changed & Why
+1. **GitHub Client Library (`app/src/lib/github.ts`)**:
+   - Built complete in-browser client using the standard GitHub REST API (`https://api.github.com`).
+   - `parseRepoInput(input)`: Parses standard `owner/repo`, HTTPS URLs, and SSH URLs into sanitized `{ owner, repo }`.
+   - `testGitHubConnection(repo, token)`: Verifies repository access and measures remaining rate-limit quotas from GitHub response headers (`x-ratelimit-remaining`, `x-ratelimit-limit`).
+   - `fetchGitHubRepoInfo`, `fetchGitHubReadme`, `fetchGitHubIssues`, `fetchGitHubCommits`: Fetches repo metadata, base64-decoded README content, recent issues, and recent commits with robust error handling and pagination limits.
+   - `githubToMemoryItems(...)`: Maps repository facts to Brain entries:
+     - Repo overview & primary documentation sections -> `concept` entries.
+     - Issues & pull requests -> `entity` entries.
+     - Recent commits -> `workstream` entries.
+     - Sanitizes secret patterns (PAT tokens, API keys) from text before filing.
+     - Attaches typed `{ kind: 'github', label: '...', ref: 'https://github.com/...' }` sources.
+   - `fetchAndConvertGitHub(...)`: Orchestrates atomic fetch and transformation pipeline.
+2. **Unit Test Suite (`app/test/github.test.ts`)**:
+   - Comprehensive Vitest suite covering repo string parsing, connection validation, README section extraction, commit/issue transformation, secret token masking, and parallel fetching (15 tests total).
+3. **Memory Model & Sanitizer (`app/src/lib/memory.ts`)**:
+   - Added `'github'` to `SourceKind` and `Source.kind`.
+   - Updated `cleanMem` source validator regex to recognize `'github'` and permit `https://github.com/...` references without stripping them during memory sanitization.
+4. **File Import Engine (`app/src/lib/file-import.ts`)**:
+   - Updated `RawMemoryItem` to accept custom `sources?: Source[]`.
+   - Enhanced `importMemoryItems` to preserve and attach GitHub sources during memory ingestion.
+5. **Content Security Policy (`app/scripts/publish.mjs`)**:
+   - Added `https://api.github.com` and `https://raw.githubusercontent.com` to `connect-src` in the CSP header so GitHub API calls execute securely in the browser without browser CSP rejection.
+6. **State Store (`app/src/store.ts`)**:
+   - Added `githubRepo`, `githubToken`, `githubStatus` to `State` and persistent storage under `brain.github.v1`.
+   - Added actions `setGithubConfig`, `testGithub`, and `syncGithub` for global access and state tracking.
+7. **Admin Panel Management (`app/src/components/AdminPanel.tsx`)**:
+   - Added dedicated **GitHub Connector** card with controlled repository and personal access token inputs, "Test Connection" button, "Sync to Brain" button, "Clear Token" button, status diagnostics pill, and token generation helper link.
+8. **Memory Import Modal (`app/src/components/MemoryPanel.tsx`)**:
+   - Added `🐙 GitHub` tab in `ImportModal` supporting custom fetch options (README, Issues state filter, Commits), real-time item preview with type badges, and direct batch import into Brain memory.
+   - Added `🐙 GitHub` trigger button to the memory panel toolbar.
+   - Updated `Detail` view to render clickable GitHub source links (`↗`).
+9. **UI Styles (`app/src/styles.css`)**:
+   - Added responsive, pixel-aligned Minecraft font styles for `.import-gh-section`, `.gh-inputs-row`, `.gh-options-row`, `.gh-fetch-btn`, `.gh-preview-list`, `.gh-type-badge`, `.gh-btn`, `.gh-source-link`, and `.gh-connector-box`.
+10. **UI Tests (`app/test/ui.test.tsx`)**:
+    - Added UI component tests asserting presence and interaction of the GitHub Connector in AdminPanel and GitHub tab in MemoryPanel ImportModal.
+11. **Production Single-File Build (`index.html` & `app/dist/index.html`)**:
+    - Recompiled production bundle with updated CSP hash, all components, and zero external build errors.
+
+## 3. Files Touched
+| File | Type | Changes Made |
+| :--- | :--- | :--- |
+| `app/src/lib/github.ts` | Source | New GitHub API client, parser, memory converter, and rate limit diagnostics. |
+| `app/test/github.test.ts` | Test | 15 unit tests verifying all GitHub parsing, fetch, and conversion flows. |
+| `app/src/lib/memory.ts` | Source | Added `'github'` to `SourceKind` and allowed `https://github.com/` in `cleanMem`. |
+| `app/src/lib/file-import.ts` | Source | Preserved custom `sources` array on imported raw items. |
+| `app/scripts/publish.mjs` | Build Script | Allowed `https://api.github.com` and `https://raw.githubusercontent.com` in CSP `connect-src`. |
+| `app/src/store.ts` | State | Added GitHub config state, localStorage persistence, test, and sync actions. |
+| `app/src/components/AdminPanel.tsx` | Component | Added GitHub Connector card with inputs, test/sync buttons, and diagnostics. |
+| `app/src/components/MemoryPanel.tsx` | Component | Added GitHub tab in ImportModal, toolbar button, and clickable source links. |
+| `app/src/styles.css` | Styles | Added styles for GitHub connector UI and import tab. |
+| `app/test/ui.test.tsx` | Test | Added UI tests for GitHub Connector in AdminPanel and ImportModal. |
+| `app/dist/index.html` | Build artifact | Rebuilt single-file production artifact. |
+| `index.html` | Build artifact | Root production file with updated hash. |
+| `HANDOFF.md` | Documentation | This handoff log entry. |
+
+## 4. Checks & Real Results
+1. **Format Check (`npm run format`)**:
+   - Output: `Formatted 77 files in 28ms. No fixes applied.`
+2. **Lint Check (`npm run lint`)**:
+   - Output: `Checked 78 files in 47ms. 0 errors, 30 warnings` (all 30 warnings are pre-existing baseline).
+3. **Typecheck (`npm run typecheck`)**:
+   - Output: `tsc --noEmit` exited code 0 (0 errors).
+4. **Unit Tests (`npm test`)**:
+   - Output: `19 passed (19) files, 107 passed (107) tests` in 3.28s.
+5. **Production Build (`npm run build`)**:
+   - Output: `built in 315ms; wrote ../index.html 1594 KB; 1 script(s) pinned by hash`.
+6. **Browser E2E Chromium Check (`npm run e2e`)**:
+   - Output: `1 passed (36.5s)` in Playwright headless Chromium.
+
+## 5. Review Sequence Handoff
+1. **Claude (Anthropic)**: Designed, implemented, and verified GitHub Connector, memory source integration, CSP updates, and tests. All 6 verification checks passed. (COMPLETED)
+2. **Cursor**: Inspect repo diffs and code structure (`app/src/lib/github.ts`, `app/src/store.ts`, `app/src/components/AdminPanel.tsx`, `app/src/components/MemoryPanel.tsx`).
+3. **Gemini**: Review UI layout, GitHub tab in ImportModal, and rate-limit diagnostics.
+4. **ChatGPT / Muse**: Verify clean system boundaries, error handling, token scrubbing, and security invariants (RedMed untouched).
+5. **Grok Bot (Lead)**: Verify real execution output and issue final PASS/FAIL verdict.
+
+## 6. How the Next AI Should Check It
+```bash
+cd app
+npm run format
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run e2e
+```
+
+## 7. Git State
+- Branch: `add_github_connector`
+- Isolation: Verified (0 references to RedMed, 0 RedMed files touched).
+- Working tree: All files built and ready locally.
+- In accordance with Max's standing rule ("Never `git push`. Max pushes himself when available. Commit locally only if asked"), changes remain local for Max's inspection and push.
+
+---
+
+# Tasks Grouped Under Project Node Worked On The Most (By Agents)
+
+## 1. Overview & Request
+- **User Directive**: "now that list is saved under tasks under the name of a project under the node it was worked on the most ( By agents )"
+- **Purpose**: When a list of items is synced or imported (e.g. from GitHub, files, or paste) or when tasks run, save the task in `mem.sessions` under the project name and link it directly to the node within that project that AI agents have worked on the most.
+- **Visual Integration**: In `Tasks.tsx`, tasks display `[Project / Node]` and center the camera on the target node when clicked. In `BrainScene.tsx`, task satellite dots in 3D orbit directly around the target node regardless of its entry type (concept, entity, workstream).
+
+## 2. What Changed & Why
+1. **Agent Work Scoring & Node Selection (`app/src/lib/memory.ts`)**:
+   - `findMostWorkedNode(m, projectName, candidateItems)`:
+     - Identifies all nodes associated with `projectName`.
+     - Analyzes all sessions with agent work (stages marked `done`, agent messages, handoff words).
+     - Scores each candidate node: `+15` for direct task association, `+10` for context usage (`s.used`), `+8` for session sources, `+(words / 50)` for agent handoff volume, and `+strength * 0.5`.
+     - Returns the node with the highest agent work score (or the project workstream node if no prior agent work exists).
+   - `saveImportedListAsTask(m, items, projectName, meta, now)`:
+     - Automatically creates a new session in `m.sessions` under the project name (`s.project = proj`).
+     - Links `s.projectId` to `findMostWorkedNode(m, proj, items).id`.
+     - Records agent handoff messages (`cursor` connected/extracted, `codex` structured, `grokbot` verified and filed).
+     - Populates flow, timing, and agent coverage (`cursor`, `codex`, `grokbot`, `gemini`, `muse`).
+     - Adds session reference to target node sources.
+2. **Store Integration (`app/src/store.ts`)**:
+   - Updated `importItems` to accept optional `meta?: TaskListMeta` and call `saveImportedListAsTask` whenever items are imported.
+   - Updated `syncGithub` to pass GitHub repository name and summary to `importItems`.
+3. **Memory Panel Import (`app/src/components/MemoryPanel.tsx`)**:
+   - Updated `doImport` to pass `{ sourceKind: 'github', repo, summary }` when importing from the GitHub tab.
+4. **Live Task Execution (`app/src/lib/run-task.ts`)**:
+   - Updated task finalization to use `findMostWorkedNode` so completed live tasks are also linked directly to the node agents worked on the most.
+5. **Tasks Component (`app/src/components/Tasks.tsx`)**:
+   - Added `nodeTitle` to `Card` and `fromSession`.
+   - Updated card display: `[{c.project}{c.nodeTitle ? ` / ${c.nodeTitle}` : ''}]`.
+   - Included `nodeTitle` in the search filter.
+   - Preserved `sceneFocus` on `c.projectId` and session viewing on click.
+6. **3D Brain Scene (`app/src/components/BrainScene.tsx`)**:
+   - Updated `pNode` lookup so task satellites orbit directly around any node type matching `s.projectId` (concept, entity, or workstream), placing them visually and physically under the node in 3D.
+7. **Unit Tests (`app/test/memory.test.ts`)**:
+   - Added tests verifying `findMostWorkedNode` fallback to project node.
+   - Added tests verifying `findMostWorkedNode` selects the node with the highest agent work score.
+   - Added tests verifying `saveImportedListAsTask` saves tasks under project and most-worked node with agent messages and coverage.
+8. **Production Single-File Build (`index.html` & `app/dist/index.html`)**:
+   - Recompiled production bundle with updated CSP hash, all components, and zero errors.
+
+## 3. Files Touched
+| File | Type | Changes Made |
+| :--- | :--- | :--- |
+| `app/src/lib/memory.ts` | Source | Implemented `findMostWorkedNode` and `saveImportedListAsTask`. |
+| `app/src/store.ts` | State | Connected `saveImportedListAsTask` to `importItems` and `syncGithub`. |
+| `app/src/components/MemoryPanel.tsx` | Component | Passed GitHub import metadata in `doImport`. |
+| `app/src/lib/run-task.ts` | Source | Linked live task sessions to `findMostWorkedNode`. |
+| `app/src/components/Tasks.tsx` | Component | Displayed `[Project / Node]` and enabled node search. |
+| `app/src/components/BrainScene.tsx` | Component | Positioned 3D task satellite dots around the most-worked node. |
+| `app/test/memory.test.ts` | Test | Added 3 unit tests for most-worked node selection and task creation. |
+| `app/dist/index.html` | Build artifact | Fresh single-file production artifact. |
+| `index.html` | Build artifact | Production root with recalculated script hash. |
+| `HANDOFF.md` | Documentation | This handoff log entry. |
+
+## 4. Checks & Real Results
+1. **Format Check (`npm run format`)**:
+   - Output: `Formatted 77 files in 39ms. Fixed 3 files.`
+2. **Lint Check (`npm run lint`)**:
+   - Output: `Checked 78 files in 32ms. 0 errors, 36 warnings` (baseline warnings).
+3. **Typecheck (`npm run typecheck`)**:
+   - Output: `tsc --noEmit` exited code 0 (0 errors).
+4. **Unit Tests (`npm test`)**:
+   - Output: `19 passed (19) files, 110 passed (110) tests` in 2.84s.
+5. **Production Build (`npm run build`)**:
+   - Output: `built in 283ms; wrote ../index.html 1597 KB; 1 script(s) pinned by hash`.
+6. **Browser E2E Chromium Check (`npm run e2e`)**:
+   - Output: `1 passed (33.5s)` in Playwright headless Chromium.
+
+## 5. Review Sequence Handoff
+1. **Claude (Anthropic)**: Built and verified node-scoring algorithm, task saving under project/node, 3D orbit resolution, and UI indicators. All 6 verification checks passed. (COMPLETED)
+2. **Cursor**: Inspect repo diffs and code structure in `memory.ts`, `Tasks.tsx`, and `BrainScene.tsx`.
+3. **Gemini**: Review UI presentation of `[Project / Node]` and 3D task satellite positioning.
+4. **ChatGPT / Muse**: Audit scoring calculations, edge cases (0 sessions, tie breaks), and security boundaries (RedMed untouched).
+5. **Grok Bot (Lead)**: Verify real execution output and issue final PASS/FAIL verdict.
+
+## 6. How the Next AI Should Check It
+```bash
+cd app
+npm run format
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run e2e
+```
+
+## 7. Git State
+- Branch: `add_github_connector`
+- Isolation: Verified (0 references to RedMed, 0 RedMed files touched).
+- Working tree: All files built and ready locally.
+- In accordance with Max's standing rule ("Never `git push`. Max pushes himself when available. Commit locally only if asked"), changes remain local for Max's inspection and push.
+
+
+
 

@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { colorOf } from '../data/colors';
 import { AGENT, LIVE_ORDER, isAgent, type AgentId } from '../data/team';
-import type { Flow, Session } from '../lib/memory';
+import type { Flow, Mem, Session } from '../lib/memory';
 import { fmtDate } from '../lib/text';
 import { useMem, useStore, type StageState } from '../store';
 import { summary } from './Coverage';
@@ -12,6 +12,7 @@ type Card = {
   q: string;
   project: string;
   projectId?: string;
+  nodeTitle?: string;
   ts: number;
   states: Partial<Record<AgentId, StageState>>;
   line: string;
@@ -20,9 +21,11 @@ type Card = {
 };
 
 const wordsPassed = (f?: Flow[]) => (f || []).reduce((n, x) => n + x[2], 0);
-function fromSession(s: Session): Card {
+function fromSession(s: Session, mem?: Mem): Card {
   const project = s.project || 'Brain';
   const projectId = s.projectId;
+  const node = projectId && mem ? mem.entries.find(e => e.id === projectId) : undefined;
+  const nodeTitle = node?.title;
   const states: Card['states'] = {};
   for (const [k, v] of Object.entries(s.cover || {})) if (isAgent(k)) states[k] = v.s;
   const sm = summary(states),
@@ -40,6 +43,7 @@ function fromSession(s: Session): Card {
       q: s.q,
       project,
       projectId,
+      nodeTitle,
       ts: s.ts,
       states,
       tone: 'bad',
@@ -52,6 +56,7 @@ function fromSession(s: Session): Card {
       q: s.q,
       project,
       projectId,
+      nodeTitle,
       ts: s.ts,
       states,
       tone: 'stop',
@@ -63,6 +68,7 @@ function fromSession(s: Session): Card {
     q: s.q,
     project,
     projectId,
+    nodeTitle,
     ts: s.ts,
     states,
     tone: 'ok',
@@ -83,13 +89,14 @@ export default function Tasks() {
     viewSession = useStore(s => s.viewSession),
     [all, setAll] = useState(false),
     [taskSearch, setTaskSearch] = useState('');
-  const saved = [...mem.sessions].reverse().map(fromSession);
+  const saved = [...mem.sessions].reverse().map(s => fromSession(s, mem));
   const cur: Card[] = busy
     ? [
         {
           id: null,
           q: task,
           project: useStore.getState().activeProject || 'Brain',
+          nodeTitle: undefined,
           ts: Date.now(),
           states: stages,
           tone: 'run',
@@ -109,7 +116,8 @@ export default function Tasks() {
           c =>
             c.q.toLowerCase().includes(taskSearch.toLowerCase()) ||
             c.line.toLowerCase().includes(taskSearch.toLowerCase()) ||
-            c.project.toLowerCase().includes(taskSearch.toLowerCase()),
+            c.project.toLowerCase().includes(taskSearch.toLowerCase()) ||
+            (c.nodeTitle && c.nodeTitle.toLowerCase().includes(taskSearch.toLowerCase())),
         )
       : cards,
     shown = all ? filtered : filtered.slice(0, SHOW);
@@ -149,8 +157,9 @@ export default function Tasks() {
           aria-label={'Task: ' + c.q}
         >
           <span className="tq">
-            <strong className="tproj" title={`Project: ${c.project}`}>
-              [{c.project}]
+            <strong className="tproj" title={`Project: ${c.project}${c.nodeTitle ? ` · Node: ${c.nodeTitle}` : ''}`}>
+              [{c.project}
+              {c.nodeTitle && c.nodeTitle.toLowerCase() !== c.project.toLowerCase() ? ` / ${c.nodeTitle}` : ''}]
             </strong>
             {c.q}
           </span>

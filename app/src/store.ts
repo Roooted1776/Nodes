@@ -6,11 +6,13 @@ import {
   loadMem,
   sanitizeMem,
   saveMem,
+  saveImportedListAsTask,
   type EntryType,
   type Flow,
   type Mem,
   type Msg,
   type Session,
+  type TaskListMeta,
 } from './lib/memory';
 import { audit } from './lib/audit';
 import { exportBackup, importBackup } from './lib/vault';
@@ -20,6 +22,12 @@ import { redact } from './lib/redact';
 import { transitMs } from './lib/geometry';
 import { NOT_ADMIN, runTask } from './lib/run-task';
 import { importMemoryItems, type RawMemoryItem } from './lib/file-import';
+import {
+  testGitHubConnection,
+  fetchAndConvertGitHub,
+  type GitHubTestResult,
+  type GitHubImportOptions,
+} from './lib/github';
 
 const LKEY = 'brain.live.v1';
 /** Saves memory and remembered keys into the encrypted vault. Set by the sign-in code while an admin is unlocked. */
@@ -110,7 +118,11 @@ export interface State {
   stop(): void;
   testProvider(provider?: ProviderId): Promise<void>;
   note(o: { type: EntryType; title: string; note: string; links?: string[] }): string | null;
-  importItems(items: RawMemoryItem[], defaultProject?: string): { added: number; updated: number; total: number };
+  importItems(
+    items: RawMemoryItem[],
+    defaultProject?: string,
+    meta?: TaskListMeta,
+  ): { added: number; updated: number; total: number };
   correct(id: string, fix: { title?: string; note: string; links?: string[]; status?: 'fresh' | 'stale' }): void;
   remove(id: string): void;
   setSetting(p: Partial<Mem['settings']>): void;
@@ -128,6 +140,12 @@ export interface State {
   viewSession(id: string | null): void;
   activeProject: string;
   setActiveProject(p: string): void;
+  githubRepo: string;
+  githubToken: string;
+  githubStatus: string;
+  setGithubConfig(cfg: { repo?: string; token?: string }): void;
+  testGithub(repo?: string, token?: string): Promise<GitHubTestResult>;
+  syncGithub(options?: GitHubImportOptions): Promise<{ added: number; updated: number; total: number }>;
 }
 
 let logN = 0,
@@ -181,7 +199,27 @@ function saveLive(live: LiveCfg, keys: Partial<Record<ProviderId, string>>) {
   }
 }
 
+const GH_KEY = 'brain.github.v1';
+function loadGithub(): { repo: string; token: string } {
+  try {
+    const raw = ls?.getItem(GH_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d && typeof d === 'object') {
+        return {
+          repo: typeof d.repo === 'string' && d.repo ? d.repo : 'Roooted1776/Brain',
+          token: typeof d.token === 'string' ? d.token : '',
+        };
+      }
+    }
+  } catch {
+    /* storage blocked */
+  }
+  return { repo: 'Roooted1776/Brain', token: '' };
+}
+
 const lv = loadLive();
+const gh = loadGithub();
 
 export const useStore = create<State>()((set, get) => {
   const keyList = () => Object.values(get().keys).filter(Boolean) as string[];
@@ -260,6 +298,9 @@ export const useStore = create<State>()((set, get) => {
     setPromptDraft: (promptDraft: string) => set({ promptDraft }),
     activeProject: 'Brain',
     setActiveProject: p => set({ activeProject: p.trim() || 'Brain' }),
+    githubRepo: gh.repo,
+    githubToken: gh.token,
+    githubStatus: '',
 
     set: p => set(p),
     /** Change memory, save it, and publish a fresh snapshot so every view (list, 3D brain) updates. */
@@ -401,7 +442,7 @@ export const useStore = create<State>()((set, get) => {
       });
       return id;
     },
-    importItems(items, defaultProject) {
+    importItems(items, defaultProject, meta) {
       if (!admin()) {
         set({ status: NOT_ADMIN });
         return { added: 0, updated: 0, total: 0 };
@@ -410,9 +451,12 @@ export const useStore = create<State>()((set, get) => {
       let result = { added: 0, updated: 0, total: 0 };
       get().commit(m => {
         result = importMemoryItems(m, items, proj, Date.now());
+        if (items.length > 0) {
+          saveImportedListAsTask(m, items, proj, meta, Date.now());
+        }
       });
       set({
-        status: `Imported ${result.added} new and updated ${result.updated} memories into project "${proj}".`,
+        status: `Imported ${result.added} new and updated ${result.updated} memories into project "${proj}". Saved under tasks.`,
       });
       if (ls) audit(ls, get().who, `Imported ${result.total} memory items into project "${proj}"`);
       return result;
@@ -530,6 +574,49 @@ export const useStore = create<State>()((set, get) => {
         live: { ...s.live, models: updatedModels },
         status: 'Auto update enabled: all bots refreshed and active.',
       });
+    },
+    setGithubConfig(cfg) {
+      if (!admin()) {
+        set({ status: NOT_ADMIN });
+        return;
+      }
+      const nextRepo = cfg.repo !== undefined ? cfg.repo.trim() : get().githubRepo;
+      const nextToken = cfg.token !== undefined ? cfg.token.trim() : get().githubToken;
+      set({ githubRepo: nextRepo, githubToken: nextToken });
+      try {
+        ls?.setItem(GH_KEY, JSON.stringify({ repo: nextRepo, token: nextToken }));
+      } catch {
+        /* storage blocked */
+      }
+    },
+    async testGithub(repoInput, tokenInput) {
+      const repo = (repoInput ?? get().githubRepo).trim();
+      const token = (tokenInput ?? get().githubToken).trim();
+      const res = await testGitHubConnection(repo, token);
+      set({ githubStatus: res.message, status: `GitHub: ${res.message}` });
+      return res;
+    },
+    async syncGithub(options) {
+      if (!admin()) {
+        set({ status: NOT_ADMIN });
+        return { added: 0, updated: 0, total: 0 };
+      }
+      const repo = get().githubRepo.trim();
+      const token = get().githubToken.trim();
+      const proj = get().activeProject || 'Brain';
+      set({ status: `Fetching data from GitHub repository "${repo}"...` });
+      try {
+        const { items, summary } = await fetchAndConvertGitHub(repo, options, token, proj);
+        const res = get().importItems(items, proj, { sourceKind: 'github', repo, summary });
+        set({
+          status: `GitHub sync complete: ${summary}. ${res.added} new, ${res.updated} updated in "${proj}". Saved under tasks.`,
+        });
+        return res;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        set({ status: `GitHub sync failed: ${msg}` });
+        return { added: 0, updated: 0, total: 0 };
+      }
     },
   };
 });

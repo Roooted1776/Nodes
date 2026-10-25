@@ -301,4 +301,33 @@ describe('who can do what', () => {
     expect(isLimitError(new ProviderError('HTTP 401: invalid key', true))).toBe(false);
     expect(isLimitError(new Error('network down'))).toBe(false);
   });
+
+  it('admin sees GitHub Connector in AdminPanel and GitHub tab in Memory import modal', async () => {
+    const { App } = await asRole('admin');
+    const u = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
+
+    // 1. Check Admin Panel has GitHub Connector
+    expect(await screen.findByText('GitHub Connector')).toBeTruthy();
+    expect(screen.getByLabelText('GitHub Repository')).toBeTruthy();
+    expect(screen.getByLabelText('GitHub Personal Access Token')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Test Connection' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sync to Brain' })).toBeTruthy();
+
+    // 2. Check MemoryPanel import modal with GitHub tab
+    const MemoryPanel = (await import('../src/components/MemoryPanel')).default;
+    cleanup();
+    render(<MemoryPanel />);
+
+    const ghBtn = await screen.findByRole('button', { name: '🐙 GitHub' });
+    expect(ghBtn).toBeTruthy();
+    await u.click(ghBtn);
+
+    const modal = await screen.findByRole('dialog', { name: 'Import Memory Files' });
+    expect(modal).toBeTruthy();
+    expect(within(modal).getByRole('button', { name: '🐙 GitHub' }).className).toContain('on');
+    expect(within(modal).getByLabelText('GitHub Repository')).toBeTruthy();
+    expect(within(modal).getByRole('button', { name: 'Fetch from GitHub' })).toBeTruthy();
+  }, 30000);
 });

@@ -462,9 +462,12 @@ function Memories() {
 
     for (const [projKey, sessions] of byProject.entries()) {
       const pNode =
+        list.find(e => e.id.toLowerCase() === projKey) ||
+        list.find(e => e.title.toLowerCase() === projKey) ||
         list.find(
           e => e.type === 'workstream' && (e.id.toLowerCase() === projKey || e.title.toLowerCase() === projKey),
-        ) || list.find(e => e.type === 'workstream');
+        ) ||
+        list.find(e => e.type === 'workstream');
 
       if (!pNode || !pos.has(pNode.id)) continue;
       const parentP3 = toWorld(pos.get(pNode.id)!);

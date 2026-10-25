@@ -13,6 +13,7 @@ import {
 import { TYPE_LABEL, byId, type Entry, type EntryType } from '../lib/memory';
 import { fmtDate } from '../lib/text';
 import { useMem, useStore } from '../store';
+import { fetchAndConvertGitHub } from '../lib/github';
 
 const SHAPE: Record<EntryType, string> = { concept: '●', entity: '●', workstream: '●' };
 
@@ -25,7 +26,8 @@ export default function MemoryPanel() {
   const [type, setType] = useState<EntryType | 'all'>('all'),
     [q, setQ] = useState(''),
     [sort, setSort] = useState<'recent' | 'strong' | 'alpha'>('recent'),
-    [importOpen, setImportOpen] = useState(false);
+    [importOpen, setImportOpen] = useState(false),
+    [importTab, setImportTab] = useState<'files' | 'paste' | 'github'>('files');
   const list = useMemo(
     () =>
       mem.entries
@@ -103,14 +105,30 @@ export default function MemoryPanel() {
 
       <div className="memory-actions">
         {role === 'admin' && (
-          <button
-            type="button"
-            className="action-btn import-btn"
-            onClick={() => setImportOpen(true)}
-            title="Import memory files (.json, .md, .txt, .csv)"
-          >
-            📥 Import Files
-          </button>
+          <>
+            <button
+              type="button"
+              className="action-btn import-btn"
+              onClick={() => {
+                setImportTab('files');
+                setImportOpen(true);
+              }}
+              title="Import memory files (.json, .md, .txt, .csv)"
+            >
+              📥 Import Files
+            </button>
+            <button
+              type="button"
+              className="action-btn gh-btn"
+              onClick={() => {
+                setImportTab('github');
+                setImportOpen(true);
+              }}
+              title="Connect and import GitHub repository"
+            >
+              🐙 GitHub
+            </button>
+          </>
         )}
         <button
           type="button"
@@ -160,7 +178,7 @@ export default function MemoryPanel() {
         ))}
       </ul>
       {role === 'admin' && <AddNote onOpenImport={() => setImportOpen(true)} />}
-      {importOpen && <ImportModal onClose={() => setImportOpen(false)} />}
+      {importOpen && <ImportModal onClose={() => setImportOpen(false)} initialTab={importTab} />}
     </section>
   );
 }
@@ -258,6 +276,16 @@ function Detail({ e, onSession }: { e: Entry; onSession(id: string): void }) {
                   >
                     {s.label}
                   </button>
+                ) : s.kind === 'github' && s.ref && s.ref.startsWith('https://github.com') ? (
+                  <a
+                    key={`${s.label}-${s.ref}`}
+                    href={s.ref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="link gh-source-link"
+                  >
+                    {s.label} ↗
+                  </a>
                 ) : (
                   <span key={`${s.label}-${s.kind}`}>{s.label}</span>
                 ),
@@ -406,18 +434,33 @@ interface ParsedFileInfo {
   items: RawMemoryItem[];
 }
 
-function ImportModal({ onClose }: { onClose: () => void }) {
+function ImportModal({
+  onClose,
+  initialTab = 'files',
+}: {
+  onClose: () => void;
+  initialTab?: 'files' | 'paste' | 'github';
+}) {
   const mem = useMem();
   const importItems = useStore(s => s.importItems);
   const activeProj = useStore(s => s.activeProject);
+  const sGithubRepo = useStore(s => s.githubRepo);
+  const sGithubToken = useStore(s => s.githubToken);
 
-  const [tab, setTab] = useState<'files' | 'paste'>('files');
+  const [tab, setTab] = useState<'files' | 'paste' | 'github'>(initialTab);
   const [project, setProject] = useState(activeProj || 'Brain');
   const [customProject, setCustomProject] = useState('');
   const [parsedFiles, setParsedFiles] = useState<ParsedFileInfo[]>([]);
   const [pasteText, setPasteText] = useState('');
   const [pasteFormat, setPasteFormat] = useState<'json' | 'md' | 'csv'>('json');
   const [pastedItems, setPastedItems] = useState<RawMemoryItem[]>([]);
+  const [ghRepo, setGhRepo] = useState(sGithubRepo);
+  const [ghToken, setGhToken] = useState(sGithubToken);
+  const [ghIncReadme, setGhIncReadme] = useState(true);
+  const [ghIncIssues, setGhIncIssues] = useState(true);
+  const [ghIssueState, setGhIssueState] = useState<'open' | 'closed' | 'all'>('open');
+  const [ghIncCommits, setGhIncCommits] = useState(true);
+  const [ghItems, setGhItems] = useState<RawMemoryItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -473,24 +516,60 @@ function ImportModal({ onClose }: { onClose: () => void }) {
     setStatus(`Parsed ${items.length} items from pasted text.`);
   };
 
+  const handleFetchGitHub = async () => {
+    if (!ghRepo.trim()) return;
+    setBusy(true);
+    setStatus('');
+    try {
+      const { items, summary } = await fetchAndConvertGitHub(
+        ghRepo,
+        {
+          includeReadme: ghIncReadme,
+          includeIssues: ghIncIssues,
+          issueState: ghIssueState,
+          includeCommits: ghIncCommits,
+          maxIssues: 15,
+          maxCommits: 8,
+        },
+        ghToken,
+        targetProject,
+      );
+      setGhItems(items);
+      setStatus(`✓ ${summary}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setStatus(`GitHub error: ${msg}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const allItems = useMemo(() => {
     if (tab === 'files') {
       return parsedFiles.flatMap(f => f.items);
     }
-    return pastedItems;
-  }, [tab, parsedFiles, pastedItems]);
+    if (tab === 'paste') {
+      return pastedItems;
+    }
+    return ghItems;
+  }, [tab, parsedFiles, pastedItems, ghItems]);
 
   const doImport = () => {
     if (!allItems.length) return;
     setBusy(true);
-    const res = importItems(allItems, targetProject);
+    const res = importItems(allItems, targetProject, {
+      sourceKind: tab === 'github' ? 'github' : 'import',
+      repo: tab === 'github' ? ghRepo.trim() : undefined,
+      summary: tab === 'github' ? `${allItems.length} GitHub memories` : `${allItems.length} memories`,
+    });
     setBusy(false);
     setStatus(
-      `✓ Successfully imported ${res.added} new and updated ${res.updated} memories into project "${targetProject}".`,
+      `✓ Successfully imported ${res.added} new and updated ${res.updated} memories into project "${targetProject}". Saved under tasks.`,
     );
     setParsedFiles([]);
     setPastedItems([]);
     setPasteText('');
+    setGhItems([]);
   };
 
   return (
@@ -535,6 +614,9 @@ function ImportModal({ onClose }: { onClose: () => void }) {
           </button>
           <button type="button" className={tab === 'paste' ? 'on' : ''} onClick={() => setTab('paste')}>
             📝 Paste Text
+          </button>
+          <button type="button" className={tab === 'github' ? 'on' : ''} onClick={() => setTab('github')}>
+            🐙 GitHub
           </button>
         </div>
 
@@ -587,7 +669,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
           </div>
-        ) : (
+        ) : tab === 'paste' ? (
           <div className="import-paste-section">
             <div className="paste-format-row">
               <span className="format-label">Format:</span>
@@ -618,6 +700,109 @@ function ImportModal({ onClose }: { onClose: () => void }) {
             <button type="button" className="parse-btn" disabled={!pasteText.trim()} onClick={handleParsePaste}>
               Parse Text
             </button>
+          </div>
+        ) : (
+          <div className="import-gh-section">
+            <div
+              className="gh-inputs-row"
+              style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}
+            >
+              <label className="mini-field" style={{ flex: '1 1 200px' }}>
+                <span>Repository (owner/repo)</span>
+                <input
+                  type="text"
+                  value={ghRepo}
+                  placeholder="e.g. Roooted1776/Brain"
+                  onChange={e => setGhRepo(e.target.value)}
+                  aria-label="GitHub Repository"
+                />
+              </label>
+              <label className="mini-field" style={{ flex: '1 1 240px' }}>
+                <span>Personal Access Token</span>
+                <input
+                  type="password"
+                  value={ghToken}
+                  placeholder="Optional for public repos"
+                  autoComplete="off"
+                  onChange={e => setGhToken(e.target.value)}
+                  aria-label="GitHub Token"
+                />
+              </label>
+            </div>
+
+            <div
+              className="gh-options-row"
+              style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', margin: '8px 0 12px' }}
+            >
+              <label className="sw sm">
+                <input type="checkbox" checked={ghIncReadme} onChange={e => setGhIncReadme(e.target.checked)} />
+                <span>README & Docs</span>
+              </label>
+
+              <label className="sw sm">
+                <input type="checkbox" checked={ghIncIssues} onChange={e => setGhIncIssues(e.target.checked)} />
+                <span>Issues</span>
+              </label>
+              {ghIncIssues && (
+                <select
+                  value={ghIssueState}
+                  onChange={e => setGhIssueState(e.target.value as 'open' | 'closed' | 'all')}
+                  className="sm"
+                  aria-label="Issue State Filter"
+                  style={{
+                    background: 'var(--card-bg, #1e1e24)',
+                    color: 'var(--txt, #fff)',
+                    border: '1px solid var(--tile-border, #333)',
+                    padding: '2px 6px',
+                    fontSize: '13px',
+                  }}
+                >
+                  <option value="open">Open Issues</option>
+                  <option value="closed">Closed Issues</option>
+                  <option value="all">All Issues</option>
+                </select>
+              )}
+
+              <label className="sw sm">
+                <input type="checkbox" checked={ghIncCommits} onChange={e => setGhIncCommits(e.target.checked)} />
+                <span>Recent Commits</span>
+              </label>
+            </div>
+
+            <button
+              type="button"
+              className="parse-btn gh-fetch-btn"
+              disabled={busy || !ghRepo.trim()}
+              onClick={handleFetchGitHub}
+            >
+              {busy ? 'Connecting to GitHub…' : 'Fetch from GitHub'}
+            </button>
+
+            {ghItems.length > 0 && (
+              <div className="parsed-list gh-preview-list">
+                <h4>Detected GitHub Memories ({ghItems.length})</h4>
+                <ul>
+                  {ghItems.map((it, idx) => (
+                    <li key={`${it.title}-${idx}`}>
+                      <span className="file-name">{it.title}</span>
+                      <span
+                        className="file-count"
+                        style={{
+                          color:
+                            it.type === 'concept'
+                              ? 'var(--blue, #4285f4)'
+                              : it.type === 'workstream'
+                                ? 'var(--green, #34a853)'
+                                : 'var(--purple, #9b72cb)',
+                        }}
+                      >
+                        [{it.type}]
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
