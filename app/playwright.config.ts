@@ -9,7 +9,7 @@ export default defineConfig({
   use: {
     ...devices['Desktop Chrome'],
     viewport: { width: 1400, height: 900 },
-    trace: 'retain-on-failure',
+    trace: 'off',
     // software WebGL so the 3D brain also draws on machines without a GPU (GitHub's runners)
     launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] },
   },

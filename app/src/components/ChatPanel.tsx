@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { pulseMs, type Pulse } from '../store';
 import { colorOf } from '../data/colors';
 import { AGENT, isAgent, type AgentId } from '../data/team';
@@ -22,6 +22,19 @@ function BotName({ id, limited, onOpen }: { id: AgentId; limited: AgentId[]; onO
   );
 }
 
+const nameOf = (id: string) =>
+  id.startsWith('mem:') ? 'Memory' : isAgent(id) ? AGENT[id].name : id === 'owner' ? 'You' : 'Brain';
+
+/** Ensures no raw code blocks (```) clutter the live chat, turning them into plain conversational text. */
+export function cleanChatText(text: string): string {
+  if (!text) return '';
+  return text.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_m, code) => {
+    const trimmed = code.trim().replace(/\s+/g, ' ');
+    if (!trimmed) return '';
+    return trimmed.length > 100 ? `[Action: ${trimmed.slice(0, 97)}…]` : `[Action: ${trimmed}]`;
+  });
+}
+
 export default function ChatPanel() {
   const log = useStore(s => s.log),
     busy = useStore(s => s.busy),
@@ -43,7 +56,8 @@ export default function ChatPanel() {
     msgsRef = useRef<HTMLDivElement>(null),
     [autoScroll, setAutoScroll] = useState(true),
     draft = useStore(s => s.draft),
-    flow = useStore(s => s.flow);
+    flow = useStore(s => s.flow),
+    activePulse = useStore(s => s.pulses.filter(p => !p.from.startsWith('mem:')).at(-1));
 
   const scrollToBottom = () => {
     const el = msgsRef.current;
@@ -70,42 +84,114 @@ export default function ChatPanel() {
     }
   };
 
+  const mem = useStore(s => s.mem);
+  const latestSession = !log.length && mem.sessions.length ? mem.sessions[mem.sessions.length - 1] : null;
+  const currentSession = viewing || latestSession;
   // the chat shows only what the AI team wrote, plus who is doing what right now
   const msgs = (
-    viewing ? viewing.msgs.map((m, i) => ({ ...m, id: i, cls: undefined as 'warn' | undefined })) : log
+    currentSession ? currentSession.msgs.map((m, i) => ({ ...m, id: i, cls: undefined as 'warn' | undefined })) : log
   ).filter(m => m.from !== 'brain');
-  const doing = viewing
+  const doing = currentSession
     ? []
     : (Object.entries(stages) as [AgentId, string][]).filter(([id, v]) => v === 'working' && id !== draft?.from);
-  const stuck = viewing ? [] : (Object.entries(stages) as [AgentId, string][]).filter(([, v]) => v === 'failed');
+  const stuck = currentSession ? [] : (Object.entries(stages) as [AgentId, string][]).filter(([, v]) => v === 'failed');
   return (
     <section className="panel chat grok" aria-label="Live chat">
-      {!viewing && <Handoff />}
-      <div className="msgs" ref={msgsRef} onScroll={onScroll} aria-live="off">
-        {msgs.map(m => {
-          const a = isAgent(m.from) ? AGENT[m.from] : null;
-          return (
-            <article
-              key={m.id}
-              tabIndex={-1}
-              data-scene-entry={a ? `agent:${a.id}` : undefined}
-              className={`msg ${a ? 'bot ' + a.kind : m.from}${m.cls === 'warn' ? ' warn' : ''}`}
-              style={a ? ({ '--c': colorOf(a.id) } as CSSProperties) : undefined}
+      {!currentSession && <Handoff />}
+      {currentSession && !log.length && (
+        <div
+          className="session-banner"
+          style={{
+            padding: '6px 12px',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            fontSize: 12,
+            color: '#888',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span>
+            {viewing ? 'Past task: ' : 'Latest task: '}
+            <strong style={{ color: '#fff' }}>{currentSession.q}</strong>
+          </span>
+          {viewing ? (
+            <button
+              type="button"
+              className="sm link"
+              onClick={() => useStore.getState().viewSession(null)}
+              style={{ color: '#aaa', cursor: 'pointer' }}
             >
-              <header>
-                {a ? <BotIcon id={a.id} /> : null}
-                {a ? (
-                  <BotName limited={limited} onOpen={inspectBot} id={a.id} />
-                ) : (
-                  <b>{m.from === 'owner' ? 'You' : 'Brain'}</b>
-                )}
-                {a && <span className="doing">{a.role}</span>}
-                {a && !viewing && via(a.id)}
-              </header>
-              <p>{m.text}</p>
-            </article>
+              Close
+            </button>
+          ) : (
+            <span style={{ fontSize: 11, color: '#4ade80' }}>Completed</span>
+          )}
+        </div>
+      )}
+      <div className="msgs" ref={msgsRef} onScroll={onScroll} aria-live="off">
+        {msgs.map((m, idx) => {
+          const a = isAgent(m.from) ? AGENT[m.from] : null;
+          const prevMsg = idx > 0 ? msgs[idx - 1] : null;
+          const showPass = a && prevMsg;
+          const passFrom = prevMsg ? prevMsg.from : 'owner';
+          const passTo = m.from;
+          return (
+            <Fragment key={m.id}>
+              {showPass && (
+                <div className="chat-pass" role="status">
+                  <span className="pass-pill">PASS</span>
+                  <span className="pass-end" style={{ color: colorOf(passFrom) }}>
+                    {isAgent(passFrom) && <BotIcon id={passFrom} size={14} />}
+                    <b>{nameOf(passFrom)}</b>
+                  </span>
+                  <span className="pass-arrow" aria-hidden="true">
+                    →
+                  </span>
+                  <span className="pass-end" style={{ color: colorOf(passTo) }}>
+                    <BotIcon id={a.id} size={14} />
+                    <b>{a.name}</b>
+                  </span>
+                </div>
+              )}
+              <article
+                tabIndex={-1}
+                data-scene-entry={a ? `agent:${a.id}` : undefined}
+                className={`msg ${a ? 'bot ' + a.kind : m.from}${m.cls === 'warn' ? ' warn' : ''}`}
+                style={a ? ({ '--c': colorOf(a.id) } as CSSProperties) : undefined}
+              >
+                <header>
+                  {a ? <BotIcon id={a.id} /> : null}
+                  {a ? (
+                    <BotName limited={limited} onOpen={inspectBot} id={a.id} />
+                  ) : (
+                    <b>{m.from === 'owner' ? 'You' : 'Brain'}</b>
+                  )}
+                  {a && <span className="doing">{a.role}</span>}
+                  {a && !viewing && via(a.id)}
+                </header>
+                <p>{cleanChatText(m.text)}</p>
+              </article>
+            </Fragment>
           );
         })}
+        {!currentSession && busy && activePulse && (
+          <div className="chat-pass in-flight" role="status">
+            <span className="pass-pill pulse">PASSING</span>
+            <span className="pass-end" style={{ color: colorOf(activePulse.from) }}>
+              {isAgent(activePulse.from) && <BotIcon id={activePulse.from as AgentId} size={14} />}
+              <b>{nameOf(activePulse.from)}</b>
+            </span>
+            <span className="pass-arrow" aria-hidden="true">
+              →
+            </span>
+            <span className="pass-end" style={{ color: colorOf(activePulse.to) }}>
+              {isAgent(activePulse.to) && <BotIcon id={activePulse.to as AgentId} size={14} />}
+              <b>{nameOf(activePulse.to)}</b>
+            </span>
+            {activePulse.words ? <small className="pass-words">{activePulse.words}w</small> : null}
+          </div>
+        )}
         {doing.map(([id]) => (
           <div key={'doing-' + id} className="activity" style={{ '--c': colorOf(id) } as CSSProperties}>
             <BotIcon id={id} size={16} />
@@ -133,7 +219,7 @@ export default function ChatPanel() {
               {via(draft.from)}
             </header>
             <p>
-              {draft.text}
+              {cleanChatText(draft.text)}
               <i className="caret" aria-hidden="true" />
             </p>
           </article>
@@ -153,14 +239,12 @@ export default function ChatPanel() {
         )}
         <div ref={end} />
       </div>
-      {role === 'admin' && !viewing && <Composer />}
+      {role === 'admin' && <Composer />}
       {busy ? <span className="sr">The team is working.</span> : null}
     </section>
   );
 }
 
-const nameOf = (id: string) =>
-  id.startsWith('mem:') ? 'Memory' : isAgent(id) ? AGENT[id].name : id === 'owner' ? 'Owner' : 'Brain';
 /** The handoff in flight: a light moves from the sender to the receiver in the same time as the 3D view. */
 function Handoff() {
   const p: Pulse | undefined = useStore(s => s.pulses.filter(x => !x.from.startsWith('mem:')).at(-1));

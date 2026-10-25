@@ -163,6 +163,60 @@
   margin: 12px 16px 0;
   background: #000;
 }
+/* passes posted within the live chat */
+.chat.grok .chat-pass {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  margin: 6px 16px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  font-size: 11.5px;
+  color: #ccc;
+}
+.chat.grok .chat-pass .pass-pill {
+  padding: 1px 5px;
+  border-radius: 99px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(138, 123, 255, 0.15);
+  color: #a79cff;
+  border: 1px solid rgba(138, 123, 255, 0.35);
+  text-transform: uppercase;
+}
+.chat.grok .chat-pass.in-flight {
+  border-color: rgba(138, 123, 255, 0.3);
+  background: rgba(138, 123, 255, 0.05);
+}
+.chat.grok .chat-pass .pass-pill.pulse {
+  animation: pulse-glow 1.5s ease-in-out infinite alternate;
+}
+@keyframes pulse-glow {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.chat.grok .chat-pass .pass-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.chat.grok .chat-pass .pass-arrow {
+  opacity: 0.5;
+  font-size: 12px;
+}
+.chat.grok .chat-pass .pass-words {
+  margin-left: auto;
+  font-size: 10.5px;
+  opacity: 0.5;
+  font-family: var(--mono);
+}
 .chat.grok .scroll-bottom-pill {
   position: sticky;
   bottom: 8px;

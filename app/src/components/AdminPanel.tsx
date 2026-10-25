@@ -138,7 +138,7 @@ export default function AdminPanel() {
           <Switch
             on={live.remember}
             set={v => s.setLive({ remember: v })}
-            label="Remember on this device (encrypted)"
+            label="Save keys in encrypted vault (persistent)"
           />
           <div className="row">
             <button type="button" onClick={() => void s.testProvider(live.provider)}>

@@ -204,6 +204,7 @@ export function systemPrompt(id: AgentId): string {
     ' We are all one team of people and bots. Never hide information out of emotion; complete your task fully and push it across the desk to the next teammate.' +
     " Follow Owner's pipeline: Collect --> Review --> Edit --> Review --> Pass to next --> Review." +
     ' Deploy the concrete step of attack: examine target, review incoming handoff, execute surgical edit, review output, and pass to next worker.' +
+    ' LIVE CHAT RULE: The live chat is for passes, common interactions, and team chatter. DO NOT OUTPUT CODE BLOCKS (never use ``` or raw code dumps). Describe any logic or edits in plain conversational words.' +
     ' You have no tools or repo access here: never claim to read files, make changes, browse or run tests. State blockers and uncertainty. Do not invent sources, results, keys or passwords.'
   );
 }
@@ -229,6 +230,7 @@ export function stagePrompt(
     'ONE TEAM PRINCIPLE: We are all one team of people and bots. Never hide information out of emotion. Complete your task and push across the desk to the next person.\n' +
     'OPERATING PIPELINE: Collect --> Review --> Edit --> Review --> Pass to next --> Review.\n' +
     'STEP OF ATTACK DEPLOYED: Target Recon -> Threat Audit -> Tactical Plan -> Surgical Strike -> Verification.\n' +
-    `Reply with these labeled sections: REVIEW OF INCOMING HANDOFF; STEP OF ATTACK; YOUR WORK; SELF-REVIEW; HANDOFF TO ${handTo}; OPEN BLOCKERS. Be specific and short. Text only.`
+    'CRITICAL FORMAT RULE: NO CODE BLOCKS. Never output markdown code fences (```). The live chat is for common interactions, team chatter, and passes between teammates. Explain your work and plans in natural conversational words.\n' +
+    `Reply with common teammate interactions and conversational chatter: acknowledge what ${incomingFrom} passed, state your work concisely in natural words, and pass to ${handTo}. Text only, no code blocks.`
   );
 }

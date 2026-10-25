@@ -14,6 +14,60 @@
 
 ---
 
+# Persistent Database API Keys & Latest Task Replay — Oct 25, 2026
+
+## 1. What Changed
+1. **Encrypted Database Vault Persistence for API Keys (`auth-store.ts`, `store.ts`)**:
+   - The encrypted vault envelope stored in PostgreSQL (`public.vaults`) now bundles `{ mem, keys }` protected with client-side AES-256-GCM encryption.
+   - On unlock, `remoteKeys` are decrypted and merged into store state, restoring all configured company keys across devices and browser sessions.
+   - Setting an API key immediately commits it to the database vault so keys persist across reboots, device switches, and sleep.
+2. **Morning Session Replay & Team Conversation View (`ChatPanel.tsx`, `chat.css`)**:
+   - When launching Brain or signing in after sleep, the live chat automatically renders the conversation from the latest completed task if no live task is running.
+   - Displays clear pass badges (`PASS botA → botB`) between teammates showing the baton passing in real time.
+   - Added a minimal top banner indicating the task and completion status.
+   - Admin Composer is always accessible so new tasks can be fired immediately without switching views.
+3. **Clean Team Chatter (`team.ts`, `store.ts`, `ChatPanel.tsx`)**:
+   - Instructed bots to use natural conversational team chatter for live passes and never output raw code dumps (` ``` `).
+   - Sanitized chat rendering with `cleanChatText()` to collapse accidental code blocks into clean inline action indicators.
+4. **Verification & Stability (`ui.test.tsx`, `playwright.config.ts`)**:
+   - Added unit tests for key restoration from the encrypted vault and past session replay on opening.
+   - Disabled Playwright trace file generation in local runs to resolve macOS SwiftShader file cleanup error.
+   - Rebuilt single-file production bundle `index.html` with updated CSP script hash.
+
+## 2. Files Touched
+- `app/src/auth-store.ts`
+- `app/src/store.ts`
+- `app/src/components/ChatPanel.tsx`
+- `app/src/components/AdminPanel.tsx`
+- `app/src/chat.css`
+- `app/src/data/team.ts`
+- `app/playwright.config.ts`
+- `app/test/ui.test.tsx`
+- `index.html` & `app/dist/index.html`
+
+## 3. How to Check It
+1. Run format, lint & typecheck:
+   ```bash
+   cd app && npm run format && npm run lint && npm run typecheck
+   ```
+2. Run Vitest unit & integration tests:
+   ```bash
+   cd app && npm test
+   ```
+   (18 test files, 94 tests passing)
+3. Run Playwright E2E browser smoke test:
+   ```bash
+   cd app && npm run e2e
+   ```
+   (1 test passing in real Chromium)
+4. Production bundle build:
+   ```bash
+   cd app && npm run build
+   ```
+   (Generates self-contained `../index.html` with CSP hash)
+
+---
+
 # Working Website Fields, Multi-Company Keys & Dynamic Filtering — date not recorded (merged from Jerk.md)
 
 ## 1. AI Companies: Where To Get Keys & What They Power
