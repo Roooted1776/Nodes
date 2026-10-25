@@ -110,7 +110,9 @@ async function handle(req: Request) {
       let u;
       try {
         u = await makeUser(name, password, 'admin', wrap);
-        const { error: ve } = await db.from('vaults').upsert({ id: 1, envelope });
+        // No accounts exist yet, so any old vault row is sealed to keys that are gone. Clear it, then start fresh.
+        await db.from('vaults').delete().eq('id', 1);
+        const { error: ve } = await db.from('vaults').insert({ id: 1, envelope });
         if (ve) {
           await db.auth.admin.deleteUser(u.id);
           throw new Refuse('Could not create encrypted memory.', 409);
