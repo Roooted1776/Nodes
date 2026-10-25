@@ -1,7 +1,7 @@
 // Brain accounts: the only way to create, change or remove a Brain account.
-// Public sign-up is never used. The first admin needs the one-time setup code; after that only admins act.
-// Passwords arrive already stretched by the browser (PBKDF2 of the passcode), so the passcode itself never leaves it.
-// Dates of birth are checked here (18+) and never stored.
+// Public sign-up is never used. While Brain has no accounts, the first visitor picks the admin username
+// and password (Owner's choice, Oct 2026); after that only admins act.
+// Passwords arrive already stretched by the browser (PBKDF2 of the password), so the password itself never leaves it.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
@@ -30,9 +30,7 @@ function cors(req: Request): Record<string, string> {
 }
 const NAME_RE = /^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/;
 const PASS_RE = /^[A-Za-z0-9_-]{43}$/; // 32 bytes, base64url, made in the browser
-const MIN_AGE = 18;
 type Role = 'admin' | 'viewer';
-type Dob = { y: number; m: number; d: number };
 
 class Refuse extends Error {
   constructor(msg: string, public status = 400) {
@@ -53,22 +51,6 @@ function checkPass(p: unknown): string {
   if (typeof p !== 'string' || !PASS_RE.test(p)) throw new Refuse('The passcode was not prepared by Brain.');
   return p;
 }
-function checkAdult(dob: unknown) {
-  const o = dob as Dob;
-  const ok = o && [o.y, o.m, o.d].every(Number.isInteger);
-  const born = ok ? new Date(Date.UTC(o.y, o.m - 1, o.d)) : null;
-  if (!born || born.getUTCMonth() !== o.m - 1 || born.getUTCDate() !== o.d) throw new Refuse('Enter a real date of birth.');
-  const now = new Date();
-  let age = now.getUTCFullYear() - o.y;
-  if (now.getUTCMonth() + 1 < o.m || (now.getUTCMonth() + 1 === o.m && now.getUTCDate() < o.d)) age--;
-  if (age > 120 || born > now) throw new Refuse('Enter a real date of birth.');
-  if (age < MIN_AGE) throw new Refuse('Brain is for adults only (18+).', 403);
-}
-const sha256 = async (s: string) =>
-  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))]
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-
 async function caller(req: Request) {
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token) throw new Refuse('Sign in first.', 401);
@@ -122,12 +104,9 @@ async function handle(req: Request) {
     }
     case 'setup': {
       const name = checkName(b.name), password = checkPass(b.password);
-      checkAdult(b.dob);
-      if (typeof b.code !== 'string' || b.code.replace(/[\s-]/g, '').length < 16) throw new Refuse('Enter the setup code.', 403);
       const wrap = checkWrap(b.wrap), envelope = checkEnvelope(b.envelope);
-      const hash = await sha256(b.code.replace(/[\s-]/g, '').toUpperCase()); // typed with or without dashes
-      const { data: ok } = await db.rpc('claim_setup', { code_sha256: hash });
-      if (ok !== true) throw new Refuse('That setup code is wrong or already used.', 403);
+      const { data: ok } = await db.rpc('claim_open_setup');
+      if (ok !== true) throw new Refuse('Brain is already set up. Sign in instead.', 409);
       let u;
       try {
         u = await makeUser(name, password, 'admin', wrap);
@@ -137,7 +116,7 @@ async function handle(req: Request) {
           throw new Refuse('Could not create encrypted memory.', 409);
         }
       } catch (e) {
-        await db.rpc('restore_setup', { code_sha256: hash }); // the code stays usable if the account could not be made
+        await db.rpc('release_open_setup'); // let setup be tried again if the account could not be made
         throw e;
       }
       await audit(u, 'Created the first admin');
@@ -153,7 +132,6 @@ async function handle(req: Request) {
       const me = await caller(req);
       if (me.role !== 'admin') throw new Refuse('Only admins can add accounts.', 403);
       const name = checkName(b.name), password = checkPass(b.password), role: Role = b.role === 'admin' ? 'admin' : 'viewer';
-      checkAdult(b.dob);
       const u = await makeUser(name, password, role, checkWrap(b.wrap));
       await audit(me, `Added ${role} ${name}`);
       return { ok: true, user: u };

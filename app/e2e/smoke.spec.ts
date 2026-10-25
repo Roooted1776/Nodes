@@ -19,17 +19,12 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   );
 
   await page.goto(PAGE);
-  await expect(page.getByRole('heading', { name: 'Set up Brain' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Set up Brain' })).toBeAttached();
 
   // first run: an adult creates the admin (a throwaway passcode that exists only in this test browser)
   const pass = 'e2e only 7Q';
-  await page.getByLabel('Name').fill('Owner');
-  await page.getByLabel(/^Passcode/).fill(pass);
-  await page.getByLabel('Repeat passcode').fill(pass);
-  await page.getByLabel('Month').selectOption({ label: 'January' });
-  await page.getByLabel('Day').fill('1');
-  await page.getByLabel('Year').fill('1990');
-  await page.getByLabel(/^Setup code/).fill('FAKE-TEST-CODE-ONLY');
+  await page.getByLabel('Username').fill('Owner');
+  await page.getByLabel('Password').fill(pass);
   await page.getByRole('button', { name: 'Create admin' }).click();
 
   const stage = page.getByRole('main', { name: 'Brain view' });
@@ -66,9 +61,9 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
 
   // lock, then sign back in with the same passcode
   await page.getByRole('button', { name: 'Lock' }).click();
-  await expect(page.getByRole('heading', { name: 'Restricted system' })).toBeVisible();
-  await page.getByLabel('Name').fill('Owner');
-  await page.getByLabel('Passcode').fill(pass);
+  await expect(page.getByRole('heading', { name: 'Sign in to Brain' })).toBeAttached();
+  await page.getByLabel('Username').fill('Owner');
+  await page.getByLabel('Password').fill(pass);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(stage).toBeVisible({ timeout: 30_000 });
 
@@ -107,17 +102,14 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   await expect(page.getByRole('tab', { name: 'Memory', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('tab', { name: 'Admin' }).click();
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Guest');
-  await page.getByPlaceholder(/Passcode \(5/).fill('fake viewer passcode');
-  await page.getByLabel('Month').selectOption({ label: 'January' });
-  await page.getByLabel('Day').fill('1');
-  await page.getByLabel('Year').fill('1990');
+  await page.getByPlaceholder(/Password \(6/).fill('fake viewer passcode');
   await page.getByRole('button', { name: 'Add account' }).click();
   await expect(page.getByText('Added Guest.', { exact: true })).toBeVisible();
   const viewer = await context.newPage();
   await viewer.goto(PAGE);
-  await expect(viewer.getByRole('heading', { name: 'Restricted system' })).toBeVisible();
-  await viewer.getByLabel('Name').fill('Guest');
-  await viewer.getByLabel('Passcode').fill('fake viewer passcode');
+  await expect(viewer.getByRole('heading', { name: 'Sign in to Brain' })).toBeAttached();
+  await viewer.getByLabel('Username').fill('Guest');
+  await viewer.getByLabel('Password').fill('fake viewer passcode');
   await viewer.getByRole('button', { name: 'Sign in' }).click();
   await expect(viewer.getByRole('main', { name: 'Brain view' })).toBeVisible({ timeout: 30_000 });
   await expect(viewer.getByRole('tab', { name: 'Admin' })).toHaveCount(0);

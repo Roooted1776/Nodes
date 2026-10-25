@@ -67,7 +67,6 @@ vi.mock('../src/lib/cloud', () => ({
   },
 }));
 
-const ADULT = { m: 'May', d: '17', y: '1980' };
 const useStoreRef: () => any = () => ({ mem: { entries: [] } });
 async function boot() {
   vi.resetModules();
@@ -79,19 +78,9 @@ async function boot() {
   await auth.useAuth.getState().init();
   return { App, auth, store };
 }
-const dob = async (u: ReturnType<typeof userEvent.setup>, d = ADULT) => {
-  await u.selectOptions(screen.getByLabelText('Month'), d.m);
-  await u.type(screen.getByLabelText('Day'), d.d);
-  await u.type(screen.getByLabelText('Year'), d.y);
-  const code = screen.queryByLabelText(/^Setup code/);
-  if (code) await u.type(code, 'fake-test-code-only');
-};
 async function makeAdmin(u: ReturnType<typeof userEvent.setup>) {
-  await u.clear(screen.getByLabelText('Name'));
-  await u.type(screen.getByLabelText('Name'), 'Owner');
-  await u.type(screen.getByLabelText(/^Passcode/), 'correct horse battery');
-  await u.type(screen.getByLabelText(/^Repeat passcode/), 'correct horse battery');
-  await dob(u);
+  await u.type(screen.getByLabelText('Username'), 'Owner');
+  await u.type(screen.getByLabelText('Password'), 'correct horse battery');
   await u.click(screen.getByRole('button', { name: 'Create admin' }));
 }
 
@@ -105,38 +94,39 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('setup and login', () => {
-  it('first run asks for an admin, refuses under 18, and makes no account', async () => {
+  it('first run shows only username and password, and refuses a short password', async () => {
     const { App } = await boot(),
       u = userEvent.setup();
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Set up Brain' })).toBeTruthy();
     expect((await screen.findByTestId('brain')).dataset.locked).toBe('true');
-    await u.type(screen.getByLabelText(/^Passcode/), 'correct horse battery');
-    await u.type(screen.getByLabelText(/^Repeat passcode/), 'correct horse battery');
-    await dob(u, { m: 'June', d: '1', y: '2012' });
+    const card = screen.getByRole('heading', { name: 'Set up Brain' }).closest('section')!;
+    expect(
+      within(card as HTMLElement).getAllByRole('textbox').length + card.querySelectorAll('input[type=password]').length,
+    ).toBe(2);
+    await u.type(screen.getByLabelText('Username'), 'Owner');
+    await u.type(screen.getByLabelText('Password'), 'five5');
     await u.click(screen.getByRole('button', { name: 'Create admin' }));
-    expect((await screen.findByRole('alert')).textContent).toMatch(/adults only/i);
-    expect(JSON.parse(localStorage.getItem('brain.auth.v1') || '{"users":[]}').users).toEqual([]);
-    expect(await screen.findByText(/paused on this browser/i)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Create admin' })).toBeNull(); // the form is gone for a day
+    expect((await screen.findByRole('alert')).textContent).toMatch(/at least 6/i);
+    expect(server.users).toEqual([]);
   }, 20000);
 
-  it('an adult creates the admin, lands on the brain home page, and can lock and sign back in', async () => {
+  it('the first visitor creates the admin, lands on the brain home page, and can lock and sign back in', async () => {
     const { App } = await boot(),
       u = userEvent.setup();
     render(<App />);
     await makeAdmin(u);
     expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
     expect(document.querySelector('.who .role')!.textContent).toBe('Admin');
-    expect(localStorage.getItem('brain.auth.v1') || '').not.toMatch(/correct horse|1980/);
+    expect(localStorage.getItem('brain.auth.v1') || '').not.toMatch(/correct horse/);
     await u.click(screen.getByRole('button', { name: 'Lock' }));
-    expect(await screen.findByRole('heading', { name: 'Restricted system' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Sign in to Brain' })).toBeTruthy();
     expect(useStoreRef().mem.entries).toEqual([]); // locking forgets the unlocked memory
-    await u.type(screen.getByLabelText('Name'), 'owner');
-    await u.type(screen.getByLabelText(/^Passcode/), 'not the passcode');
+    await u.type(screen.getByLabelText('Username'), 'owner');
+    await u.type(screen.getByLabelText('Password'), 'not the passcode');
     await u.click(screen.getByRole('button', { name: 'Sign in' }));
     expect((await screen.findByRole('alert')).textContent).toMatch(/wrong/i);
-    await u.type(screen.getByLabelText(/^Passcode/), 'correct horse battery');
+    await u.type(screen.getByLabelText('Password'), 'correct horse battery');
     await u.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
   }, 30000);
@@ -251,13 +241,9 @@ describe('who can do what', () => {
     const acc = screen.getByText('Accounts').closest('section')!;
     expect(within(acc as HTMLElement).getByText('Owner')).toBeTruthy();
     await u.type(screen.getByLabelText('Name', { selector: 'input[placeholder="Name"]' }), 'Kid');
-    await u.type(screen.getByPlaceholderText(/Passcode \(5/), 'a long enough passcode');
-    await u.selectOptions(screen.getByLabelText('Month'), 'June');
-    await u.type(screen.getByLabelText('Day'), '1');
-    await u.type(screen.getByLabelText('Year'), '2012');
+    await u.type(screen.getByPlaceholderText(/Password \(6/), 'a long enough password');
     await u.click(screen.getByRole('button', { name: 'Add account' }));
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/adults only/i));
-    expect(server.users.map(u => u.name)).toEqual(['Owner']);
+    await waitFor(() => expect(server.users.map(u => u.name)).toEqual(['Owner', 'Kid']));
   }, 30000);
 
   it('chat panel has auto-scroll enabled by default and can toggle off and on', async () => {

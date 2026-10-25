@@ -1,0 +1,44 @@
+/* Minimal sign-in / setup card: username + password only.
+   Backgrounds are only black or white (Owner's rule). The animated wave and the 3D brain are not styled here. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.access .card.minimal {
+  width: min(320px, 100%);
+  padding: 24px;
+  background: #000;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.access .card.minimal::before {
+  display: none;
+}
+.access .card.minimal form {
+  gap: 16px;
+}
+.access .card.minimal input,
+.access .card.minimal input:hover,
+.access .card.minimal input:focus,
+.access .card.minimal input:focus-visible {
+  background: #000;
+}
+.access .card.minimal .error,
+.access .card.minimal .notice {
+  background: #000;
+}
+.access .card.minimal button.primary,
+.access .card.minimal button.primary:hover:not(:disabled) {
+  background: #fff;
+  color: #000;
+}
+.banner {
+  background: #000;
+}

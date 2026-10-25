@@ -1,10 +1,9 @@
-import { MIN_AGE, ageBlockedUntil, blockDevice, dobError, isAdult, type Dob } from './age';
 import { EMAIL_DOMAIN } from './config';
 
 // Accounts live in Supabase Auth. Only admins make them, through Brain's accounts function.
 // The passcode never leaves the browser: it is stretched here (PBKDF2) and only the result is sent as the password.
-/** Shortest passcode allowed (Owner's choice, Oct 2026). */
-export const PASS_MIN = 5;
+/** Shortest password allowed (Owner's choice, Oct 2026). */
+export const PASS_MIN = 6;
 export const PASS_ITER = 310_000,
   IDLE_MS = 15 * 60_000,
   FREE_TRIES = 5,
@@ -28,6 +27,22 @@ export class AuthError extends Error {
 }
 
 // ---------- rules ----------
+/** Very common short passwords, refused only as the whole password. */
+const SHORT_COMMON = new Set([
+  '123456',
+  '1234567',
+  '12345678',
+  '654321',
+  '111111',
+  '000000',
+  'password',
+  'qwerty',
+  'abc123',
+  'letmein',
+  'iloveyou',
+  'admin1',
+  'brain1',
+]);
 const COMMON = [
   'passwordpassword',
   'password123',
@@ -47,29 +62,16 @@ export const nameError = (n: string) => {
     : 'Use 2 to 32 letters or numbers, with single spaces between words. No symbols.';
 };
 export function passcodeError(p: string, name = ''): string | null {
+  void name;
   if (p.length < PASS_MIN) return `Use at least ${PASS_MIN} characters.`;
   if (p.length > 128) return 'Use 128 characters or fewer.';
-  if (new Set(p).size < 4) return 'Use a mix of different characters.';
   const low = p.toLowerCase();
-  if (name.trim().length >= 3 && low.includes(name.trim().toLowerCase()))
-    return 'Do not put your name in the passcode.';
-  if (COMMON.some(c => low.includes(c))) return 'That passcode is too easy to guess.';
+  if (COMMON.some(c => low.includes(c)) || SHORT_COMMON.has(low) || new Set(p).size < 2)
+    return 'That password is too easy to guess.';
   return null;
 }
-/** Checks for a new account before anything is sent. Under 18: refused, and this browser refuses new accounts for a day. */
-export function checkNewAccount(
-  input: { name: string; passcode: string; dob: Dob },
-  store: Pick<Storage, 'getItem' | 'setItem'>,
-  now: number,
-): string {
-  if (ageBlockedUntil(store, now))
-    throw new AuthError('New accounts are paused on this browser. Try again later.', 'blocked');
-  const bad = dobError(input.dob, now);
-  if (bad) throw new AuthError(bad, 'age');
-  if (!isAdult(input.dob, now)) {
-    blockDevice(store, now);
-    throw new AuthError(`Brain is for adults only (${MIN_AGE}+). No account was made.`, 'age');
-  }
+/** Checks a new account's name and password before anything is sent. */
+export function checkNewAccount(input: { name: string; passcode: string }): string {
   const name = input.name.trim(),
     e1 = nameError(name);
   if (e1) throw new AuthError(e1, 'name');

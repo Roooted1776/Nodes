@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { ageBlockedUntil, type Dob } from './lib/age';
 import { audit, setAuditSink } from './lib/audit';
 import { AuthError, IDLE_MS, checkNewAccount, derivePassword, passcodeError, type Role, type User } from './lib/auth';
 import {
@@ -37,13 +36,12 @@ interface AuthState {
   lastActive: number;
   ready: boolean;
   init(): Promise<void>;
-  setup(i: { name: string; passcode: string; dob: Dob; code?: string }): Promise<boolean>;
+  setup(i: { name: string; passcode: string }): Promise<boolean>;
   login(name: string, pass: string): Promise<boolean>;
   logout(why?: string): void;
-  addUser(i: { name: string; role: Role; passcode: string; dob: Dob }): Promise<boolean>;
+  addUser(i: { name: string; role: Role; passcode: string }): Promise<boolean>;
   dropUser(id: string): Promise<string>;
   resetPasscode(id: string, pass: string): Promise<string>;
-  ageBlocked(): number;
 }
 const ls = localStorage;
 const hub: Hub = {
@@ -275,18 +273,15 @@ export const useAuth = create<AuthState>()((set, get) => {
         fail(e);
       }
     },
-    ageBlocked: () => ageBlockedUntil(ls, Date.now()),
     async setup(i) {
       set({ busy: true, error: '' });
       try {
-        const name = checkNewAccount(i, ls, Date.now());
+        const name = checkNewAccount(i);
         const { password, kek } = await derivePassword(name, i.passcode);
         const sec = await newSecrets();
         await accounts('setup', {
           name,
           password,
-          dob: i.dob,
-          code: i.code,
           wrap: await sealFor(kek, sec, true),
           envelope: await encryptVault(sec, { mem: blankMem() }, 1),
         });
@@ -310,11 +305,11 @@ export const useAuth = create<AuthState>()((set, get) => {
         return fail(new AuthError('Only admins can add accounts.', 'blocked'));
       set({ busy: true, error: '' });
       try {
-        const name = checkNewAccount(i, ls, Date.now());
+        const name = checkNewAccount(i);
         const { password, kek } = await derivePassword(name, i.passcode);
         await accounts(
           'create',
-          { name, password, role: i.role, dob: i.dob, wrap: await sealFor(kek, secrets, i.role === 'admin') },
+          { name, password, role: i.role, wrap: await sealFor(kek, secrets, i.role === 'admin') },
           true,
         );
         await refresh();

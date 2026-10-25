@@ -9,7 +9,6 @@ import { report, runAll, type Check } from '../lib/selfcheck';
 import { fmtDate } from '../lib/text';
 import { AGENTS } from '../data/team';
 import { useMem, useStore } from '../store';
-import { AgeFields, emptyDob } from './AgeFields';
 import KeyGuide from './KeyGuide';
 import { downloadFile } from '../lib/file-import';
 
@@ -443,8 +442,7 @@ const SECURITY: [string, string][] = [
   ['Admin-signed', 'Every save is signed with a key only admins hold. A changed copy is refused.'],
   ['Locked down', 'Only the page script runs. Connections are limited to Brain’s database and the four AI providers.'],
   ['Auto-lock', 'After 15 idle minutes, a minute hidden, or Esc twice.'],
-  ['Adults only', 'Date of birth is checked once and never stored. It cannot prove age.'],
-  ['Limits', 'No certification. No memory recovery if every admin passcode is lost.'],
+  ['Limits', 'No certification. No memory recovery if every admin password is lost.'],
 ];
 
 function Accounts() {
@@ -453,11 +451,10 @@ function Accounts() {
   const [name, setName] = useState(''),
     [role, setRole] = useState<Role>('viewer'),
     [pass, setPass] = useState(''),
-    [dob, setDob] = useState(emptyDob()),
     [ok, setOk] = useState(''),
     [note, setNote] = useState('');
   return (
-    <Card title="Accounts" hint="Admins add accounts. Adults only. Viewers can only read and watch." wide>
+    <Card title="Accounts" hint="Admins add accounts. Viewers can only read and watch." wide>
       <ul className="users">
         {db.users.map(u => (
           <li key={u.id}>
@@ -467,11 +464,11 @@ function Accounts() {
             <button
               type="button"
               onClick={() => {
-                const p = prompt(`New passcode for ${u.name} (${PASS_MIN}+ characters)`);
-                if (p) void resetPasscode(u.id, p).then(m => setNote(m || `Passcode changed for ${u.name}.`));
+                const p = prompt(`New password for ${u.name} (${PASS_MIN}+ characters)`);
+                if (p) void resetPasscode(u.id, p).then(m => setNote(m || `Password changed for ${u.name}.`));
               }}
             >
-              Reset passcode
+              Reset password
             </button>
             <button
               type="button"
@@ -493,12 +490,11 @@ function Accounts() {
         onSubmit={e => {
           e.preventDefault();
           setOk('');
-          void addUser({ name, role, passcode: pass, dob }).then(done => {
+          void addUser({ name, role, passcode: pass }).then(done => {
             if (done) {
               setOk(`Added ${name}.`);
               setName('');
               setPass('');
-              setDob(emptyDob());
             }
           });
         }}
@@ -514,12 +510,11 @@ function Accounts() {
           type="password"
           value={pass}
           onChange={e => setPass(e.target.value)}
-          placeholder={`Passcode (${PASS_MIN}+ characters)`}
+          placeholder={`Password (${PASS_MIN}+ characters)`}
           autoComplete="new-password"
-          aria-label="Passcode"
+          aria-label="Password"
           required
         />
-        <AgeFields value={dob} onChange={setDob} />
         {error && (
           <p className="error" role="alert">
             {error}
