@@ -1,0 +1,53 @@
+name: Check & Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'app/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci || npm install
+
+      - name: Install Playwright browsers
+        working-directory: app
+        run: npx playwright install --with-deps chromium
+
+      - name: Check code format & lint
+        working-directory: app
+        run: |
+          npm run format
+          npm run lint
+
+      - name: Typecheck
+        working-directory: app
+        run: npm run typecheck
+
+      - name: Unit & Integration tests
+        working-directory: app
+        run: npm test
+
+      - name: Build single-file bundle
+        working-directory: app
+        run: npm run build
+
+      - name: Run E2E tests
+        working-directory: app
+        run: npm run e2e
