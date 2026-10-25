@@ -58,7 +58,9 @@ export default function AdminPanel() {
     [ghToken, setGhToken] = useState(s.githubToken),
     [ghTesting, setGhTesting] = useState(false),
     [ghSyncing, setGhSyncing] = useState(false),
-    [ghResult, setGhResult] = useState('');
+    [ghResult, setGhResult] = useState(''),
+    [ghDifferential, setGhDifferential] = useState(true),
+    [ghIncReleases, setGhIncReleases] = useState(true);
 
   useEffect(() => {
     setGhRepo(s.githubRepo);
@@ -239,6 +241,38 @@ export default function AdminPanel() {
           wide
         >
           <div className="gh-connector-box">
+            {s.githubRecentRepos && s.githubRecentRepos.length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <span className="mini" style={{ color: 'var(--sub, #999)' }}>
+                  Recent:
+                </span>
+                <select
+                  className="sm"
+                  value={ghRepo}
+                  onChange={e => {
+                    const r = e.target.value;
+                    if (r) {
+                      setGhRepo(r);
+                      s.setGithubConfig({ repo: r });
+                      s.setActiveProject(r);
+                    }
+                  }}
+                  aria-label="Recent Repositories"
+                  style={{
+                    background: 'var(--card-bg, #1e1e24)',
+                    color: 'var(--txt, #fff)',
+                    border: '1px solid var(--tile-border, #333)',
+                    padding: '2px 6px',
+                  }}
+                >
+                  {s.githubRecentRepos.map(r => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="gh-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               <label className="mini-field" style={{ flex: '1 1 240px' }}>
                 <span>Repository (owner/repo)</span>
@@ -268,6 +302,42 @@ export default function AdminPanel() {
                 />
               </label>
             </div>
+            <div
+              className="gh-options-row"
+              style={{
+                display: 'flex',
+                gap: '14px',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                margin: '8px 0',
+              }}
+            >
+              <label className="sw sm">
+                <input
+                  type="checkbox"
+                  checked={ghIncReleases}
+                  onChange={e => setGhIncReleases(e.target.checked)}
+                />
+                <span>Releases & Milestones</span>
+              </label>
+              <label className="sw sm">
+                <input
+                  type="checkbox"
+                  checked={ghDifferential}
+                  onChange={e => setGhDifferential(e.target.checked)}
+                />
+                <span>Sync changes only</span>
+              </label>
+              {s.githubLastSync[ghRepo] && (
+                <span
+                  className="pill ok"
+                  style={{ fontSize: '11px' }}
+                  title={`Last synced: ${new Date(s.githubLastSync[ghRepo].date).toLocaleString()}`}
+                >
+                  Synced {new Date(s.githubLastSync[ghRepo].date).toLocaleDateString()}
+                </span>
+              )}
+            </div>
             <div className="row" style={{ marginTop: '8px', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <button
                 type="button"
@@ -295,7 +365,10 @@ export default function AdminPanel() {
                 onClick={async () => {
                   setGhSyncing(true);
                   try {
-                    const res = await s.syncGithub();
+                    const res = await s.syncGithub({
+                      includeReleases: ghIncReleases,
+                      differential: ghDifferential,
+                    });
                     setGhResult(`✓ Synced ${res.total} items (${res.added} new, ${res.updated} updated).`);
                   } catch (e: unknown) {
                     const errMsg = e instanceof Error ? e.message : String(e);
