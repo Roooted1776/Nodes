@@ -57,3 +57,11 @@ Changed `app/src/styles.css` and rebuilt `app/dist/index.html` and root `index.h
 Verified in real Chromium at widths 1920, 1440, 1366, 1280, 1024, 901, 900, 768, and 390: no horizontal overflow. At 1024px, the canvas has 696px and the panel 328px. Formatting, lint (warnings only), type-check, 77 unit/UI tests, build, and the existing browser check pass. Screenshots were visually checked. No real provider requests or production accounts were used for verification.
 
 Codex checked the layout and integration. Gemini context review, Muse audit, collective named-program review, and Grok Bot’s final decision were not performed in this chat; no substitute approvals are claimed.
+
+## Single page, simple login and pinned deploys (2026-10-24, Claude)
+
+- **Deploy:** the `brain-site` compose project's `init` container downloads `index.html` from a pinned GitHub commit (`BUILD_URL`), checks `BUILD_SHA256`, backs up the served file to `/var/backups/nodes/` and swaps it in atomically. On any failure it keeps the current page. To deploy: push to `main`, then update `BUILD_URL`/`BUILD_SHA256` in the compose project (Hostinger `vps_docker_create` with the same name) and check the `init` log line `deployed <sha>`.
+- **Login:** username + password only (6+ characters). No setup code and no date-of-birth check: while Brain has no accounts, the first visitor creates the admin (`claim_open_setup` lease). Admins add users. `accounts` function v5, migration `open_first_setup`.
+- **Screen:** one page. 3D brain (unchanged), live chat beside it, admin panel as a horizontal strip along the bottom. No text outside the chat. Bot names use their node colours with a fixed pixel icon; a bot that hits a token/rate/credit limit shows a red name until it answers again.
+- **Favicon:** pixel brain, inline data URI (`app/src/assets/favicon.svg`).
+- **Open item:** migrations `20261024200000_tighten_access` and `20261024210000_persistent_memory` are not applied in production, so `syncMemoryDatabase` writes fail silently (`projects` table and `upsert_*` functions are missing). Memory is still saved in the encrypted vault. Applying `persistent_memory` would store memory as readable rows, which works against the encrypted design; Owner should decide.
