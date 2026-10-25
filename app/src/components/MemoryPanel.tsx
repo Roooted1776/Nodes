@@ -444,8 +444,12 @@ function ImportModal({
   const mem = useMem();
   const importItems = useStore(s => s.importItems);
   const activeProj = useStore(s => s.activeProject);
+  const setActiveProject = useStore(s => s.setActiveProject);
   const sGithubRepo = useStore(s => s.githubRepo);
   const sGithubToken = useStore(s => s.githubToken);
+  const sGithubRecentRepos = useStore(s => s.githubRecentRepos);
+  const sGithubLastSync = useStore(s => s.githubLastSync);
+  const addRecentGithubRepo = useStore(s => s.addRecentGithubRepo);
 
   const [tab, setTab] = useState<'files' | 'paste' | 'github'>(initialTab);
   const [project, setProject] = useState(activeProj || 'Brain');
@@ -460,6 +464,8 @@ function ImportModal({
   const [ghIncIssues, setGhIncIssues] = useState(true);
   const [ghIssueState, setGhIssueState] = useState<'open' | 'closed' | 'all'>('open');
   const [ghIncCommits, setGhIncCommits] = useState(true);
+  const [ghIncReleases, setGhIncReleases] = useState(true);
+  const [ghDifferential, setGhDifferential] = useState(true);
   const [ghItems, setGhItems] = useState<RawMemoryItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -521,6 +527,7 @@ function ImportModal({
     setBusy(true);
     setStatus('');
     try {
+      const lastSyncRecord = sGithubLastSync[ghRepo.trim()];
       const { items, summary } = await fetchAndConvertGitHub(
         ghRepo,
         {
@@ -528,12 +535,17 @@ function ImportModal({
           includeIssues: ghIncIssues,
           issueState: ghIssueState,
           includeCommits: ghIncCommits,
+          includeReleases: ghIncReleases,
+          differential: ghDifferential,
+          since: ghDifferential && lastSyncRecord?.date ? lastSyncRecord.date : undefined,
           maxIssues: 15,
           maxCommits: 8,
+          maxReleases: 5,
         },
         ghToken,
         targetProject,
       );
+      addRecentGithubRepo(ghRepo.trim());
       setGhItems(items);
       setStatus(`✓ ${summary}`);
     } catch (e: unknown) {
@@ -562,6 +574,9 @@ function ImportModal({
       repo: tab === 'github' ? ghRepo.trim() : undefined,
       summary: tab === 'github' ? `${allItems.length} GitHub memories` : `${allItems.length} memories`,
     });
+    if (tab === 'github' && ghRepo.trim()) {
+      addRecentGithubRepo(ghRepo.trim());
+    }
     setBusy(false);
     setStatus(
       `✓ Successfully imported ${res.added} new and updated ${res.updated} memories into project "${targetProject}". Saved under tasks.`,
