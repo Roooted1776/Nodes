@@ -247,3 +247,28 @@ describe('memory storage', () => {
     expect(sess.msgs[2].from).toBe('grokbot');
   });
 });
+
+describe('agentActivityScores', () => {
+  it('tallies node mentions, session targets, and handoff activity across all sessions', () => {
+    const m = blankMem();
+    m.entries = [
+      { id: 'n1', type: 'concept', title: 'React Framework', note: 'Frontend library', sources: [], links: [] },
+      { id: 'n2', type: 'concept', title: 'ThreeJS Canvas', note: '3D rendering', sources: [], links: [] },
+    ];
+    m.sessions = [
+      {
+        id: 's1',
+        ts: Date.now(),
+        q: 'Setup React components and optimize rendering',
+        project: 'Brain',
+        nodeId: 'n1',
+        nodeTitle: 'React Framework',
+        msgs: [{ from: 'cursor', text: 'Checked React Framework implementation in app' }],
+      },
+    ];
+
+    const scores = agentActivityScores(m);
+    expect(scores.get('n1')).toBeGreaterThan(0);
+    expect(scores.get('n2') || 0).toBe(0);
+  });
+});
