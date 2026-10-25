@@ -53,6 +53,15 @@ const EVENTS: Record<ProviderId, unknown[]> = {
       x_groq: { usage: { prompt_tokens: 11, completion_tokens: 3 } },
     },
   ],
+  get cerebras() {
+    return this.groq;
+  },
+  get freebuff() {
+    return this.groq;
+  },
+  get muse() {
+    return this.groq;
+  },
 };
 const base = { key: 'k-123', model: 'm', system: 's', user: 'u', maxTokens: 50 };
 
@@ -69,7 +78,21 @@ describe('streaming replies', () => {
     expect((g.body as any).reasoning_effort).toBe('low');
     expect((buildRequest({ provider: 'openai', ...base }).body as any).stream).toBeUndefined();
   });
-  for (const p of ['anthropic', 'openai', 'xai', 'google', 'groq'] as ProviderId[])
+  it('Cerebras, Freebuff and Muse use the chat format at their own addresses', () => {
+    const urls: Record<string, string> = {
+      cerebras: 'https://api.cerebras.ai/v1/chat/completions',
+      freebuff: 'https://freebuff.com/api/v1/chat/completions',
+      muse: 'https://api.meta.ai/v1/chat/completions',
+    };
+    for (const p of ['cerebras', 'freebuff', 'muse'] as ProviderId[]) {
+      const r = buildRequest({ provider: p, ...base, model: 'm' }, true);
+      expect(r.url).toBe(urls[p]);
+      expect(r.headers.authorization).toBe('Bearer k-123');
+      expect((r.body as any).messages[0].role).toBe('system');
+      expect((r.body as any).stream).toBe(true);
+    }
+  });
+  for (const p of ['anthropic', 'openai', 'xai', 'google', 'groq', 'cerebras', 'freebuff', 'muse'] as ProviderId[])
     it(`${p}: text grows as it arrives and the totals are kept`, async () => {
       const seen: string[] = [];
       const r = await callModel({ provider: p, ...base, fetchImpl: sse(EVENTS[p]) as any, onDelta: t => seen.push(t) });
