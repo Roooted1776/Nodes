@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  agentActivityScores,
   blankMem,
   ensureProjectNode,
   findMostWorkedNode,
@@ -254,7 +255,7 @@ describe('agentActivityScores', () => {
     m.entries = [
       { id: 'n1', type: 'concept', title: 'React Framework', note: 'Frontend library', sources: [], links: [] },
       { id: 'n2', type: 'concept', title: 'ThreeJS Canvas', note: '3D rendering', sources: [], links: [] },
-    ];
+    ] as unknown as typeof m.entries;
     m.sessions = [
       {
         id: 's1',
@@ -263,12 +264,13 @@ describe('agentActivityScores', () => {
         project: 'Brain',
         nodeId: 'n1',
         nodeTitle: 'React Framework',
-        msgs: [{ from: 'cursor', text: 'Checked React Framework implementation in app' }],
+        msgs: [{ from: 'cursor', tag: 'live · test', text: 'Checked React Framework implementation in app' }],
       },
-    ];
+    ] as unknown as typeof m.sessions;
 
     const scores = agentActivityScores(m);
     expect(scores.get('n1')).toBeGreaterThan(0);
     expect(scores.get('n2') || 0).toBe(0);
   });
 });
+
