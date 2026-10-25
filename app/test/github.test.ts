@@ -9,7 +9,6 @@ import {
   githubToMemoryItems,
   parseRepoInput,
   testGitHubConnection,
-  type GitHubRelease,
   type GitHubRepoInfo,
 } from '../src/lib/github';
 
