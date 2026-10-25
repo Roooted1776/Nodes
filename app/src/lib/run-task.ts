@@ -236,8 +236,13 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
               ? 'The page call budget is used.'
               : null;
       },
+      onCreditFailure: (id: AgentId) => {
+        set(x => ({
+          inactiveBots: Array.from(new Set([...(x.inactiveBots || []), id])),
+        }));
+      },
     },
-    { brainContext: ctxBlock, clean },
+    { brainContext: ctxBlock, clean, inactiveBots: get().inactiveBots },
   );
   set(x => ({
     stages: Object.fromEntries(Object.entries(x.stages).map(([k, v]) => [k, v === 'waiting' ? 'skipped' : v])),

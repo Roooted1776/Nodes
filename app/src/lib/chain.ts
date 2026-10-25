@@ -10,6 +10,7 @@ export interface ChainHooks {
   active(id: AgentId | null): void;
   handoff(from: string, to: string, payload?: string): void;
   blocked(): string | null; // a reason to stop before the next call, or null
+  onCreditFailure?(id: AgentId, reason: string): void;
 }
 export interface ChainResult {
   msgs: Msg[];
@@ -17,16 +18,24 @@ export interface ChainResult {
   failed: AgentId[];
 }
 
-export const chainFor = (task: string): AgentId[] => LIVE_ORDER.filter(id => id !== 'xcode' || IOS_RE.test(task));
+export const chainFor = (task: string, inactiveBots?: ReadonlySet<AgentId> | AgentId[]): AgentId[] => {
+  const inactiveSet = Array.isArray(inactiveBots) ? new Set(inactiveBots) : inactiveBots;
+  return LIVE_ORDER.filter(id => (id !== 'xcode' || IOS_RE.test(task)) && (!inactiveSet || !inactiveSet.has(id)));
+};
 
 export async function runChain(
   task: string,
   tag: string,
   call: StageCall,
   hooks: ChainHooks,
-  opts: { brainContext?: string; perTaskCap?: number; clean?: (t: string) => string } = {},
+  opts: {
+    brainContext?: string;
+    perTaskCap?: number;
+    clean?: (t: string) => string;
+    inactiveBots?: ReadonlySet<AgentId> | AgentId[];
+  } = {},
 ): Promise<ChainResult> {
-  const bots = chainFor(task),
+  const bots = chainFor(task, opts.inactiveBots),
     msgs: Msg[] = [],
     failed: AgentId[] = [];
   const clean = opts.clean || (t => t),
@@ -36,15 +45,21 @@ export async function runChain(
     hooks.say(m);
   };
   say({ from: 'owner', text: task, tag: '' });
+  const inactiveCount = opts.inactiveBots
+    ? Array.isArray(opts.inactiveBots)
+      ? opts.inactiveBots.length
+      : opts.inactiveBots.size
+    : 0;
   say({
     from: 'brain',
     tag: 'page',
     text:
       'Handoff chain: ' +
-      bots.map(b => AGENT[b].name).join(' → ') +
+      bots.map(b => `${AGENT[b].name} (${AGENT[b].company})`).join(' → ') +
       '.' +
       (IOS_RE.test(task) ? '' : ' Xcode sits this one out because it is not an iOS task.') +
-      ' Each agent reviews the handoff first. Text only; no files change.',
+      (inactiveCount > 0 ? ` [${inactiveCount} inactive bot(s) filtered out]` : '') +
+      ' One team of people and bots. Pipeline: Collect → Review → Edit → Review → Pass to next → Review. Text only; no files change.',
   });
   let previous = 'Owner task: ' + task,
     calls = 0,
@@ -79,10 +94,15 @@ export async function runChain(
       previous = `HANDOFF FROM ${AGENT[bot].name}:\n${text}`;
       handoffs.push(previous);
     } catch (e: any) {
-      const msg = `${AGENT[bot].name} did not finish: ${clean(String(e?.message || e))}. Nothing was made up in its place.`;
+      const errStr = String(e?.message || e);
+      const isCredits = e?.outOfCredits || /credit|quota|billing|payment|balance|402/i.test(errStr);
+      const msg = isCredits
+        ? `${AGENT[bot].name} (${AGENT[bot].company}) has no credits/inactive: ${clean(errStr)}. Dynamic brain filters it out.`
+        : `${AGENT[bot].name} did not finish: ${clean(errStr)}. Nothing was made up in its place.`;
       say({ from: 'brain', tag: 'page', cls: 'warn', text: msg });
       failed.push(bot);
-      previous = `HANDOFF STATUS FOR ${AGENT[bot].name}:\n${msg}`;
+      if (isCredits) hooks.onCreditFailure?.(bot, errStr);
+      previous = `HANDOFF STATUS FOR ${AGENT[bot].name}:\n${msg}\n(Next worker: review the last available handoff above and continue autonomously.)`;
       handoffs.push(previous);
     }
     if (next) hooks.handoff(bot, next, previous);

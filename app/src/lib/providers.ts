@@ -26,10 +26,16 @@ export const RETIRED = new Set([
 ]);
 export const MODEL_RE = /^[A-Za-z0-9._:-]{1,80}$/;
 
+export function isCreditOrQuotaError(msg: string, status?: number): boolean {
+  if (status === 402) return true;
+  return /credit|quota|billing|balance|payment|insufficient|exhausted|unpaid/i.test(msg);
+}
+
 export class ProviderError extends Error {
   constructor(
     msg: string,
     public rejected = false,
+    public outOfCredits = false,
   ) {
     super(msg);
   }
@@ -271,9 +277,12 @@ export async function callModel(o: CallOpts): Promise<CallResult> {
       res.status === 401 ||
       res.status === 403 ||
       (o.provider === 'google' && res.status === 400 && /API key not valid|API_KEY_INVALID/i.test(raw));
+    const msg = httpMessage(res.status, raw, o.key);
+    const outOfCredits = isCreditOrQuotaError(raw + ' ' + msg, res.status);
     throw new ProviderError(
-      httpMessage(res.status, raw, o.key) + (rejected ? ' (key rejected; this provider is off until you reload)' : ''),
+      msg + (rejected ? ' (key rejected; this provider is off until you reload)' : ''),
       rejected,
+      outOfCredits,
     );
   }
   let data: unknown;

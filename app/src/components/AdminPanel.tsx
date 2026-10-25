@@ -7,6 +7,7 @@ import { MODEL_RE, PROV, PROVIDERS, type ProviderId } from '../lib/providers';
 import { KEY_GUIDE } from '../lib/keyguide';
 import { report, runAll, type Check } from '../lib/selfcheck';
 import { fmtDate } from '../lib/text';
+import { AGENTS } from '../data/team';
 import { useMem, useStore } from '../store';
 import { AgeFields, emptyDob } from './AgeFields';
 import KeyGuide from './KeyGuide';
@@ -44,11 +45,34 @@ export default function AdminPanel() {
   const s = useStore(),
     mem = useMem(),
     { live } = s;
-  const [key, setKey] = useState(''),
+  const [key, setKey] = useState(s.keys[live.provider] || ''),
+    [modelText, setModelText] = useState(live.models[live.provider] || PROV[live.provider].model),
+    [maxTokensText, setMaxTokensText] = useState(String(live.maxTokens)),
+    [callCapText, setCallCapText] = useState(String(live.callCap)),
+    [focusText, setFocusText] = useState(mem.settings.instructions || ''),
+    [compKeys, setCompKeys] = useState<Partial<Record<ProviderId, string>>>({}),
     [restore, setRestore] = useState(''),
     [phrase, setPhrase] = useState(''),
     [msg, setMsg] = useState(''),
     [sure, setSure] = useState(false);
+
+  useEffect(() => {
+    setKey(s.keys[live.provider] || '');
+    setModelText(live.models[live.provider] || PROV[live.provider].model);
+  }, [live.provider, s.keys[live.provider], live.models[live.provider]]);
+
+  useEffect(() => {
+    setMaxTokensText(String(live.maxTokens));
+  }, [live.maxTokens]);
+
+  useEffect(() => {
+    setCallCapText(String(live.callCap));
+  }, [live.callCap]);
+
+  useEffect(() => {
+    setFocusText(mem.settings.instructions || '');
+  }, [mem.settings.instructions]);
+
   const ready = !!s.keys[live.provider];
   return (
     <section className="panel admin" aria-label="Admin">
@@ -74,7 +98,6 @@ export default function AdminPanel() {
             value={live.provider}
             onChange={e => {
               s.setLive({ provider: e.target.value as ProviderId });
-              setKey('');
             }}
           >
             {PROVIDERS.map(p => (
@@ -85,10 +108,19 @@ export default function AdminPanel() {
           </select>
           <input
             aria-label="Model"
-            value={live.models[live.provider]}
+            value={modelText}
             onChange={e => {
+              setModelText(e.target.value);
               const v = e.target.value.trim();
               if (MODEL_RE.test(v)) s.setLive({ models: { ...live.models, [live.provider]: v } });
+            }}
+            onBlur={() => {
+              const v = modelText.trim();
+              if (MODEL_RE.test(v)) {
+                s.setLive({ models: { ...live.models, [live.provider]: v } });
+              } else {
+                setModelText(live.models[live.provider] || PROV[live.provider].model);
+              }
             }}
           />
         </Card>
@@ -101,7 +133,7 @@ export default function AdminPanel() {
             autoComplete="off"
             onChange={e => {
               setKey(e.target.value);
-              s.setKey(e.target.value);
+              s.setKey(e.target.value, live.provider);
             }}
           />
           <Switch
@@ -110,15 +142,86 @@ export default function AdminPanel() {
             label="Remember on this device (encrypted)"
           />
           <div className="row">
-            <button type="button" onClick={() => void s.testProvider()}>
+            <button type="button" onClick={() => void s.testProvider(live.provider)}>
               Test (1 call)
             </button>
-            <button type="button" onClick={s.forgetKey}>
+            <button
+              type="button"
+              onClick={() => {
+                s.forgetKey(live.provider);
+                setKey('');
+              }}
+            >
               Forget
             </button>
             <a className="btnlink sm" href={KEY_GUIDE[live.provider].url} target="_blank" rel="noopener noreferrer">
               Get a key ↗
             </a>
+          </div>
+        </Card>
+        <Card
+          title="All Company API Keys"
+          hint="Connect keys for any or all AI companies. When connected, each bot calls its native company directly (Claude -> Anthropic, Codex -> OpenAI, Gemini -> Google, Grok -> xAI)."
+          wide
+        >
+          <div className="company-keys-list">
+            {PROVIDERS.map(p => {
+              const has = !!s.keys[p];
+              const isDead = !!s.dead[p];
+              const g = KEY_GUIDE[p];
+              return (
+                <div key={p} className="company-key-card">
+                  <div className="company-key-head">
+                    <span className="company-tag" style={{ borderLeftColor: PROV[p].color }}>
+                      <b style={{ color: PROV[p].color }}>{PROV[p].label}</b>
+                      <small>
+                        {p === 'anthropic'
+                          ? 'Claude, Artifact'
+                          : p === 'openai'
+                            ? 'Codex, ChatGPT, Canvas, Muse'
+                            : p === 'google'
+                              ? 'Gemini'
+                              : 'Grok, Grok Bot'}
+                      </small>
+                    </span>
+                    <span className={`pill ${has ? (isDead ? 'warn' : 'ok') : ''}`}>
+                      {isDead ? 'Key rejected' : has ? 'Key set' : 'Not set'}
+                    </span>
+                  </div>
+                  <div className="company-key-row">
+                    <input
+                      type="password"
+                      aria-label={`${PROV[p].label} key`}
+                      value={compKeys[p] ?? (s.keys[p] || '')}
+                      placeholder={has ? 'Key is set (encrypted)' : `Starts with ${g.prefix}`}
+                      autoComplete="off"
+                      onChange={e => {
+                        const val = e.target.value;
+                        setCompKeys(prev => ({ ...prev, [p]: val }));
+                        s.setKey(val, p);
+                      }}
+                    />
+                    <button type="button" className="sm" disabled={!s.keys[p]} onClick={() => void s.testProvider(p)}>
+                      Test
+                    </button>
+                    <button
+                      type="button"
+                      className="sm"
+                      disabled={!s.keys[p]}
+                      onClick={() => {
+                        s.forgetKey(p);
+                        setCompKeys(prev => ({ ...prev, [p]: '' }));
+                      }}
+                    >
+                      Clear
+                    </button>
+                    <a className="btnlink sm" href={g.url} target="_blank" rel="noopener noreferrer">
+                      Get key ↗
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
         <Card title="Limits" hint="Per page load. Reload to reset.">
@@ -128,8 +231,17 @@ export default function AdminPanel() {
               type="number"
               min={20}
               max={150}
-              value={live.maxTokens}
-              onChange={e => s.setLive({ maxTokens: Math.max(20, Math.min(150, +e.target.value || 120)) })}
+              value={maxTokensText}
+              onChange={e => {
+                setMaxTokensText(e.target.value);
+                const n = +e.target.value;
+                if (Number.isFinite(n) && n >= 20 && n <= 150) s.setLive({ maxTokens: n });
+              }}
+              onBlur={() => {
+                const n = Math.max(20, Math.min(150, Math.round(+maxTokensText || 120)));
+                setMaxTokensText(String(n));
+                s.setLive({ maxTokens: n });
+              }}
             />
           </label>
           <label className="mini-field">
@@ -138,10 +250,46 @@ export default function AdminPanel() {
               type="number"
               min={1}
               max={9}
-              value={live.callCap}
-              onChange={e => s.setLive({ callCap: Math.max(1, Math.min(9, +e.target.value || 9)) })}
+              value={callCapText}
+              onChange={e => {
+                setCallCapText(e.target.value);
+                const n = +e.target.value;
+                if (Number.isFinite(n) && n >= 1 && n <= 9) s.setLive({ callCap: n });
+              }}
+              onBlur={() => {
+                const n = Math.max(1, Math.min(9, Math.round(+callCapText || 9)));
+                setCallCapText(String(n));
+                s.setLive({ callCap: n });
+              }}
             />
           </label>
+        </Card>
+        <Card
+          title="Bots & Credits"
+          hint="Dynamically filters out bots whose providers have no credits, rearranging the 3D brain and live handoff chain so work continues autonomously."
+          wide
+        >
+          <div className="bot-auto-update-bar">
+            <Switch on={s.autoUpdateBots} set={s.setAutoUpdateBots} label="Auto update enabled for all bots" />
+            <button type="button" className="sm" onClick={s.updateAllBots}>
+              Update all bots now
+            </button>
+          </div>
+          <div className="bot-credits-list">
+            {AGENTS.map(a => {
+              const active = !s.inactiveBots.includes(a.id);
+              return (
+                <div key={a.id} className="bot-credit-item">
+                  <Switch
+                    on={active}
+                    set={val => s.setBotActive(a.id, val)}
+                    label={`${a.name} (${a.company}) — ${a.role}`}
+                  />
+                  <span className={`pill ${active ? 'ok' : 'warn'}`}>{active ? 'Active' : 'No Credits'}</span>
+                </div>
+              );
+            })}
+          </div>
         </Card>
       </div>
 
@@ -166,8 +314,9 @@ export default function AdminPanel() {
             aria-label="Focus"
             rows={3}
             maxLength={400}
-            defaultValue={mem.settings.instructions}
-            onBlur={e => s.setSetting({ instructions: e.target.value })}
+            value={focusText}
+            onChange={e => setFocusText(e.target.value)}
+            onBlur={() => s.setSetting({ instructions: focusText })}
           />
         </Card>
         <Card title="Backup" hint="Encrypted with a passphrase you choose.">
@@ -179,6 +328,9 @@ export default function AdminPanel() {
             autoComplete="off"
             placeholder="Passphrase, 10+ characters"
           />
+          <small className="mini">
+            {phrase.length < 10 ? `${phrase.length}/10 characters minimum` : 'Passphrase ready'}
+          </small>
           <div className="row">
             <button
               type="button"
