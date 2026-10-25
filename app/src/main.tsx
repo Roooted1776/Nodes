@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
 import './tidal.css';
+import './access.css';
 import './tidal-bg';
 
 // Guard against Drei Html unmount race condition where React 19 detaches DOM before Drei finishes unmount
