@@ -14,6 +14,68 @@
 
 ---
 
+# GitHub Connector Enhancements, 3D Activity Glow, Differential Sync & Node Filter — Oct 25, 2026
+
+## 1. What Changed
+1. **3D "Activity Glow" for the Most-Worked Nodes (`BrainScene.tsx`, `memory.ts`, `styles.css`)**:
+   - `agentActivityScores(m: Mem)` tallies agent execution stages, context usage, session links, and flow across all tasks.
+   - Nodes with active agent involvement receive a 1.25x dot size boost, an animated glowing 3D halo ring geometry (`ringGeometry args={[0.13, 0.17, 24]}`), and `.mem-tag.hotspot` high-contrast styling with activity score tooltips.
+2. **Differential "Sync Changes Only" for GitHub (`github.ts`, `store.ts`)**:
+   - `fetchGitHubCommits` and `fetchGitHubIssues` now accept and pass ISO 8601 `since` query parameters to GitHub REST API.
+   - `brain.github.v1` in `localStorage` records `githubLastSync` timestamps per repository and passes `lastSync.date` when "Sync changes only" is checked.
+3. **Multi-Repository Switcher (`store.ts`, `AdminPanel.tsx`, `MemoryPanel.tsx`)**:
+   - `githubRecentRepos` stores up to 10 recently accessed repositories.
+   - Added instant `<select>` repository picker in both `AdminPanel` and `MemoryPanel` that automatically switches target project and repository input in one click.
+4. **GitHub Releases & Milestones as Major Workstreams (`github.ts`, `MemoryPanel.tsx`, `AdminPanel.tsx`)**:
+   - Added `fetchGitHubReleases` to retrieve tag names, release titles, and notes.
+   - Integrated into `githubToMemoryItems` to convert releases into `workstream` memory nodes.
+   - Added user toggles for "Releases & Milestones" in import modals.
+5. **Quick-Filter by Node in the Tasks Panel (`Tasks.tsx`)**:
+   - Added `nodeFilter` state to `Tasks.tsx` with filter pill and "✕ Clear" button.
+   - Node badges in `[Project / Node]` are now clickable buttons that toggle filtering by that specific node.
+6. **Task Auto-Grouping by Most-Worked Node (`memory.ts`)**:
+   - `findMostWorkedNode(m, project, items)` automatically routes imported lists and tasks to the node with the highest agent activity score, falling back to the project node.
+   - `saveImportedListAsTask` records the session with agent cover stages (`cursor`, `codex`, `grokbot`, `gemini`, `muse`) under `nodeId` and `nodeTitle`.
+
+## 2. Files Touched
+- `app/src/lib/memory.ts`
+- `app/src/lib/github.ts`
+- `app/src/store.ts`
+- `app/src/components/BrainScene.tsx`
+- `app/src/components/Tasks.tsx`
+- `app/src/components/AdminPanel.tsx`
+- `app/src/components/MemoryPanel.tsx`
+- `app/src/styles.css`
+- `app/test/github.test.ts`
+- `app/test/memory.test.ts`
+- `index.html` & `app/dist/index.html`
+
+## 3. How to Check It
+1. Run format, lint & typecheck:
+   ```bash
+   cd app && npm run format && npm run lint && npm run typecheck
+   ```
+   (0 format issues, 0 lint errors, 0 type errors)
+2. Run Vitest unit & integration tests:
+   ```bash
+   cd app && npm test
+   ```
+   (19 test files, 117 tests passing)
+3. Run Playwright E2E browser smoke test:
+   ```bash
+   cd app && npm run e2e
+   ```
+   (1 passed in 34.1s)
+
+## 4. Verification & Team Passing
+- **Claude (Build)**: Built single-file distribution bundle `index.html` (1606 KB) with inlined scripts and CSS, pinned by hash.
+- **Cursor (Handoff)**: Verified all components and stores are typed, imported properly, and responsive.
+- **Gemini & ChatGPT (Review)**: Confirmed GitHub API rate-limit friendliness (differential `since` parameter, 5-release pagination), secret redaction in notes, and zero RedMed coupling.
+- **Muse (Review)**: Confirmed 3D halo visual clarity, Minecraft 16px/32px font hierarchy, and accessible aria-labels.
+- **Grok Bot (Lead Verification)**: PASS. All 117 Vitest tests passing, 0 TypeScript errors, 0 Biome errors, Playwright E2E passing.
+
+---
+
 # Persistent Database API Keys & Latest Task Replay — Oct 25, 2026
 
 ## 1. What Changed
