@@ -273,4 +273,3 @@ describe('agentActivityScores', () => {
     expect(scores.get('n2') || 0).toBe(0);
   });
 });
-
