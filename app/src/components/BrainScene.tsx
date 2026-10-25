@@ -4,7 +4,7 @@ import type React from 'react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { STAGE_COLOR, TYPE_COLOR, colorOf } from '../data/colors';
-import { AGENTS, isAgent } from '../data/team';
+import { AGENT, AGENTS, isAgent } from '../data/team';
 import { OUTLINE } from '../data/outline';
 import { buildSkull, skullLines } from '../lib/skull';
 import { buildShell, midline, placeMemory, route, station, surfaceFolds, toWorld, type P3 } from '../lib/geometry';
@@ -393,20 +393,26 @@ function Agents({ locked }: { locked: boolean }) {
               <Html center distanceFactor={9} zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={e => {
+                    e.stopPropagation();
                     useStore.setState(s => ({
                       tab: 'chat',
                       sceneFocus: { kind: 'agent', id: a.id, sequence: (s.sceneFocus?.sequence || 0) + 1 },
-                    }))
-                  }
+                      inspectedBot: isAgent(a.id) ? (a.id as any) : null,
+                    }));
+                  }}
                   className={
                     'agent-tag' +
                     (active === a.id ? ' on' : '') +
                     (stages[a.id as keyof typeof stages] === 'skipped' ? ' off' : '')
                   }
-                  style={{ '--c': colorOf(a.id), pointerEvents: 'auto' } as React.CSSProperties}
+                  style={{ '--c': colorOf(a.id), pointerEvents: 'auto', cursor: 'pointer' } as React.CSSProperties}
+                  title={`${a.name} · Click to inspect`}
                 >
                   {a.name}
+                  {isAgent(a.id) && AGENT[a.id].company && (
+                    <span className="bot-company"> · {AGENT[a.id].company}</span>
+                  )}
                 </button>
               </Html>
             </group>

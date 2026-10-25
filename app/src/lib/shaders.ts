@@ -1,5 +1,6 @@
 // GLSL for the brain view. Kept apart from the scene so the System check can compile them on this computer's GPU.
 export const DOT_VERT = /* glsl */ `
+  precision highp float;
   attribute vec3 aColor; attribute float aSize; attribute float aAlpha;
   uniform float uDpr; uniform float uFocus; uniform float uScale; uniform float uHalo;
   varying vec3 vColor; varying float vAlpha; varying float vPx; varying float vCore;

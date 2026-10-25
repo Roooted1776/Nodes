@@ -39,6 +39,7 @@ export default function ChatPanel() {
     viewSession = useStore(s => s.viewSession);
   const sceneFocus = useStore(s => s.sceneFocus);
   const focusedAgent = sceneFocus?.kind === 'agent' && isAgent(sceneFocus.id) ? AGENT[sceneFocus.id] : null;
+  const inspectBot = useStore(s => s.inspectBot);
   const ready = useStore(s => !!s.keys[s.live.provider]),
     end = useRef<HTMLDivElement>(null),
     msgsRef = useRef<HTMLDivElement>(null),
@@ -150,7 +151,18 @@ export default function ChatPanel() {
               style={a ? ({ '--g1': colorOf(a.id), '--c': colorOf(a.id) } as CSSProperties) : undefined}
             >
               <header>
-                <b>{who}</b>
+                {a ? (
+                  <button
+                    type="button"
+                    className="link bot-name-btn"
+                    onClick={() => inspectBot(a.id)}
+                    title={`Click to see ${a.name}'s profile`}
+                  >
+                    <b>{who}</b>
+                  </button>
+                ) : (
+                  <b>{who}</b>
+                )}
                 {a && <span>{a.role}</span>}
                 {t && <em>{t}</em>}
                 <CopyButton text={m.text} />

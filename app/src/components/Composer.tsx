@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PROV } from '../lib/providers';
 import { useStore } from '../store';
 
@@ -19,7 +19,16 @@ export default function Composer() {
     activeProject = useStore(s => s.activeProject),
     setActiveProject = useStore(s => s.setActiveProject),
     mem = useStore(s => s.mem),
-    ready = useStore(s => Object.values(s.keys).some(Boolean));
+    ready = useStore(s => Object.values(s.keys).some(Boolean)),
+    promptDraft = useStore(s => s.promptDraft),
+    setPromptDraft = useStore(s => s.setPromptDraft);
+
+  useEffect(() => {
+    if (promptDraft) {
+      setQ(promptDraft);
+      setPromptDraft('');
+    }
+  }, [promptDraft, setPromptDraft]);
   const [showNew, setShowNew] = useState(false);
   const [newProj, setNewProj] = useState('');
 

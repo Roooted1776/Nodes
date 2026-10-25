@@ -81,7 +81,8 @@ export default function Tasks() {
     used = useStore(s => s.used);
   const viewing = useStore(s => s.viewing),
     viewSession = useStore(s => s.viewSession),
-    [all, setAll] = useState(false);
+    [all, setAll] = useState(false),
+    [taskSearch, setTaskSearch] = useState('');
   const saved = [...mem.sessions].reverse().map(fromSession);
   const cur: Card[] = busy
     ? [
@@ -103,14 +104,33 @@ export default function Tasks() {
       ]
     : [];
   const cards = [...cur, ...saved],
-    shown = all ? cards : cards.slice(0, SHOW);
+    filtered = taskSearch.trim()
+      ? cards.filter(
+          c =>
+            c.q.toLowerCase().includes(taskSearch.toLowerCase()) ||
+            c.line.toLowerCase().includes(taskSearch.toLowerCase()) ||
+            c.project.toLowerCase().includes(taskSearch.toLowerCase()),
+        )
+      : cards,
+    shown = all ? filtered : filtered.slice(0, SHOW);
   if (!cards.length) return null;
   return (
     <section className="tasks" aria-label="Tasks">
-      <p className="group">
-        Tasks · {mem.sessions.length + cur.length}
-        <small>one task per page load</small>
-      </p>
+      <div className="tasks-header">
+        <p className="group">
+          Tasks · {mem.sessions.length + cur.length}
+          <small>one task per page load</small>
+        </p>
+        {cards.length > 3 && (
+          <input
+            className="search task-search"
+            placeholder="Search work…"
+            value={taskSearch}
+            onChange={e => setTaskSearch(e.target.value)}
+            aria-label="Search tasks"
+          />
+        )}
+      </div>
       {shown.map(c => (
         <button
           type="button"

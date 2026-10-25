@@ -2883,3 +2883,375 @@ legend {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ==================== Personal Collection & Work Tracker ==================== */
+.mem-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}
+.mem-toolbar .search {
+  flex: 1;
+}
+.mem-sort-group {
+  display: flex;
+  gap: 4px;
+}
+.sort-btn {
+  padding: 4px 8px;
+  font-size: 14px;
+  background: rgba(154, 168, 255, 0.08);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 6px;
+}
+.sort-btn.on {
+  background: rgba(154, 168, 255, 0.22);
+  border-color: var(--accent);
+  color: #fff;
+}
+.work-tracker-banner {
+  background: linear-gradient(135deg, rgba(255, 189, 112, 0.12), rgba(255, 189, 112, 0.04));
+  border: 1px solid rgba(255, 189, 112, 0.35);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wt-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wt-title {
+  color: var(--workstream);
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+.badge-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  background: rgba(143, 240, 192, 0.15);
+  border: 1px solid rgba(143, 240, 192, 0.35);
+  color: var(--good);
+}
+.badge-stale {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  background: rgba(154, 168, 255, 0.1);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.badge-manual {
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(129, 184, 255, 0.15);
+  border: 1px solid rgba(129, 184, 255, 0.3);
+  color: var(--concept);
+}
+.badge-learned {
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 216, 77, 0.12);
+  border: 1px solid rgba(255, 216, 77, 0.3);
+  color: #ffd84d;
+}
+.entry-workstream {
+  border-left: 3px solid var(--workstream) !important;
+}
+.entry-tag.manual {
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(129, 184, 255, 0.15);
+  color: var(--concept);
+  margin-left: 4px;
+}
+.stale-label {
+  font-size: 14px;
+  color: var(--muted);
+  font-style: normal;
+  margin-left: 4px;
+}
+.chip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(154, 168, 255, 0.08);
+  border: 1px solid var(--line);
+  color: var(--c, var(--fg));
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.chip-link:hover,
+.chip-link.on {
+  background: rgba(154, 168, 255, 0.2);
+  border-color: var(--c, var(--accent));
+}
+.mem-actions {
+  margin-top: 8px;
+}
+.mem-footer {
+  margin-top: 10px;
+  text-align: center;
+}
+.edit-form {
+  display: grid;
+  gap: 8px;
+}
+.edit-links-picker,
+.add-links-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+}
+.tasks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.task-search {
+  max-width: 140px;
+  padding: 3px 8px;
+  font-size: 14px;
+}
+
+/* ==================== See You Guys (Agent Inspector & Roster) ==================== */
+.team-roster {
+  position: absolute;
+  bottom: 28px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  z-index: 10;
+  pointer-events: auto;
+}
+.roster-title {
+  font-size: 14px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.roster-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(14, 17, 32, 0.85);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.roster-pill:hover,
+.roster-pill.on {
+  border-color: var(--c);
+  background: rgba(154, 168, 255, 0.18);
+  box-shadow: 0 0 10px rgba(154, 168, 255, 0.15);
+}
+.roster-pill.inactive {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+.roster-pill small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.edge.edge-spotlight {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+.edge.edge-dimmed {
+  opacity: 0.12 !important;
+}
+.tnode.inspected {
+  border-color: var(--c) !important;
+  box-shadow: 0 0 18px var(--c) !important;
+  transform: scale(1.06);
+}
+
+/* Modal / Card Inspector for each Bot */
+.agent-inspector {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  background: rgba(10, 13, 24, 0.94);
+  border: 1px solid var(--c, var(--line2));
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.7),
+    0 0 20px rgba(154, 168, 255, 0.12);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  pointer-events: auto;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ai-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+.ai-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ai-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: #000;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 0 10px var(--c);
+}
+.ai-header h3 {
+  font-size: 18px;
+  margin: 0;
+  color: var(--fg);
+}
+.ai-company {
+  font-size: 14px;
+  color: var(--accent);
+}
+.ai-role {
+  font-size: 14px;
+  color: var(--muted);
+  display: block;
+}
+.ai-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  padding: 4px;
+  cursor: pointer;
+}
+.ai-close:hover {
+  color: #fff;
+}
+.ai-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ai-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.ai-tile {
+  background: rgba(154, 168, 255, 0.05);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ai-tile .lbl,
+.ai-section .lbl {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.ai-tile b {
+  font-size: 14px;
+  color: var(--fg);
+}
+.ai-tile .desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.3;
+}
+.ai-specialty {
+  margin: 2px 0 0;
+  font-size: 15px;
+  color: #d7dbff;
+  line-height: 1.4;
+}
+.ai-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.ai-skill {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(154, 168, 255, 0.08);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--fg);
+}
+.ai-handoffs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+.handoff-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ai-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
