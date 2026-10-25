@@ -143,7 +143,10 @@ export interface State {
   githubRepo: string;
   githubToken: string;
   githubStatus: string;
+  githubRecentRepos: string[];
+  githubLastSync: Record<string, GitHubSyncRecord>;
   setGithubConfig(cfg: { repo?: string; token?: string }): void;
+  addRecentGithubRepo(repo: string): void;
   testGithub(repo?: string, token?: string): Promise<GitHubTestResult>;
   syncGithub(options?: GitHubImportOptions): Promise<{ added: number; updated: number; total: number }>;
 }
@@ -200,22 +203,51 @@ function saveLive(live: LiveCfg, keys: Partial<Record<ProviderId, string>>) {
 }
 
 const GH_KEY = 'brain.github.v1';
-function loadGithub(): { repo: string; token: string } {
+export interface GitHubSyncRecord {
+  date: string;
+  count: number;
+}
+
+function loadGithub(): {
+  repo: string;
+  token: string;
+  recentRepos: string[];
+  lastSync: Record<string, GitHubSyncRecord>;
+} {
   try {
     const raw = ls?.getItem(GH_KEY);
     if (raw) {
       const d = JSON.parse(raw);
       if (d && typeof d === 'object') {
+        const repo = typeof d.repo === 'string' && d.repo ? d.repo : 'Roooted1776/Brain';
+        const recent = Array.isArray(d.recentRepos)
+          ? d.recentRepos.filter((r: unknown): r is string => typeof r === 'string' && !!r.trim())
+          : [repo];
         return {
-          repo: typeof d.repo === 'string' && d.repo ? d.repo : 'Roooted1776/Brain',
+          repo,
           token: typeof d.token === 'string' ? d.token : '',
+          recentRepos: Array.from(new Set([repo, ...recent])).slice(0, 10),
+          lastSync: d.lastSync && typeof d.lastSync === 'object' ? d.lastSync : {},
         };
       }
     }
   } catch {
     /* storage blocked */
   }
-  return { repo: 'Roooted1776/Brain', token: '' };
+  return { repo: 'Roooted1776/Brain', token: '', recentRepos: ['Roooted1776/Brain'], lastSync: {} };
+}
+
+function saveGithub(data: {
+  repo: string;
+  token: string;
+  recentRepos: string[];
+  lastSync: Record<string, GitHubSyncRecord>;
+}) {
+  try {
+    ls?.setItem(GH_KEY, JSON.stringify(data));
+  } catch {
+    /* storage blocked */
+  }
 }
 
 const lv = loadLive();
@@ -301,6 +333,8 @@ export const useStore = create<State>()((set, get) => {
     githubRepo: gh.repo,
     githubToken: gh.token,
     githubStatus: '',
+    githubRecentRepos: gh.recentRepos,
+    githubLastSync: gh.lastSync,
 
     set: p => set(p),
     /** Change memory, save it, and publish a fresh snapshot so every view (list, 3D brain) updates. */
@@ -583,16 +617,33 @@ export const useStore = create<State>()((set, get) => {
       const nextRepo = cfg.repo !== undefined ? cfg.repo.trim() : get().githubRepo;
       const nextToken = cfg.token !== undefined ? cfg.token.trim() : get().githubToken;
       set({ githubRepo: nextRepo, githubToken: nextToken });
-      try {
-        ls?.setItem(GH_KEY, JSON.stringify({ repo: nextRepo, token: nextToken }));
-      } catch {
-        /* storage blocked */
-      }
+      saveGithub({
+        repo: nextRepo,
+        token: nextToken,
+        recentRepos: get().githubRecentRepos,
+        lastSync: get().githubLastSync,
+      });
+    },
+    addRecentGithubRepo(repoInput) {
+      const repo = repoInput.trim();
+      if (!repo) return;
+      const current = get().githubRecentRepos;
+      const updated = Array.from(new Set([repo, ...current])).slice(0, 10);
+      set({ githubRecentRepos: updated });
+      saveGithub({
+        repo: get().githubRepo,
+        token: get().githubToken,
+        recentRepos: updated,
+        lastSync: get().githubLastSync,
+      });
     },
     async testGithub(repoInput, tokenInput) {
       const repo = (repoInput ?? get().githubRepo).trim();
       const token = (tokenInput ?? get().githubToken).trim();
       const res = await testGitHubConnection(repo, token);
+      if (res.ok) {
+        get().addRecentGithubRepo(repo);
+      }
       set({ githubStatus: res.message, status: `GitHub: ${res.message}` });
       return res;
     },
@@ -606,8 +657,27 @@ export const useStore = create<State>()((set, get) => {
       const proj = get().activeProject || 'Brain';
       set({ status: `Fetching data from GitHub repository "${repo}"...` });
       try {
-        const { items, summary } = await fetchAndConvertGitHub(repo, options, token, proj);
+        const lastSyncRecord = get().githubLastSync[repo];
+        const effectiveOptions: GitHubImportOptions = {
+          ...options,
+          since: options?.differential && lastSyncRecord?.date ? lastSyncRecord.date : undefined,
+        };
+        const { items, summary } = await fetchAndConvertGitHub(repo, effectiveOptions, token, proj);
         const res = get().importItems(items, proj, { sourceKind: 'github', repo, summary });
+
+        const updatedSync = {
+          ...get().githubLastSync,
+          [repo]: { date: new Date().toISOString(), count: res.total },
+        };
+        set({ githubLastSync: updatedSync });
+        get().addRecentGithubRepo(repo);
+        saveGithub({
+          repo,
+          token,
+          recentRepos: get().githubRecentRepos,
+          lastSync: updatedSync,
+        });
+
         set({
           status: `GitHub sync complete: ${summary}. ${res.added} new, ${res.updated} updated in "${proj}". Saved under tasks.`,
         });

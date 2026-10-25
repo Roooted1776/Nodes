@@ -45,6 +45,16 @@ export interface GitHubCommit {
   htmlUrl: string;
 }
 
+export interface GitHubRelease {
+  id: number;
+  tagName: string;
+  name: string;
+  body: string;
+  htmlUrl: string;
+  publishedAt: string;
+  prerelease: boolean;
+}
+
 export interface GitHubTestResult {
   ok: boolean;
   status: 'connected' | 'rejected' | 'rate_limited' | 'not_found' | 'error';
@@ -57,9 +67,13 @@ export interface GitHubImportOptions {
   includeReadme?: boolean;
   includeIssues?: boolean;
   includeCommits?: boolean;
+  includeReleases?: boolean;
   maxIssues?: number;
   maxCommits?: number;
+  maxReleases?: number;
   issueState?: 'open' | 'closed' | 'all';
+  since?: string;
+  differential?: boolean;
 }
 
 export interface GitHubRawMemoryItem {
@@ -306,7 +320,7 @@ export async function fetchGitHubReadme(
 /** Fetch issues from a repository. */
 export async function fetchGitHubIssues(
   repoInput: string,
-  options?: { token?: string; state?: 'open' | 'closed' | 'all'; limit?: number },
+  options?: { token?: string; state?: 'open' | 'closed' | 'all'; limit?: number; since?: string },
   fetchImpl: typeof fetch = globalThis.fetch,
 ): Promise<GitHubIssue[]> {
   const parsed = parseRepoInput(repoInput);
@@ -314,7 +328,10 @@ export async function fetchGitHubIssues(
 
   const state = options?.state || 'open';
   const limit = Math.max(1, Math.min(50, options?.limit || 15));
-  const url = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/issues?state=${state}&per_page=${limit}`;
+  let url = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/issues?state=${state}&per_page=${limit}`;
+  if (options?.since) {
+    url += `&since=${encodeURIComponent(options.since)}`;
+  }
 
   try {
     const res = await fetchImpl(url, { headers: getHeaders(options?.token) });
@@ -357,14 +374,17 @@ export async function fetchGitHubIssues(
 /** Fetch recent commits from a repository. */
 export async function fetchGitHubCommits(
   repoInput: string,
-  options?: { token?: string; limit?: number },
+  options?: { token?: string; limit?: number; since?: string },
   fetchImpl: typeof fetch = globalThis.fetch,
 ): Promise<GitHubCommit[]> {
   const parsed = parseRepoInput(repoInput);
   if (!parsed) return [];
 
   const limit = Math.max(1, Math.min(30, options?.limit || 10));
-  const url = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/commits?per_page=${limit}`;
+  let url = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/commits?per_page=${limit}`;
+  if (options?.since) {
+    url += `&since=${encodeURIComponent(options.since)}`;
+  }
 
   try {
     const res = await fetchImpl(url, { headers: getHeaders(options?.token) });
@@ -403,6 +423,44 @@ export async function fetchGitHubCommits(
   }
 }
 
+/** Fetch releases and milestones from a repository. */
+export async function fetchGitHubReleases(
+  repoInput: string,
+  options?: { token?: string; limit?: number },
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<GitHubRelease[]> {
+  const parsed = parseRepoInput(repoInput);
+  if (!parsed) return [];
+
+  const limit = Math.max(1, Math.min(20, options?.limit || 5));
+  const url = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/releases?per_page=${limit}`;
+
+  try {
+    const res = await fetchImpl(url, { headers: getHeaders(options?.token) });
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as unknown;
+    if (!Array.isArray(data)) return [];
+
+    return data
+      .filter((it): it is Record<string, unknown> => !!it && typeof it === 'object')
+      .map(it => ({
+        id: Number(it.id) || 0,
+        tagName: String(it.tag_name || '').trim(),
+        name: String(it.name || it.tag_name || '').trim(),
+        body: String(it.body || '').trim(),
+        htmlUrl:
+          typeof it.html_url === 'string'
+            ? it.html_url
+            : `https://github.com/${parsed.owner}/${parsed.repo}/releases`,
+        publishedAt: typeof it.published_at === 'string' ? it.published_at : '',
+        prerelease: !!it.prerelease,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 /** Convert fetched GitHub data into Brain neural memory entries. */
 export function githubToMemoryItems(
   data: {
@@ -410,10 +468,11 @@ export function githubToMemoryItems(
     readme?: { title: string; content: string; htmlUrl: string } | null;
     issues?: GitHubIssue[];
     commits?: GitHubCommit[];
+    releases?: GitHubRelease[];
   },
   targetProject?: string,
 ): GitHubRawMemoryItem[] {
-  const { repoInfo, readme, issues = [], commits = [] } = data;
+  const { repoInfo, readme, issues = [], commits = [], releases = [] } = data;
   const project = (targetProject || repoInfo.name || 'Brain').trim();
   const items: GitHubRawMemoryItem[] = [];
 
@@ -544,6 +603,31 @@ export function githubToMemoryItems(
     });
   }
 
+  // 5. Releases & Milestones
+  for (const rel of (data.releases || []).slice(0, 5)) {
+    const relName = rel.name || rel.tagName;
+    const title = `${repoInfo.name} Release ${rel.tagName || relName}`.slice(0, 80);
+    const dateStr = rel.publishedAt ? `Published ${rel.publishedAt.slice(0, 10)}` : 'Milestone release';
+    const note = redact(
+      `Milestone Release: ${relName} (${dateStr}${rel.prerelease ? ', prerelease' : ''}).\n\n${rel.body || 'No release notes.'}`,
+    ).text.slice(0, 1000);
+
+    items.push({
+      title,
+      note,
+      type: 'workstream',
+      project,
+      kws: keywords(`release ${rel.tagName} ${relName} milestone`).slice(0, 8),
+      sources: [
+        {
+          kind: 'github',
+          label: `GitHub Release: ${rel.tagName || relName}`,
+          ref: rel.htmlUrl,
+        },
+      ],
+    });
+  }
+
   return items;
 }
 
@@ -560,19 +644,35 @@ export async function fetchAndConvertGitHub(
   const includeReadme = options?.includeReadme !== false;
   const includeIssues = options?.includeIssues !== false;
   const includeCommits = options?.includeCommits !== false;
+  const includeReleases = !!options?.includeReleases;
+  const since = options?.differential ? options.since : undefined;
 
-  const [readme, issues, commits] = await Promise.all([
+  const [readme, issues, commits, releases] = await Promise.all([
     includeReadme ? fetchGitHubReadme(repoInput, token, fetchImpl) : Promise.resolve(null),
     includeIssues
-      ? fetchGitHubIssues(repoInput, { token, state: options?.issueState, limit: options?.maxIssues }, fetchImpl)
+      ? fetchGitHubIssues(
+          repoInput,
+          { token, state: options?.issueState, limit: options?.maxIssues, since },
+          fetchImpl,
+        )
       : Promise.resolve([]),
     includeCommits
-      ? fetchGitHubCommits(repoInput, { token, limit: options?.maxCommits }, fetchImpl)
+      ? fetchGitHubCommits(repoInput, { token, limit: options?.maxCommits, since }, fetchImpl)
+      : Promise.resolve([]),
+    includeReleases
+      ? fetchGitHubReleases(repoInput, { token, limit: options?.maxReleases }, fetchImpl)
       : Promise.resolve([]),
   ]);
 
-  const items = githubToMemoryItems({ repoInfo, readme, issues, commits }, project);
-  const summary = `Found ${items.length} items from ${repoInfo.fullName} (${readme ? 'README, ' : ''}${issues.length} issues, ${commits.length} commits)`;
+  const items = githubToMemoryItems({ repoInfo, readme, issues, commits, releases }, project);
+  const parts = [
+    readme ? 'README' : '',
+    issues.length > 0 ? `${issues.length} issue${issues.length === 1 ? '' : 's'}` : '',
+    commits.length > 0 ? `${commits.length} commit${commits.length === 1 ? '' : 's'}` : '',
+    releases.length > 0 ? `${releases.length} release${releases.length === 1 ? '' : 's'}` : '',
+  ].filter(Boolean);
+
+  const summary = `Found ${items.length} item${items.length === 1 ? '' : 's'} from ${repoInfo.fullName} (${parts.join(', ') || 'overview'})${since ? ' [differential]' : ''}`;
 
   return { items, repoInfo, summary };
 }

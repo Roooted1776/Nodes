@@ -8,7 +8,7 @@ import { AGENT, AGENTS, isAgent } from '../data/team';
 import { OUTLINE } from '../data/outline';
 import { buildSkull, skullLines } from '../lib/skull';
 import { buildShell, midline, placeMemory, route, station, surfaceFolds, toWorld, type P3 } from '../lib/geometry';
-import { TYPE_LABEL, type Session } from '../lib/memory';
+import { TYPE_LABEL, agentActivityScores, type Session } from '../lib/memory';
 import { PULSE_AFTERGLOW, pulseMs, useMem, useStore, type Pulse } from '../store';
 import { DOT_FRAG, DOT_VERT, RIM_FRAG, RIM_VERT } from '../lib/shaders';
 import { sceneStats } from '../lib/stats';
@@ -489,6 +489,13 @@ function Memories() {
 
     return { items, linkLines: new Float32Array(linkPoints) };
   }, [mem.sessions, list, pos]);
+  const activityScores = useMemo(() => agentActivityScores(mem), [mem.sessions, mem.entries]);
+  const maxActScore = useMemo(() => {
+    let m = 0;
+    for (const v of activityScores.values()) if (v > m) m = v;
+    return m;
+  }, [activityScores]);
+
   const mat = useMemo(dotMaterial, []);
   const geo = useMemo(() => {
     const g = dotGeometry(list.length),
@@ -497,18 +504,20 @@ function Memories() {
       const on = e.id === selected,
         linked = !!sel?.links.includes(e.id),
         grey = !!sel && !on && !linked;
+      const actScore = activityScores.get(e.id) || 0;
+      const isTopActive = maxActScore > 0 && actScore >= maxActScore * 0.4;
       c.set(grey ? '#6b6b72' : TYPE_COLOR[e.type]);
       setDot(
         g,
         i,
         toWorld(pos.get(e.id)!),
         c,
-        (0.1 + 0.02 * e.strength) * (on ? 1.5 : grey ? 0.8 : e.id === hover ? 1.15 : 1),
+        (0.1 + 0.02 * e.strength) * (on ? 1.5 : grey ? 0.8 : isTopActive ? 1.25 : e.id === hover ? 1.15 : 1),
         e.status === 'stale' ? 0.4 : grey ? 0.7 : 1,
       );
     });
     return g;
-  }, [list, pos, selected, sel, hover]);
+  }, [list, pos, selected, sel, hover, activityScores, maxActScore]);
   useEffect(() => () => geo.dispose(), [geo]);
   useEffect(() => () => mat.dispose(), [mat]);
   const links = useMemo(() => {
@@ -554,10 +563,25 @@ function Memories() {
       <points geometry={geo} material={mat} frustumCulled={false} renderOrder={4} />
       {list.map(e => {
         const on = e.id === selected,
+          actScore = activityScores.get(e.id) || 0,
+          isTopActive = maxActScore > 0 && actScore >= maxActScore * 0.4,
           show =
-            on || e.id === hover || !!sel?.links.includes(e.id) || (!selected && (top.has(e.id) || list.length <= 12)); // like the video: the focused cluster is labelled
+            on || e.id === hover || !!sel?.links.includes(e.id) || (!selected && (top.has(e.id) || list.length <= 12 || isTopActive));
         return (
           <group key={e.id} position={toWorld(pos.get(e.id)!)}>
+            {isTopActive && !on && (
+              <mesh renderOrder={3}>
+                <ringGeometry args={[0.13, 0.17, 24]} />
+                <meshBasicMaterial
+                  color={TYPE_COLOR[e.type]}
+                  transparent
+                  opacity={0.35 + 0.3 * Math.min(1, actScore / (maxActScore || 1))}
+                  side={THREE.DoubleSide}
+                  depthTest={false}
+                  depthWrite={false}
+                />
+              </mesh>
+            )}
             {/* biome-ignore lint/a11y/noStaticElementInteractions: a three.js mesh, not a DOM element; the Memory tab offers the same choice as buttons */}
             <mesh
               onClick={ev => {
@@ -583,7 +607,10 @@ function Memories() {
             </mesh>
             {show && (
               <Html center distanceFactor={9} zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>
-                <div className={'mem-tag ' + e.type + (on ? ' on' : '')} title={TYPE_LABEL[e.type]}>
+                <div
+                  className={'mem-tag ' + e.type + (on ? ' on' : '') + (isTopActive ? ' hotspot' : '')}
+                  title={TYPE_LABEL[e.type] + (isTopActive ? ` · Agent Activity: ${Math.round(actScore)} pts` : '')}
+                >
                   {e.title.length > 26 ? e.title.slice(0, 25) + '…' : e.title}
                 </div>
               </Html>
