@@ -3,6 +3,7 @@ import { pulseMs, type Pulse } from '../store';
 import { colorOf } from '../data/colors';
 import { AGENT, isAgent, type AgentId } from '../data/team';
 import { useStore } from '../store';
+import { PROV } from '../lib/providers';
 import BotIcon from './BotIcon';
 import Composer from './Composer';
 
@@ -28,7 +29,15 @@ export default function ChatPanel() {
     viewing = useStore(s => s.viewing),
     stages = useStore(s => s.stages),
     notes = useStore(s => s.notes),
-    limited = useStore(s => s.limited);
+    limited = useStore(s => s.limited),
+    ranOn = useStore(s => s.ranOn);
+  /** "via Groq" when a free service stood in for the bot's own company. */
+  const via = (id: AgentId) => {
+    const p = ranOn[id];
+    return p && p !== AGENT[id].provider ? (
+      <small className="via">via {PROV[p].label.replace(' (free)', '')}</small>
+    ) : null;
+  };
   const inspectBot = useStore(s => s.inspectBot);
   const end = useRef<HTMLDivElement>(null),
     msgsRef = useRef<HTMLDivElement>(null),
@@ -91,6 +100,7 @@ export default function ChatPanel() {
                   <b>{m.from === 'owner' ? 'You' : 'Brain'}</b>
                 )}
                 {a && <span className="doing">{a.role}</span>}
+                {a && !viewing && via(a.id)}
               </header>
               <p>{m.text}</p>
             </article>
@@ -120,6 +130,7 @@ export default function ChatPanel() {
               <BotIcon id={draft.from} />
               <BotName limited={limited} onOpen={inspectBot} id={draft.from} />
               <span className="doing">{AGENT[draft.from].role}</span>
+              {via(draft.from)}
             </header>
             <p>
               {draft.text}

@@ -358,3 +358,8 @@
     grid-template-rows: 50vh auto minmax(60vh, auto) 260px;
   }
 }
+
+.chat.grok .via {
+  color: rgba(255, 255, 255, 0.3);
+  margin-left: auto;
+}

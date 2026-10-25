@@ -77,6 +77,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
     draft: null,
     timing: {},
     flow: [],
+    ranOn: {},
     stages: Object.fromEntries(LIVE_ORDER.map(b => [b, bots.includes(b) ? 'waiting' : 'skipped'])),
     notes: Object.fromEntries(
       LIVE_ORDER.filter(b => !bots.includes(b)).map(b => [
@@ -128,8 +129,13 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
           set({ draft: { from: bot, text: clean(t) } });
         }
       : undefined;
-    const botProv = bot && (AGENT[bot]?.provider as ProviderId | undefined);
-    const activeProv = botProv && st.keys[botProv] && !st.dead[botProv] ? botProv : pv;
+    // the bot's own company if there is a key for it, else its free service, else the main provider
+    const usable = (p?: string): p is ProviderId =>
+      !!p && p in PROV && !!st.keys[p as ProviderId] && !st.dead[p as ProviderId];
+    const own = bot ? AGENT[bot]?.provider : undefined,
+      free = bot ? AGENT[bot]?.free : undefined;
+    const activeProv: ProviderId = usable(own) ? own : usable(free) ? free : pv;
+    if (bot) set(x => ({ ranOn: { ...x.ranOn, [bot]: activeProv } }));
     const activeKey = st.keys[activeProv] || st.keys[pv] || '';
     const activeModel = st.live.models[activeProv] || PROV[activeProv].model;
     try {
