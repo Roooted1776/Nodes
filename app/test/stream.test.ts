@@ -45,6 +45,14 @@ const EVENTS: Record<ProviderId, unknown[]> = {
       usageMetadata: { promptTokenCount: 11, candidatesTokenCount: 3 },
     },
   ],
+  groq: [
+    { choices: [{ delta: { role: 'assistant', content: '' } }] },
+    { choices: [{ delta: { content: 'Hello ' } }] },
+    {
+      choices: [{ delta: { content: 'team' }, finish_reason: 'stop' }],
+      x_groq: { usage: { prompt_tokens: 11, completion_tokens: 3 } },
+    },
+  ],
 };
 const base = { key: 'k-123', model: 'm', system: 's', user: 'u', maxTokens: 50 };
 
@@ -54,9 +62,14 @@ describe('streaming replies', () => {
     expect((buildRequest({ provider: 'openai', ...base }, true).body as any).stream).toBe(true);
     expect((buildRequest({ provider: 'xai', ...base }, true).body as any).stream).toBe(true);
     expect(buildRequest({ provider: 'google', ...base }, true).url).toMatch(/:streamGenerateContent\?alt=sse&key=/);
+    const g = buildRequest({ provider: 'groq', ...base, model: 'openai/gpt-oss-120b' }, true);
+    expect(g.url).toBe('https://api.groq.com/openai/v1/chat/completions');
+    expect(g.headers.authorization).toBe('Bearer k-123');
+    expect((g.body as any).stream).toBe(true);
+    expect((g.body as any).reasoning_effort).toBe('low');
     expect((buildRequest({ provider: 'openai', ...base }).body as any).stream).toBeUndefined();
   });
-  for (const p of ['anthropic', 'openai', 'xai', 'google'] as ProviderId[])
+  for (const p of ['anthropic', 'openai', 'xai', 'google', 'groq'] as ProviderId[])
     it(`${p}: text grows as it arrives and the totals are kept`, async () => {
       const seen: string[] = [];
       const r = await callModel({ provider: p, ...base, fetchImpl: sse(EVENTS[p]) as any, onDelta: t => seen.push(t) });

@@ -94,6 +94,8 @@ export interface State {
   inactiveBots: AgentId[];
   /** Bots that hit a token, rate or credit limit. Their name shows red in the chat until they answer again. */
   limited: AgentId[];
+  /** Which company actually answered for each bot in this task (a free stand-in shows as 'via …'). */
+  ranOn: Partial<Record<AgentId, ProviderId>>;
   autoUpdateBots: boolean;
   inspectedBot: AgentId | null;
   promptDraft: string;
@@ -250,6 +252,7 @@ export const useStore = create<State>()((set, get) => {
     flow: [],
     inactiveBots: [],
     limited: [],
+    ranOn: {},
     autoUpdateBots: true,
     inspectedBot: null,
     inspectBot: (id: AgentId | null) => set({ inspectedBot: id }),

@@ -250,6 +250,8 @@ describe('who can do what', () => {
     expect(doing.textContent).toMatch(/Cursor/);
     const claude = within(chat).getByRole('button', { name: 'Claude' });
     expect(claude.className).not.toMatch(/limited/);
+    act(() => store.useStore.setState({ ranOn: { claude: 'google' } }));
+    expect(within(chat).getByText('via Google')).toBeTruthy(); // a free stand-in is labelled, never passed off as the real bot
     act(() => store.useStore.setState({ limited: ['claude'] }));
     expect(within(chat).getByRole('button', { name: 'Claude' }).className).toMatch(/limited/);
     act(() => store.useStore.setState({ limited: [] })); // it answered again
