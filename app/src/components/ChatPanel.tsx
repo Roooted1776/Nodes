@@ -28,7 +28,12 @@ const nameOf = (id: string) =>
 /** Ensures no raw code blocks (```) clutter the live chat, turning them into plain conversational text. */
 export function cleanChatText(text: string): string {
   if (!text) return '';
-  return text.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_m, code) => {
+  const closed = text.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_m, code) => {
+    const trimmed = code.trim().replace(/\s+/g, ' ');
+    if (!trimmed) return '';
+    return trimmed.length > 100 ? `[Action: ${trimmed.slice(0, 97)}…]` : `[Action: ${trimmed}]`;
+  });
+  return closed.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*)$/g, (_m, code) => {
     const trimmed = code.trim().replace(/\s+/g, ' ');
     if (!trimmed) return '';
     return trimmed.length > 100 ? `[Action: ${trimmed.slice(0, 97)}…]` : `[Action: ${trimmed}]`;
@@ -59,21 +64,24 @@ export default function ChatPanel() {
     flow = useStore(s => s.flow),
     activePulse = useStore(s => s.pulses.filter(p => !p.from.startsWith('mem:')).at(-1));
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (smooth = false) => {
     const el = msgsRef.current;
-    if (typeof el?.scrollTo === 'function') {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    } else if (el) {
-      el.scrollTop = el.scrollHeight;
+    if (el) {
+      if (smooth && typeof el.scrollTo === 'function') {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
     }
-    end.current?.scrollIntoView?.({ block: 'end' });
+    end.current?.scrollIntoView?.({ block: 'end', behavior: smooth ? 'smooth' : 'auto' });
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: these values trigger the scroll into view
   useEffect(() => {
-    if (!autoScroll) return;
-    scrollToBottom();
-  }, [log.length, viewing, draft?.text, draft?.from, flow.length, stages, autoScroll]);
+    if (!autoScroll && !busy) return;
+    // Fast instant scroll keeps streaming viewports pinned to the latest message without stalling
+    scrollToBottom(false);
+  }, [log.length, viewing, draft?.text, draft?.from, flow.length, stages, autoScroll, busy]);
 
   const onScroll = () => {
     const el = msgsRef.current;

@@ -257,7 +257,11 @@ export const useStore = create<State>()((set, get) => {
   const keyList = () => Object.values(get().keys).filter(Boolean) as string[];
   const clean = (t: string) => {
     const r = redact(t, keyList()).text;
-    return r.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_m, code) => {
+    const closed = r.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_m, code) => {
+      const trimmed = code.trim().replace(/\s+/g, ' ');
+      return trimmed ? `[${trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed}]` : '';
+    });
+    return closed.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*)$/g, (_m, code) => {
       const trimmed = code.trim().replace(/\s+/g, ' ');
       return trimmed ? `[${trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed}]` : '';
     });
