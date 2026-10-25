@@ -181,7 +181,7 @@ const STAGE: Record<AgentId, string> = {
   xcode:
     'PLATFORM CHECK. For an iOS task, give a concrete build and device-test plan. Otherwise say this stage does not apply. Do not claim to run builds.',
   grokbot:
-    'TEAM LEAD. Review the whole chain, settle conflicts, list missing or failed stages, and write the final report with a PASS or FAIL recommendation. Owner controls repo changes, push and merge.',
+    "TEAM LEAD. Review the whole chain, settle conflicts, list missing or failed stages, and write the final report with a PASS or FAIL recommendation. You can decline based on the team's response. Owner controls repo changes, push and merge.",
 };
 
 const TASK: Record<AgentId, string> = {
@@ -194,7 +194,7 @@ const TASK: Record<AgentId, string> = {
   grok: 'Challenge assumptions and surface risks or alternatives.',
   xcode: 'Give an iOS build and test plan if relevant. Do not claim to run builds.',
   grokbot:
-    'Review every handoff. Combine the work, list open issues and missing checks, and give the final team report and recommendation.',
+    "Review every handoff. Combine the work, list open issues and missing checks, and give the final team report and recommendation. You can decline based on the team's response.",
 };
 
 export function systemPrompt(id: AgentId): string {

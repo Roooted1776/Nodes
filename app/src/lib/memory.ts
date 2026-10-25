@@ -35,6 +35,7 @@ export interface Entry {
   corpusId: number | null;
   kws: string[] | null;
   manual: boolean;
+  project?: string;
 }
 export interface Msg {
   from: string;
@@ -469,6 +470,8 @@ export interface TaskListMeta {
   sourceKind?: string;
   repo?: string;
   summary?: string;
+  hasError?: boolean;
+  failedStage?: string;
 }
 
 /**
@@ -522,11 +525,32 @@ export function saveImportedListAsTask(
   ];
 
   const cover: Record<string, { s: Cover; why?: string }> = {
-    cursor: { s: 'done', why: `Retrieved ${items.length} items from ${repoName || 'source'}.` },
-    codex: { s: 'done', why: `Structured entries into node "${targetNode.title}".` },
-    grokbot: { s: 'done', why: `Verified and saved under tasks in "${proj}".` },
-    gemini: { s: 'done', why: 'Validated memory graph links.' },
-    muse: { s: 'done', why: 'Audited secret redactions and source references.' },
+    cursor: {
+      s: meta?.failedStage === 'cursor' ? 'failed' : 'done',
+      why:
+        meta?.failedStage === 'cursor'
+          ? 'Extraction failed'
+          : `Retrieved ${items.length} items from ${repoName || 'source'}.`,
+    },
+    codex: {
+      s: meta?.failedStage === 'codex' ? 'failed' : 'done',
+      why: meta?.failedStage === 'codex' ? 'Structuring failed' : `Structured entries into node "${targetNode.title}".`,
+    },
+    grokbot: {
+      s: meta?.hasError || meta?.failedStage === 'grokbot' ? 'failed' : 'done',
+      why:
+        meta?.hasError || meta?.failedStage === 'grokbot'
+          ? 'Declined based on team response.'
+          : `Verified and saved under tasks in "${proj}".`,
+    },
+    gemini: {
+      s: meta?.failedStage === 'gemini' ? 'failed' : 'done',
+      why: meta?.failedStage === 'gemini' ? 'Validation failed' : 'Validated memory graph links.',
+    },
+    muse: {
+      s: meta?.failedStage === 'muse' ? 'failed' : 'done',
+      why: meta?.failedStage === 'muse' ? 'Audit failed' : 'Audited secret redactions and source references.',
+    },
   };
 
   const matchedIds = m.entries
@@ -552,7 +576,9 @@ export function saveImportedListAsTask(
     learned: true,
     flow,
     ms: { cursor: 280, codex: 350, grokbot: 210 },
-    grokFinalReview: 'squash push merge all main remove all branches post merge make sure to commit and deploy',
+    grokFinalReview: Object.values(cover).some(c => c.s === 'failed')
+      ? 'DECLINED: Blocked based on team response.'
+      : 'squash push merge all main remove all branches post merge make sure to commit and deploy',
     msgs,
     cover,
   };
