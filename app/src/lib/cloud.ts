@@ -152,15 +152,21 @@ export interface SyncResult {
 }
 const cut = (t: string, n: number) => (t.length > n ? t.slice(0, n) : t);
 const BODY_LIMIT = 200_000; // the sessions table refuses bodies near 256 KB
+/** What the database already holds, row by row, so a sync sends only what changed. */
+const sent = new Map<string, string>();
+export const resetMirror = () => sent.clear();
 
 /** Persist memory entries, projects and task sessions to the database. Reports what really saved. */
 export async function syncMemoryDatabase(mem: import('./memory').Mem, d: Db = db()): Promise<SyncResult> {
   const out: SyncResult = { saved: 0, failed: 0, firstError: '' };
   // The database answers with an error value instead of throwing, so check it every time.
-  const track = async (job: PromiseLike<{ error: { message?: string } | null }>) => {
+  const track = async (id: string, row: object, send: () => PromiseLike<{ error: { message?: string } | null }>) => {
+    const sig = JSON.stringify(row);
+    if (sent.get(id) === sig) return;
     try {
-      const { error } = await job;
+      const { error } = await send();
       if (error) throw new Error(error.message);
+      sent.set(id, sig);
       out.saved++;
     } catch (e) {
       out.failed++;
@@ -173,46 +179,75 @@ export async function syncMemoryDatabase(mem: import('./memory').Mem, d: Db = db
   const now = new Date().toISOString();
   for (const n of names) {
     const id = cut(n, 80);
-    await track(d.from('projects').upsert({ id, name: id, updated_at: now }, { onConflict: 'id' }));
+    await track('p:' + id, { id }, () =>
+      d.from('projects').upsert({ id, name: id, updated_at: now }, { onConflict: 'id' }),
+    );
   }
   for (const e of mem.entries) {
-    await track(
-      d.rpc('upsert_memory', {
-        p_id: e.id,
-        p_key: cut(e.key, 120),
-        p_type: e.type,
-        p_title: cut(e.title, 80),
-        p_note: cut(e.note || '', 600),
-        p_project: cut(e.project || (e.type === 'workstream' ? e.title : 'Brain'), 80),
-        p_body: {
-          links: e.links,
-          strength: e.strength,
-          status: e.status,
-          created: e.created,
-          seen: e.seen,
-          corrected: e.corrected,
-          skill: e.skill,
-          prog: e.prog,
-          manual: e.manual,
-          kws: e.kws,
-          sources: e.sources.slice(0, 20),
-        },
-      }),
-    );
+    const args = {
+      p_id: e.id,
+      p_key: cut(e.key, 120),
+      p_type: e.type,
+      p_title: cut(e.title, 80),
+      p_note: cut(e.note || '', 600),
+      p_project: cut(e.project || (e.type === 'workstream' ? e.title : 'Brain'), 80),
+      p_body: {
+        links: e.links,
+        strength: e.strength,
+        status: e.status,
+        created: e.created,
+        seen: e.seen,
+        corrected: e.corrected,
+        skill: e.skill,
+        prog: e.prog,
+        manual: e.manual,
+        kws: e.kws,
+        sources: e.sources.slice(0, 20),
+      },
+    };
+    await track('m:' + e.id, args, () => d.rpc('upsert_memory', args));
   }
   for (const s of mem.sessions) {
-    let body: object = { ...s, msgs: s.msgs };
+    let body: object = { ...s };
     if (JSON.stringify(body).length > BODY_LIMIT)
       body = { ...s, msgs: s.msgs.map(m => ({ ...m, text: cut(m.text, 2000) })) };
-    await track(
-      d.rpc('upsert_session', {
-        p_id: s.id,
-        p_task: cut(s.q, 300),
-        p_project: cut(s.project || 'Brain', 80),
-        p_project_id: s.projectId || null,
-        p_body: body,
-      }),
-    );
+    const args = {
+      p_id: s.id,
+      p_task: cut(s.q, 300),
+      p_project: cut(s.project || 'Brain', 80),
+      p_project_id: s.projectId || null,
+      p_body: body,
+    };
+    await track('s:' + s.id, args, () => d.rpc('upsert_session', args));
   }
   return out;
+}
+
+/** Read memory back from the database tables (the copy `syncMemoryDatabase` keeps), shaped for `sanitizeMem`. */
+export async function loadMemoryDatabase(d: Db = db()): Promise<{ entries: unknown[]; sessions: unknown[] }> {
+  const [m, t] = await Promise.all([
+    d.from('memories').select('id, key, type, title, note, project, body').eq('archived', false).limit(10000),
+    d.from('sessions').select('body').order('ts', { ascending: false }).limit(25),
+  ]);
+  if (m.error || t.error) throw new CloudError(`Memory tables could not be read: ${why(m.error || t.error)}`);
+  const entries = (m.data || []).map(r => {
+    const b = (r.body || {}) as Record<string, unknown>;
+    return {
+      links: [],
+      strength: 1,
+      status: 'fresh',
+      created: Date.now(),
+      seen: Date.now(),
+      sources: [],
+      ...b,
+      id: r.id,
+      key: r.key,
+      type: r.type,
+      title: r.title,
+      note: r.note,
+      project: r.project,
+    };
+  });
+  const sessions = (t.data || []).map(r => r.body).reverse();
+  return { entries, sessions };
 }
