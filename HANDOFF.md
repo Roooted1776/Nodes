@@ -14,6 +14,76 @@
 
 ---
 
+# Comprehensive Team Handoff to Claude — Oct 25, 2026 (02:30 EDT)
+
+## 1. What Changed
+1. **Live Chat Passes & Natural Teammate Chatter (`ChatPanel.tsx`, `store.ts`, `team.ts`)**:
+   - Visual inline passes (`[PASS] Bot A → Bot B`) and in-flight transit indicators (`PASSING Bot A → Bot B`) rendered right in the chat stream.
+   - Markdown code fences (` ``` `) strictly prohibited in bot instructions and stripped on arrival (including unclosed streaming fences) into clean action summaries (`[Action: ...]`).
+   - Pinned instant auto-scrolling during active token streaming so viewports never stall or lag behind fast token arrivals.
+2. **3D Skull & Brain Viewport Framing (`BrainScene.tsx`)**:
+   - Camera position moved back ~1.32x from `[2.8, 0.4, 14]` to `[3.8, 0.9, 18.5]` while preserving elevation and viewing angle.
+   - Expanded OrbitControls `maxDistance` to `32` so users have generous breathing room to zoom and view the entire skull contour without clipping.
+3. **Project-Aware Memory Engine & Deep Context (`retrieve.ts`, `run-task.ts`, `memory.ts`)**:
+   - `relevant(m, prompt, k, project)` automatically boosts memories belonging to the active project or `[ProjectName]` tag.
+   - Context injection expanded from 180 chars to 600 chars per note with project labels, preventing truncated amnesia for LLM workers.
+   - Added `project?: string` to `Entry` type for persistent workstream attribution.
+4. **Autonomous Team Accountability (`run-task.ts`, `CLAUDE.md`, `team-handoff`)**:
+   - Grok Bot empowered to decline tasks based on failed stage responses (`DECLINED: Blocked based on team response`).
+   - Git push and deploy directives are halted when tasks are declined, preventing regressions.
+5. **CLI & Merge Residue Cleanup**:
+   - Pruned remote and local `github-backup` tags, removed stray `wave-background-snippet.html`, and cleaned untracked `state/` directory.
+   - Refactored error handling and backup payload validation to eliminate loose `any` casts in `providers.ts`, `vault.ts`, `legacy.ts`, `share.ts`, and `selfcheck.ts`.
+
+## 2. Files Touched
+- `app/src/components/ChatPanel.tsx`
+- `app/src/components/BrainScene.tsx`
+- `app/src/lib/retrieve.ts`
+- `app/src/lib/run-task.ts`
+- `app/src/lib/memory.ts`
+- `app/src/lib/providers.ts`
+- `app/src/lib/vault.ts`
+- `app/src/lib/share.ts`
+- `app/src/lib/chain.ts`
+- `app/src/lib/selfcheck.ts`
+- `app/src/lib/legacy.ts`
+- `app/src/store.ts`
+- `app/test/memory.test.ts`
+- `app/test/github.test.ts`
+- `CLAUDE.md`
+- `.agents/skills/team-handoff/SKILL.md`
+- `index.html` & `app/dist/index.html`
+
+## 3. How to Check It
+1. **Typecheck & Linter**:
+   ```bash
+   cd app && npm run typecheck && npm run lint
+   ```
+   (0 TypeScript errors, 0 linter errors)
+2. **Vitest Test Suite**:
+   ```bash
+   cd app && npm test
+   ```
+   (19 test files, 118 tests passing 100%)
+3. **Playwright E2E**:
+   ```bash
+   cd app && npm run e2e
+   ```
+   (Chromium smoke test passing with software WebGL)
+4. **Production Live Check**:
+   ```bash
+   curl -s https://redeemed.live | sha256sum && sha256sum index.html
+   ```
+   (Checksums match: `6a1366ace0c5464ee6bcbba205028168a0d9b07902df8aabb92ecbd777809e75`)
+
+## 4. Verification & Team Passing
+- **Claude (Build)**: Compiled single-file production bundle `index.html` (1,608 KB) and deployed to Hostinger VPS.
+- **Cursor (Handoff)**: Inspected repository integration, verified single clean branch `main`, zero untracked files, and 0 compiler warnings.
+- **Gemini, ChatGPT & Muse (Review)**: Reviewed project-aware memory retrieval, chat streaming fluidity, and visual 3D skull composition.
+- **Grok Bot (Lead Verification)**: PASS. All 118 tests pass, live VPS deployment verified, clean Git state.
+
+---
+
 # GitHub Connector Enhancements, 3D Activity Glow, Differential Sync & Node Filter — Oct 25, 2026
 
 ## 1. What Changed
