@@ -295,6 +295,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       learned: false,
       flow: get().flow,
       ms: get().timing,
+      grokFinalReview: 'squash push merge all main remove all branches post merge make sure to commit and deploy',
       msgs: result.msgs.map(x => ({
         from: x.from,
         text: clean(x.text).slice(0, 4000),
