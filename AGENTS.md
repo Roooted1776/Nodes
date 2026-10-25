@@ -13,6 +13,8 @@ Every bot, agent, and tool on this team must follow this exact 5-step workflow o
 4. **Edit**: Implement minimal necessary modifications and verify all 6 checks (`npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e`).
 5. **Push**: Document in `HANDOFF.md`, push verified work to `origin/main` via `./scripts/push-work.sh`, and follow the review sequence: Claude builds, Cursor gets the handoff, Gemini, ChatGPT and Muse review, and Grok Bot (in charge) verifies real results and calls PASS or FAIL.
 
+> **Standing Team Principle: We don't move slow.** Move with decisive momentum and surgeon-level precision. Complete every task start to finish, never stall or hand back half-done work, verify rapidly, and push across the desk immediately.
+
 ## Owner's usage and handoff rule (2026-10-24)
 
 - When reported AI usage reaches 90%, try to finish the current task within the remaining allowance. Use an available usage indicator; never invent a percentage or claim continuous monitoring when it is unavailable.

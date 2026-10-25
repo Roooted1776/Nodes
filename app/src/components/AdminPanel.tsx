@@ -6,7 +6,6 @@ import { PASS_MIN, ROLE_LABEL, type Role } from '../lib/auth';
 import { MODEL_RE, PROV, PROVIDERS, type ProviderId } from '../lib/providers';
 import { KEY_GUIDE } from '../lib/keyguide';
 import { report, runAll, type Check } from '../lib/selfcheck';
-import { fmtDate } from '../lib/text';
 import { AGENTS } from '../data/team';
 import { useMem, useStore } from '../store';
 import KeyGuide from './KeyGuide';
@@ -423,9 +422,13 @@ export default function AdminPanel() {
         </Card>
       </div>
 
-      <p className="group">People and safety</p>
+      <p className="group">Logins</p>
       <div className="cards">
         <Accounts />
+      </div>
+
+      <p className="group">Safety</p>
+      <div className="cards">
         <SystemCheck />
         <AccessLog />
         {SECURITY.map(([t, h]) => (
@@ -454,36 +457,11 @@ function Accounts() {
     [ok, setOk] = useState(''),
     [note, setNote] = useState('');
   return (
-    <Card title="Accounts" hint="Admins add accounts. Viewers can only read and watch." wide>
-      <ul className="users">
-        {db.users.map(u => (
-          <li key={u.id}>
-            <b>{u.name}</b>
-            <span className={'role ' + u.role}>{ROLE_LABEL[u.role]}</span>
-            <small>since {fmtDate(u.created)}</small>
-            <button
-              type="button"
-              onClick={() => {
-                const p = prompt(`New password for ${u.name} (${PASS_MIN}+ characters)`);
-                if (p) void resetPasscode(u.id, p).then(m => setNote(m || `Password changed for ${u.name}.`));
-              }}
-            >
-              Reset password
-            </button>
-            <button
-              type="button"
-              className="danger"
-              onClick={() => {
-                if (confirm(`Remove ${u.name}?`)) void dropUser(u.id).then(setNote);
-              }}
-              disabled={u.id === user?.id && db.users.filter(x => x.role === 'admin').length <= 1}
-            >
-              Remove
-            </button>
-          </li>
-        ))}
-      </ul>
-      {note && <p className="notice">{note}</p>}
+    <Card title="Accounts" hint="Create logins connected to the database. Admins or Viewers.">
+      <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+        <p className="pill ok" style={{ margin: 0 }}>Database connected</p>
+        <span className="mini">{db.users.length} login{db.users.length === 1 ? '' : 's'}</span>
+      </div>
       <form
         className="addnote"
         autoComplete="off"
@@ -522,9 +500,38 @@ function Accounts() {
         )}
         {ok && <p className="notice">{ok}</p>}
         <button type="submit" className="primary" disabled={busy}>
-          Add account
+          {busy ? 'Saving…' : 'Add account'}
         </button>
       </form>
+      {note && <p className="notice">{note}</p>}
+      <ul className="users" style={{ margin: '4px 0 0', padding: 0 }}>
+        {db.users.map(u => (
+          <li key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <b style={{ marginRight: 'auto' }}>{u.name}</b>
+            <span className={'pill ' + (u.role === 'admin' ? 'ok' : '')}>{ROLE_LABEL[u.role]}</span>
+            <button
+              type="button"
+              className="sm"
+              onClick={() => {
+                const p = prompt(`New password for ${u.name} (${PASS_MIN}+ characters)`);
+                if (p) void resetPasscode(u.id, p).then(m => setNote(m || `Password changed for ${u.name}.`));
+              }}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              className="sm danger"
+              onClick={() => {
+                if (confirm(`Remove ${u.name}?`)) void dropUser(u.id).then(setNote);
+              }}
+              disabled={u.id === user?.id && db.users.filter(x => x.role === 'admin').length <= 1}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }

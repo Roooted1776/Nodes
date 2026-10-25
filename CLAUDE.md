@@ -16,4 +16,5 @@ Owner's Brain. Read `@AGENTS.md` first.
 - Automated push authorized: Completed, verified task changes are automatically pushed to main after passing all checks and reviews (run `npm run push` or `./scripts/push-work.sh`). Never touch the RedMed project.
 - Keep explanations in plain words, one idea at a time.
 - Auto-scroll chats: Always auto-scroll chat views to follow streaming output and new messages. Never leave viewports stuck at the top or stall waiting for manual scrolling. To be fully autonomous, auto-scrolling is required so tasks run faster without wasting time.
+- Velocity (We don't move slow): Move with decisive speed and momentum. Complete every task start to finish without stalling, wasting cycles, or handing back half-done steps. Verify cleanly and push across the desk immediately.
 

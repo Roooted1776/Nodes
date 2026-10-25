@@ -779,4 +779,48 @@ git diff HEAD~1
 cd app && npm test
 ```
 
+---
+
+# Team Velocity Principle: "We Don't Move Slow" — Oct 25, 2026
+
+## 1. Directive & Intent
+- **User Directive**: "we dont move slow"
+- **Intent**:
+  - Permanently establish the standing velocity principle across all agents, tools, and documentation.
+  - Zero hesitation, decisive execution, start-to-finish completion without stalling or handing back partial tasks.
+  - Swift surgical edits, immediate test verification, and automated push across the desk to the next reviewer.
+
+## 2. Changes Made
+1. **CLAUDE.md**:
+   - Added `Velocity (We don't move slow)` standing instruction.
+2. **AGENTS.md**:
+   - Added `Standing Team Principle: We don't move slow` under the 5-step workflow.
+3. **.agents/skills/team-handoff/SKILL.md**:
+   - Integrated the velocity principle directly into the team handoff runbook.
+
+## 3. Files Touched
+| File | Type | Changes Made |
+| :--- | :--- | :--- |
+| `CLAUDE.md` | Configuration | Added velocity directive for Claude. |
+| `AGENTS.md` | Core Documentation | Added standing team velocity principle. |
+| `.agents/skills/team-handoff/SKILL.md` | Skill Runbook | Added velocity principle callout. |
+| `HANDOFF.md` | Documentation | This handoff log entry. |
+
+## 4. Verification & Real Results
+- Repository cleanliness verified (`git status` clean).
+- Automated push pipeline executed via `./scripts/push-work.sh`.
+
+## 5. Review Sequence Handoff
+1. **Claude (Anthropic)**: Added velocity principle to core configs and pushed to `main`. (COMPLETED)
+2. **Cursor**: Inspect repo diffs and clean file structure.
+3. **Gemini**: Review velocity and consistency across team guides.
+4. **ChatGPT**: Review team instruction consistency.
+5. **Muse**: Review boundary integrity (RedMed untouched; zero secrets).
+6. **Grok Bot (Lead)**: Verify real execution output and issue final PASS/FAIL verdict.
+
+## 6. How the Next AI Should Check It
+```bash
+git diff HEAD~1
+```
+
 
