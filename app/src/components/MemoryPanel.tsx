@@ -116,7 +116,6 @@ export default function MemoryPanel() {
           <li key={e.id}>
             <button
               type="button"
-              data-scene-entry={`memory:${e.id}`}
               className={e.id === selected ? 'on' : ''}
               onClick={() => select(e.id === selected ? null : e.id)}
             >
