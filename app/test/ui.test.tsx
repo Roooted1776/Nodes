@@ -14,10 +14,14 @@ const server = vi.hoisted(() => ({
   users: [] as { id: string; name: string; role: 'admin' | 'viewer'; password: string; wrap: any }[],
   vault: null as any,
   rev: 1,
+  failStatus: false,
 }));
 vi.mock('../src/lib/cloud', () => ({
   async accounts(action: string, b: any = {}) {
-    if (action === 'status') return { setupNeeded: !server.users.length };
+    if (action === 'status') {
+      if (server.failStatus) throw new Error('Cannot reach server');
+      return { setupNeeded: !server.users.length };
+    }
     if (action === 'list') return { users: server.users.map(u => ({ ...u, created_at: new Date().toISOString() })) };
     if (action === 'setup' || action === 'create') {
       const user = {
@@ -88,6 +92,7 @@ beforeEach(() => {
   server.users = [];
   server.vault = null;
   server.rev = 1;
+  server.failStatus = false;
   localStorage.clear();
   sessionStorage.clear();
 });
@@ -140,6 +145,17 @@ describe('setup and login', () => {
     expect(screen.getByRole('heading', { name: 'Sign in to Brain' })).toBeTruthy();
     await u.click(screen.getByRole('button', { name: 'Register as admin' }));
     expect(screen.getByRole('heading', { name: 'Set up Brain' })).toBeTruthy();
+  });
+
+  it('allows registering as admin even if connection check fails initially', async () => {
+    server.failStatus = true;
+    vi.resetModules();
+    const { default: App } = await import('../src/App');
+    const u = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText('Cannot reach server')).toBeTruthy();
+    await u.click(screen.getByRole('button', { name: 'Register as admin' }));
+    expect(await screen.findByRole('heading', { name: 'Set up Brain' })).toBeTruthy();
   });
 });
 
