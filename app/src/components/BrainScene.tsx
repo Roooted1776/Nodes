@@ -489,7 +489,7 @@ function Memories() {
 
     return { items, linkLines: new Float32Array(linkPoints) };
   }, [mem.sessions, list, pos]);
-  const activityScores = useMemo(() => agentActivityScores(mem), [mem.sessions, mem.entries]);
+  const activityScores = useMemo(() => agentActivityScores(mem), [mem]);
   const maxActScore = useMemo(() => {
     let m = 0;
     for (const v of activityScores.values()) if (v > m) m = v;
@@ -566,7 +566,10 @@ function Memories() {
           actScore = activityScores.get(e.id) || 0,
           isTopActive = maxActScore > 0 && actScore >= maxActScore * 0.4,
           show =
-            on || e.id === hover || !!sel?.links.includes(e.id) || (!selected && (top.has(e.id) || list.length <= 12 || isTopActive));
+            on ||
+            e.id === hover ||
+            !!sel?.links.includes(e.id) ||
+            (!selected && (top.has(e.id) || list.length <= 12 || isTopActive));
         return (
           <group key={e.id} position={toWorld(pos.get(e.id)!)}>
             {isTopActive && !on && (

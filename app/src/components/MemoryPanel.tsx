@@ -447,8 +447,8 @@ function ImportModal({
   const setActiveProject = useStore(s => s.setActiveProject);
   const sGithubRepo = useStore(s => s.githubRepo);
   const sGithubToken = useStore(s => s.githubToken);
-  const sGithubRecentRepos = useStore(s => s.githubRecentRepos);
   const sGithubLastSync = useStore(s => s.githubLastSync);
+  const sGithubRecentRepos = useStore(s => s.githubRecentRepos);
   const addRecentGithubRepo = useStore(s => s.addRecentGithubRepo);
 
   const [tab, setTab] = useState<'files' | 'paste' | 'github'>(initialTab);
@@ -577,6 +577,7 @@ function ImportModal({
     if (tab === 'github' && ghRepo.trim()) {
       addRecentGithubRepo(ghRepo.trim());
     }
+    setActiveProject(targetProject);
     setBusy(false);
     setStatus(
       `✓ Successfully imported ${res.added} new and updated ${res.updated} memories into project "${targetProject}". Saved under tasks.`,
@@ -718,6 +719,41 @@ function ImportModal({
           </div>
         ) : (
           <div className="import-gh-section">
+            {sGithubRecentRepos.length > 0 && (
+              <div style={{ marginBottom: '8px' }}>
+                <label className="mini-field" style={{ width: '100%' }}>
+                  <span>Recent Repositories</span>
+                  <select
+                    value={sGithubRecentRepos.includes(ghRepo) ? ghRepo : ''}
+                    onChange={e => {
+                      if (e.target.value) {
+                        setGhRepo(e.target.value);
+                        const repoPart = e.target.value.split('/')[1];
+                        if (repoPart) setProject(repoPart);
+                      }
+                    }}
+                    style={{
+                      background: 'var(--card-bg, #1e1e24)',
+                      color: 'var(--txt, #fff)',
+                      border: '1px solid var(--tile-border, #333)',
+                      padding: '4px 8px',
+                      fontSize: '13px',
+                      borderRadius: '4px',
+                      width: '100%',
+                    }}
+                  >
+                    <option value="" disabled>
+                      Select a recent repository…
+                    </option>
+                    {sGithubRecentRepos.map(r => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
             <div
               className="gh-inputs-row"
               style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}
@@ -782,6 +818,26 @@ function ImportModal({
                 <input type="checkbox" checked={ghIncCommits} onChange={e => setGhIncCommits(e.target.checked)} />
                 <span>Recent Commits</span>
               </label>
+
+              <label className="sw sm">
+                <input type="checkbox" checked={ghIncReleases} onChange={e => setGhIncReleases(e.target.checked)} />
+                <span>Releases & Notes</span>
+              </label>
+
+              <label className="sw sm" title="Only sync items created or updated since the last sync">
+                <input type="checkbox" checked={ghDifferential} onChange={e => setGhDifferential(e.target.checked)} />
+                <span>Differential Sync</span>
+              </label>
+
+              {sGithubLastSync[ghRepo.trim()] && (
+                <span
+                  className="pill ok"
+                  style={{ fontSize: '11px' }}
+                  title={`Last synced: ${new Date(sGithubLastSync[ghRepo.trim()].date).toLocaleString()}`}
+                >
+                  Synced {new Date(sGithubLastSync[ghRepo.trim()].date).toLocaleDateString()}
+                </span>
+              )}
             </div>
 
             <button
