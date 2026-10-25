@@ -38,8 +38,8 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   await expect(page.getByRole('region', { name: 'Live chat' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Admin panel' })).toBeVisible();
 
-  // no key yet: the real-AI guide is shown and nothing can be sent
-  await expect(page.getByRole('region', { name: 'Connect real AI' })).toBeVisible();
+  // no key yet: nothing can be sent
+  await expect(page.getByLabel('OpenAI key')).toBeVisible();
   await expect(page.getByLabel('Task for the team')).toBeDisabled();
 
   // Brain's own System check: shaders, drawing, encryption, policy, storage

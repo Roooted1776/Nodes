@@ -8,7 +8,6 @@ import { KEY_GUIDE } from '../lib/keyguide';
 import { report, runAll, type Check } from '../lib/selfcheck';
 import { AGENTS } from '../data/team';
 import { useMem, useStore } from '../store';
-import KeyGuide from './KeyGuide';
 import { downloadFile } from '../lib/file-import';
 
 /** One small box: a short title, one line of help, then its controls. */
@@ -86,8 +85,10 @@ export default function AdminPanel() {
     <section className="panel admin" aria-label="Admin">
       <p className="group">Real AI</p>
       <div className="cards">
-        {!ready && <KeyGuide wide />}
-        <Card title="Status" hint="Brain always uses a real AI model. A task is sent only when you press Send.">
+        <Card
+          title="Status"
+          hint={ready ? 'A task is sent only when you press Send.' : 'Add a key under API keys to start.'}
+        >
           <p className={'pill ' + (ready && !s.dead[live.provider] ? 'ok' : 'warn')}>
             {s.dead[live.provider] ? 'Key rejected' : ready ? `${PROV[live.provider].label} ready` : 'Add a key'}
           </p>
@@ -132,44 +133,16 @@ export default function AdminPanel() {
             }}
           />
         </Card>
-        <Card title="API key" hint={`From ${KEY_GUIDE[live.provider].site}. Never paste a key into a chat.`}>
-          <input
-            aria-label="API key"
-            type="password"
-            value={s.keys[live.provider] || ''}
-            placeholder={ready ? 'Key is set for this tab' : PROV[live.provider].hint}
-            autoComplete="off"
-            onChange={e => {
-              s.setKey(e.target.value, live.provider);
-            }}
-          />
-          <Switch
-            on={live.remember}
-            set={v => s.setLive({ remember: v })}
-            label="Save keys in encrypted vault (persistent)"
-          />
-          <div className="row">
-            <button type="button" onClick={() => void s.testProvider(live.provider)}>
-              Test (1 call)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                s.forgetKey(live.provider);
-              }}
-            >
-              Forget
-            </button>
-            <a className="btnlink sm" href={KEY_GUIDE[live.provider].url} target="_blank" rel="noopener noreferrer">
-              Get a key ↗
-            </a>
-          </div>
-        </Card>
         <Card
-          title="All Company API Keys"
-          hint="Connect keys for any or all AI companies. When connected, each bot calls its native company directly (Claude -> Anthropic, Codex -> OpenAI, Gemini -> Google, Grok -> xAI)."
+          title="API keys"
+          hint="Paste a key for any company, then press Test. Each bot uses its own company's key when there is one. Keys are saved encrypted."
           wide
         >
+          {s.status && (
+            <p className="mini key-status" role="status">
+              {s.status}
+            </p>
+          )}
           <div className="company-keys-list">
             {PROVIDERS.map(p => {
               const has = !!s.keys[p];
