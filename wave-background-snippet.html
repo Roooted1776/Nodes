@@ -1,0 +1,178 @@
+<!-- ===== Tidal wave background: paste just before </body> ===== -->
+<style>
+  #tidal-bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; display: block; pointer-events: none; }
+  html, body { background: #000; }
+</style>
+<canvas id="tidal-bg" aria-hidden="true"></canvas>
+<script>
+
+/* ============================================================
+   TIDAL FIELD — tweak these to taste
+   ============================================================ */
+const CONFIG = {
+  waveSpeed:      1.0,   // overall animation speed (1 = one slow swell every ~10s)
+  waveHeight:     1.0,   // amplitude multiplier
+  density:        1.0,   // line + point density (auto-reduced on small screens)
+  mouseStrength:  1.0,   // how strongly the cursor lifts the surface
+  mouseRadius:    180,   // px radius of cursor influence
+  rippleSpeed:    520,   // px per second for click pulses
+  rippleLife:     3.2,   // seconds a click pulse lasts
+  tilt:           0.06,  // parallax tilt toward the cursor
+};
+
+const canvas = document.getElementById('tidal-bg');
+const ctx = canvas.getContext('2d');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+let W = 0, H = 0, DPR = 1;
+let rows = 0, cols = 0;
+const mouse = { x: -9999, y: -9999, sx: 0.5, sy: 0.5, tx: 0.5, ty: 0.5, active: false, lift: 0 };
+const ripples = [];
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  buildGrid();
+}
+
+function buildGrid() {
+  const small = W < 700 ? 0.6 : 1;
+  rows = Math.round(46 * CONFIG.density * small);
+  cols = Math.round(Math.min(160, W / 9) * CONFIG.density * small);
+  rows = Math.max(16, rows); cols = Math.max(40, cols);
+}
+
+/* Height of the resting wave surface at plane coords (u: -1..1 across, v: 0..1 depth) */
+function surface(u, v, t) {
+  const s = t * CONFIG.waveSpeed;
+  return (
+    Math.sin(u * 3.1 + s * 0.62 + v * 2.2) * 0.55 +
+    Math.sin(u * 1.4 - s * 0.38 + v * 5.0) * 0.35 +
+    Math.sin((u + v) * 6.5 + s * 0.9) * 0.08
+  ) * CONFIG.waveHeight;
+}
+
+function frame(now) {
+  const t = now / 1000;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // ease parallax + mouse presence
+  mouse.sx += (mouse.tx - mouse.sx) * 0.04;
+  mouse.sy += (mouse.ty - mouse.sy) * 0.04;
+  mouse.lift += ((mouse.active ? 1 : 0) - mouse.lift) * 0.06;
+
+  const tiltX = (mouse.sx - 0.5) * CONFIG.tilt;
+  const tiltY = (mouse.sy - 0.5) * CONFIG.tilt;
+
+  const horizon = H * (0.6 + tiltY);   // where the far edge of the wave sits (0 = top, 1 = bottom)
+  const spread = 0.2;                   // how far the near rows extend below the horizon
+  const camH = 1.0;       // camera height above plane
+  const focal = H * 0.9;
+  const amp = H * 0.11;
+  const R2 = CONFIG.mouseRadius * CONFIG.mouseRadius;
+
+  // drop old ripples
+  for (let i = ripples.length - 1; i >= 0; i--) if (t - ripples[i].t > CONFIG.rippleLife) ripples.splice(i, 1);
+
+  ctx.lineWidth = 1;
+  for (let r = 0; r < rows; r++) {
+    const v = r / (rows - 1);            // 0 far → 1 near
+    const z = 0.6 + (1 - v) * 9;          // depth in world units
+    const scale = focal / z;
+    const depthFade = Math.pow(v, 1.15);
+
+    ctx.beginPath();
+    let prevAlpha = 0;
+    for (let c = 0; c < cols; c++) {
+      const u = (c / (cols - 1)) * 2 - 1;
+      const worldX = u * 6 * (0.5 + z * 0.12);
+      const bx = W / 2 + (worldX + tiltX * z * 6) * scale * 0.18 * 1.0;
+      const baseY = horizon + camH * scale * spread;
+
+      let h = surface(u * (1 + z * 0.05), v, t);
+      let y = baseY - h * amp * (scale / focal) * 2.2;
+
+      // cursor lift (screen space)
+      if (mouse.lift > 0.01) {
+        const dx = bx - mouse.x, dy = baseY - mouse.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < R2 * 4) {
+          const g = Math.exp(-d2 / R2);
+          y -= g * 70 * CONFIG.mouseStrength * mouse.lift * (0.4 + v);
+        }
+      }
+      // click ripples
+      for (let k = 0; k < ripples.length; k++) {
+        const rp = ripples[k];
+        const age = t - rp.t;
+        const dx = bx - rp.x, dy = (baseY - rp.y) * 1.6;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const front = age * CONFIG.rippleSpeed;
+        const off = d - front;
+        if (off > -260 && off < 60) {
+          const env = Math.exp(-(off * off) / 9000) * (1 - age / CONFIG.rippleLife);
+          y -= Math.sin(off * 0.045) * 26 * env * (0.4 + v) * CONFIG.mouseStrength;
+        }
+      }
+
+      if (c === 0) ctx.moveTo(bx, y); else ctx.lineTo(bx, y);
+    }
+    const a = 0.05 + depthFade * 0.42;
+    ctx.strokeStyle = `rgba(255,255,255,${a.toFixed(3)})`;
+    ctx.stroke();
+
+    // crest dots on every other row for texture
+    if (r % 2 === 0) {
+      ctx.fillStyle = `rgba(255,255,255,${(a * 1.6).toFixed(3)})`;
+      const step = Math.max(2, Math.round(cols / 60));
+      for (let c = 0; c < cols; c += step) {
+        const u = (c / (cols - 1)) * 2 - 1;
+        const h = surface(u * (1 + z * 0.05), v, t);
+        if (h < 0.55 * CONFIG.waveHeight) continue;
+        const worldX = u * 6 * (0.5 + z * 0.12);
+        const bx = W / 2 + (worldX + tiltX * z * 6) * scale * 0.18;
+        const by = horizon + camH * scale * spread - h * amp * (scale / focal) * 2.2;
+        const s = 0.6 + v * 1.4;
+        ctx.fillRect(bx - s / 2, by - s / 2, s, s);
+      }
+    }
+  }
+
+  tickFps(now);
+  if (!reduceMotion.matches) requestAnimationFrame(frame);
+}
+
+/* fps readout */
+let fpsLast = performance.now(), fpsCount = 0;
+function tickFps(now) {
+  fpsCount++;
+  if (now - fpsLast > 1000) { fpsCount = 0; fpsLast = now; }
+}
+
+/* input */
+function setPointer(x, y) {
+  mouse.x = x; mouse.y = y; mouse.active = true;
+  mouse.tx = x / W; mouse.ty = y / H;
+}
+window.addEventListener('pointermove', e => setPointer(e.clientX, e.clientY), { passive: true });
+window.addEventListener('pointerleave', () => { mouse.active = false; mouse.tx = 0.5; mouse.ty = 0.5; });
+document.addEventListener('mouseleave', () => { mouse.active = false; mouse.tx = 0.5; mouse.ty = 0.5; });
+window.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') mouse.active = false; });
+window.addEventListener('pointerdown', e => {
+  if (e.target.closest('a, button, input, textarea, select, label')) return;
+  setPointer(e.clientX, e.clientY);
+  ripples.push({ x: e.clientX, y: e.clientY, t: performance.now() / 1000 });
+  if (ripples.length > 8) ripples.shift();
+  if (reduceMotion.matches) requestAnimationFrame(frame);
+});
+
+
+window.addEventListener('resize', () => { resize(); if (reduceMotion.matches) requestAnimationFrame(frame); });
+reduceMotion.addEventListener?.('change', () => requestAnimationFrame(frame));
+resize();
+requestAnimationFrame(frame);
+</script>
+<!-- ===== end Tidal wave background ===== -->
