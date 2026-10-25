@@ -88,7 +88,8 @@ export default function Tasks() {
   const viewing = useStore(s => s.viewing),
     viewSession = useStore(s => s.viewSession),
     [all, setAll] = useState(false),
-    [taskSearch, setTaskSearch] = useState('');
+    [taskSearch, setTaskSearch] = useState(''),
+    [nodeFilter, setNodeFilter] = useState<string | null>(null);
   const saved = [...mem.sessions].reverse().map(s => fromSession(s, mem));
   const cur: Card[] = busy
     ? [
@@ -110,17 +111,24 @@ export default function Tasks() {
         },
       ]
     : [];
-  const cards = [...cur, ...saved],
-    filtered = taskSearch.trim()
-      ? cards.filter(
-          c =>
-            c.q.toLowerCase().includes(taskSearch.toLowerCase()) ||
-            c.line.toLowerCase().includes(taskSearch.toLowerCase()) ||
-            c.project.toLowerCase().includes(taskSearch.toLowerCase()) ||
-            (c.nodeTitle && c.nodeTitle.toLowerCase().includes(taskSearch.toLowerCase())),
-        )
-      : cards,
-    shown = all ? filtered : filtered.slice(0, SHOW);
+  const cards = [...cur, ...saved];
+  const nodeFiltered = nodeFilter
+    ? cards.filter(
+        c =>
+          (c.nodeTitle && c.nodeTitle.toLowerCase() === nodeFilter.toLowerCase()) ||
+          (c.projectId && c.projectId === nodeFilter),
+      )
+    : cards;
+  const filtered = taskSearch.trim()
+    ? nodeFiltered.filter(
+        c =>
+          c.q.toLowerCase().includes(taskSearch.toLowerCase()) ||
+          c.line.toLowerCase().includes(taskSearch.toLowerCase()) ||
+          c.project.toLowerCase().includes(taskSearch.toLowerCase()) ||
+          (c.nodeTitle && c.nodeTitle.toLowerCase().includes(taskSearch.toLowerCase())),
+      )
+    : nodeFiltered;
+  const shown = all ? filtered : filtered.slice(0, SHOW);
   if (!cards.length) return null;
   return (
     <section className="tasks" aria-label="Tasks">
@@ -139,6 +147,34 @@ export default function Tasks() {
           />
         )}
       </div>
+      {nodeFilter && (
+        <div
+          className="task-filter-pill"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '3px 8px',
+            margin: '2px 0 6px',
+            fontSize: '12px',
+            background: 'var(--tile-bg, rgba(255,255,255,0.05))',
+            border: '1px solid var(--tile-border, #333)',
+            borderRadius: '4px',
+          }}
+        >
+          <span>
+            Node: <strong>{nodeFilter}</strong>
+          </span>
+          <button
+            type="button"
+            className="link"
+            style={{ fontSize: '11px', cursor: 'pointer', padding: '0 2px' }}
+            onClick={() => setNodeFilter(null)}
+          >
+            ✕ Clear
+          </button>
+        </div>
+      )}
       {shown.map(c => (
         <button
           type="button"
@@ -159,7 +195,21 @@ export default function Tasks() {
           <span className="tq">
             <strong className="tproj" title={`Project: ${c.project}${c.nodeTitle ? ` · Node: ${c.nodeTitle}` : ''}`}>
               [{c.project}
-              {c.nodeTitle && c.nodeTitle.toLowerCase() !== c.project.toLowerCase() ? ` / ${c.nodeTitle}` : ''}]
+              {c.nodeTitle && c.nodeTitle.toLowerCase() !== c.project.toLowerCase() ? (
+                <span
+                  className="tnode-badge"
+                  style={{ textDecoration: 'underline', cursor: 'pointer' }}
+                  title={`Click to filter tasks by node "${c.nodeTitle}"`}
+                  onClick={e => {
+                    e.stopPropagation();
+                    setNodeFilter(f => (f === c.nodeTitle ? null : c.nodeTitle!));
+                  }}
+                >
+                  {' / ' + c.nodeTitle}
+                </span>
+              ) : (
+                ''
+              )}]
             </strong>
             {c.q}
           </span>
