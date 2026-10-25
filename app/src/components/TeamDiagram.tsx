@@ -6,19 +6,22 @@ import { pulseMs, useStore } from '../store';
 
 const DOT = { waiting: '#9aa4c4', working: '#ffffff', done: '#8ff0c0', failed: '#ff7a7a', skipped: '#4a5170' } as const;
 
-/** The node diagram: who hands work to whom. Drag a node to move it. Packets show real handoffs. */
+/** The node diagram: who hands work to whom. Drag a node to move it. Click to see each bot. */
 export default function TeamDiagram() {
   const box = useRef<HTMLDivElement>(null),
     stages = useStore(s => s.stages),
     active = useStore(s => s.active),
     pulses = useStore(s => s.pulses),
     live = useStore(s => s.live),
-    inactiveBots = useStore(s => s.inactiveBots || []);
+    inactiveBots = useStore(s => s.inactiveBots || []),
+    inspectedBot = useStore(s => s.inspectedBot),
+    inspectBot = useStore(s => s.inspectBot);
   const [pos, setPos] = useState<Record<string, { x: number; y: number }>>(() =>
     Object.fromEntries(AGENTS.map(a => [a.id, { x: a.x, y: a.y }])),
   );
   const [, tick] = useState(0),
-    drag = useRef<AgentId | null>(null);
+    drag = useRef<AgentId | null>(null),
+    hasMoved = useRef(false);
   useEffect(() => {
     if (!pulses.length) return;
     let id = 0;
@@ -31,6 +34,7 @@ export default function TeamDiagram() {
   }, [pulses.length]);
   const move = (e: React.PointerEvent) => {
     if (!drag.current || !box.current) return;
+    hasMoved.current = true;
     const r = box.current.getBoundingClientRect();
     const id = drag.current;
     setPos(p => ({
@@ -61,7 +65,8 @@ export default function TeamDiagram() {
         {TEAM_EDGES.map(([a, b], i) => {
           const isAInactive = inactiveBots.includes(a),
             isBInactive = inactiveBots.includes(b),
-            isInactiveEdge = isAInactive || isBInactive;
+            isInactiveEdge = isAInactive || isBInactive,
+            isConnected = !inspectedBot || a === inspectedBot || b === inspectedBot;
           const p = spot(a)!,
             q = spot(b)!,
             dx = q.x - p.x,
@@ -76,7 +81,10 @@ export default function TeamDiagram() {
               x2={q.x - dx * k}
               y2={q.y - dy * k}
               className={
-                'edge' + (a === 'muse' && b === 'claude' ? ' audit' : '') + (isInactiveEdge ? ' edge-inactive' : '')
+                'edge' +
+                (a === 'muse' && b === 'claude' ? ' audit' : '') +
+                (isInactiveEdge ? ' edge-inactive' : '') +
+                (inspectedBot ? (isConnected ? ' edge-spotlight' : ' edge-dimmed') : '')
               }
               markerEnd={isInactiveEdge ? undefined : 'url(#arr)'}
             />
@@ -157,20 +165,28 @@ export default function TeamDiagram() {
         const st = stages[a.id],
           on = active === a.id,
           isInactive = inactiveBots.includes(a.id),
+          isInspected = inspectedBot === a.id,
           p = pos[a.id];
         return (
-          <div
+          <button
+            type="button"
             key={a.id}
-            className={`tnode ${a.kind}${on ? ' on' : ''}${st === 'skipped' || isInactive ? ' off' : ''}${isInactive ? ' inactive' : ''}`}
+            className={`tnode ${a.kind}${on ? ' on' : ''}${isInspected ? ' inspected' : ''}${st === 'skipped' || isInactive ? ' off' : ''}${isInactive ? ' inactive' : ''}`}
             style={{ left: p.x * 100 + '%', top: p.y * 100 + '%', '--c': colorOf(a.id) } as React.CSSProperties}
             onPointerDown={e => {
+              hasMoved.current = false;
               drag.current = a.id;
               (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
             }}
+            onClick={() => {
+              if (!hasMoved.current) {
+                inspectBot(inspectedBot === a.id ? null : a.id);
+              }
+            }}
             title={
               isInactive
-                ? `${a.name} (${a.company}) · Inactive / No Credits`
-                : `${a.name} (${a.company}) · ${a.specialty}`
+                ? `${a.name} (${a.company}) · Inactive / No Credits · Click to inspect`
+                : `${a.name} (${a.company}) · ${a.specialty} · Click to inspect`
             }
           >
             <b>
@@ -184,12 +200,33 @@ export default function TeamDiagram() {
               <i className="dot" style={{ background: on ? 'var(--live)' : DOT[st] }} role="img" aria-label={st} />
             )}
             {on && <em>{live.models[live.provider]}</em>}
-          </div>
+          </button>
         );
       })}
+      <nav className="team-roster" aria-label="AI Team Roster">
+        <span className="roster-title">THE TEAM:</span>
+        {AGENTS.map(a => {
+          const isSelected = inspectedBot === a.id;
+          const isInactive = inactiveBots.includes(a.id);
+          return (
+            <button
+              type="button"
+              key={a.id}
+              className={`roster-pill${isSelected ? ' on' : ''}${isInactive ? ' inactive' : ''}`}
+              style={{ '--c': colorOf(a.id) } as React.CSSProperties}
+              onClick={() => inspectBot(isSelected ? null : a.id)}
+              title={`${a.name} (${a.company}) · ${a.role}`}
+            >
+              <b className="sw8" style={{ background: colorOf(a.id) }} aria-hidden="true" />
+              <span>{a.name}</span>
+              {a.company && <small>{a.company}</small>}
+            </button>
+          );
+        })}
+      </nav>
       <p className="hint">
-        Pipeline: Collect → Review → Edit → Review → Pass to next → Review. Drag a node to move it. Solid arrows show
-        handoffs.
+        Pipeline: Collect → Review → Edit → Review → Pass to next → Review. Click any bot to inspect their role and
+        handoffs. Drag to move.
       </p>
     </div>
   );

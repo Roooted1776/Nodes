@@ -24,6 +24,7 @@ export default function MemoryPanel() {
     viewSession = useStore(s => s.viewSession);
   const [type, setType] = useState<EntryType | 'all'>('all'),
     [q, setQ] = useState(''),
+    [sort, setSort] = useState<'recent' | 'strong' | 'alpha'>('recent'),
     [importOpen, setImportOpen] = useState(false);
   const list = useMemo(
     () =>
@@ -33,12 +34,18 @@ export default function MemoryPanel() {
             (type === 'all' || e.type === type) &&
             (!q.trim() || (e.title + ' ' + e.note).toLowerCase().includes(q.trim().toLowerCase())),
         )
-        .sort((a, b) => b.seen - a.seen),
-    [mem.entries, type, q],
+        .sort((a, b) => {
+          if (sort === 'alpha') return a.title.localeCompare(b.title);
+          if (sort === 'strong') return b.strength - a.strength;
+          return b.seen - a.seen;
+        }),
+    [mem.entries, type, q, sort],
   );
   const cur = selected ? byId(mem, selected) : undefined;
   const counts = { concept: 0, entity: 0, workstream: 0 };
   mem.entries.forEach(e => counts[e.type]++);
+  const activeWorkstreams = mem.entries.filter(e => e.type === 'workstream' && e.status !== 'stale').length;
+  const completedWorkstreams = mem.entries.filter(e => e.type === 'workstream' && e.status === 'stale').length;
   return (
     <section className="panel memory" aria-label="Memory">
       <div className="filters" role="tablist" aria-label="Memory type">
@@ -62,13 +69,38 @@ export default function MemoryPanel() {
           </button>
         ))}
       </div>
-      <input
-        className="search"
-        placeholder="Search memory"
-        value={q}
-        onChange={e => setQ(e.target.value)}
-        aria-label="Search memory"
-      />
+
+      {type === 'workstream' && (
+        <div className="work-tracker-banner card2">
+          <div className="wt-stats">
+            <span className="wt-title">WORK TRACKER</span>
+            <div className="row">
+              <span className="badge-active">● {activeWorkstreams} Active</span>
+              <span className="badge-stale">○ {completedWorkstreams} Completed</span>
+            </div>
+          </div>
+          <small className="muted">Track ongoing projects, initiatives and team milestones</small>
+        </div>
+      )}
+
+      <div className="mem-toolbar">
+        <input
+          className="search"
+          placeholder="Search memory…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          aria-label="Search memory"
+        />
+        <fieldset className="mem-sort-group">
+          <legend className="sr">Sort memories</legend>
+          {(['recent', 'strong', 'alpha'] as const).map(s => (
+            <button type="button" key={s} className={`sort-btn${sort === s ? ' on' : ''}`} onClick={() => setSort(s)}>
+              {s === 'recent' ? 'Recent' : s === 'strong' ? 'Strong' : 'A–Z'}
+            </button>
+          ))}
+        </fieldset>
+      </div>
+
       <div className="memory-actions">
         {role === 'admin' && (
           <button

@@ -274,4 +274,63 @@ describe('who can do what', () => {
     expect(autoScrollBtn.textContent).toBe('Auto-scroll on');
     expect(autoScrollBtn.getAttribute('aria-pressed')).toBe('true');
   }, 30000);
+
+  it('allows inspecting bots from Team roster, sorting memories, and viewing work tracker', async () => {
+    const { u, App } = await asRole('admin', {
+      entries: [
+        {
+          id: 'e1',
+          key: 'note:concept:zebra',
+          type: 'concept',
+          title: 'Zebra Concept',
+          note: 'Last in alpha.',
+          sources: [],
+          links: [],
+          strength: 5,
+          seen: 1000,
+          created: 1000,
+          status: 'fresh',
+          manual: true,
+        },
+        {
+          id: 'e2',
+          key: 'note:workstream:apple',
+          type: 'workstream',
+          title: 'Apple Project',
+          note: 'First in alpha.',
+          sources: [],
+          links: [],
+          strength: 1,
+          seen: 2000,
+          created: 2000,
+          status: 'fresh',
+          manual: true,
+        },
+      ],
+    });
+    render(<App />);
+
+    // 1. Inspect a bot from Team view ("see you guys")
+    await u.click(screen.getByRole('button', { name: /Team diagram/i }));
+    const roster = await screen.findByRole('navigation', { name: 'AI Team Roster' });
+    expect(roster).toBeTruthy();
+    await u.click(within(roster).getByRole('button', { name: /Claude/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Agent Inspector: Claude/ });
+    expect(dialog).toBeTruthy();
+    expect(within(dialog).getByText(/Anthropic/)).toBeTruthy();
+    expect(within(dialog).getByText(/Surgical Strike/)).toBeTruthy();
+
+    // 2. Memory sorting & Work Tracker
+    await u.click(screen.getByRole('tab', { name: 'Memory' }));
+    expect(screen.getByText('Zebra Concept')).toBeTruthy();
+    expect(screen.getByText('Apple Project')).toBeTruthy();
+
+    // Click sort A–Z
+    await u.click(screen.getByRole('button', { name: 'A–Z' }));
+    expect(screen.getByText('Apple Project')).toBeTruthy();
+
+    // Work Tracker filter
+    await u.click(screen.getByRole('tab', { name: /Workstreams/ }));
+    expect(screen.getByText('WORK TRACKER')).toBeTruthy();
+  }, 30000);
 });

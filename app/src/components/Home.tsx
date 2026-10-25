@@ -4,6 +4,7 @@ import { useAuth } from '../auth-store';
 import { ROLE_LABEL } from '../lib/auth';
 import { useMem, useStore } from '../store';
 import AdminPanel from './AdminPanel';
+import AgentInspector from './AgentInspector';
 import ChatPanel from './ChatPanel';
 import MemoryPanel from './MemoryPanel';
 import TeamDiagram from './TeamDiagram';
@@ -36,7 +37,9 @@ export default function Home() {
     setView = useStore(s => s.setView),
     tab = useStore(s => s.tab),
     setTab = useStore(s => s.setTab),
-    busy = useStore(s => s.busy);
+    busy = useStore(s => s.busy),
+    inspectedBot = useStore(s => s.inspectedBot),
+    inspectBot = useStore(s => s.inspectBot);
   const admin = user?.role === 'admin',
     [open, setOpen] = useState(true);
   const sceneFocus = useStore(s => s.sceneFocus);
@@ -140,6 +143,7 @@ export default function Home() {
               </ul>
             </>
           )}
+          {inspectedBot && <AgentInspector id={inspectedBot} onClose={() => inspectBot(null)} />}
         </main>
       </section>
       {open && (

@@ -99,7 +99,11 @@ export function maintain(m: Mem, t: Tally, now: number) {
     }
 }
 
-export function addNote(m: Mem, o: { type: EntryType; title: string; note: string }, now: number): Entry | null {
+export function addNote(
+  m: Mem,
+  o: { type: EntryType; title: string; note: string; links?: string[] },
+  now: number,
+): Entry | null {
   const title = redact(o.title.trim()).text.slice(0, 80),
     note = redact(o.note.trim()).text.slice(0, 600);
   if (!title) return null;
@@ -120,18 +124,36 @@ export function addNote(m: Mem, o: { type: EntryType; title: string; note: strin
   );
   m.entries.push(e);
   m.inbox.push({ kind: 'file', ref: e.id });
+  if (o.links && Array.isArray(o.links)) {
+    for (const linkId of o.links) {
+      const target = byId(m, linkId);
+      if (target && target !== e) link(e, target);
+    }
+  }
   for (const other of m.entries)
     if (other !== e && other.kws && e.kws && other.kws.filter(k => e.kws!.includes(k)).length >= 2) link(e, other);
   return e;
 }
-export function correctEntry(m: Mem, id: string, fix: { title?: string; note: string }, now: number) {
+export function correctEntry(
+  m: Mem,
+  id: string,
+  fix: { title?: string; note: string; links?: string[]; status?: 'fresh' | 'stale' },
+  now: number,
+) {
   const e = byId(m, id);
   if (!e) return;
   if (fix.title?.trim()) e.title = redact(fix.title.trim()).text.slice(0, 80);
   e.note = redact(fix.note).text.slice(0, 600);
   e.corrected = true;
   e.seen = now;
-  e.status = 'fresh';
+  if (fix.status) e.status = fix.status;
+  else e.status = 'fresh';
+  if (fix.links && Array.isArray(fix.links)) {
+    for (const linkId of fix.links) {
+      const target = byId(m, linkId);
+      if (target && target !== e) link(e, target);
+    }
+  }
   e.sources.push({ kind: 'correction', label: 'Your correction, ' + fmtDate(now), ref: null });
   if (e.sources.length > 6) e.sources.shift();
   m.inbox.push({ kind: 'correction', ref: e.id });

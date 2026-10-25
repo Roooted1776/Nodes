@@ -123,4 +123,21 @@ describe('memory storage', () => {
     expect(back.entries[0].links).not.toContain('e99');
     expect(sanitizeMem(JSON.parse(JSON.stringify(back)))!.archived).toHaveLength(1); // stays archived on the next load
   });
+  it('supports explicit memory linking and status toggling for workstreams', async () => {
+    const { addNote, correctEntry } = await import('../src/lib/learn');
+    const m = blankMem();
+    const e1 = addNote(m, { type: 'concept', title: 'Modular Architecture', note: 'Clear boundaries.' }, 1000)!;
+    const e2 = addNote(
+      m,
+      { type: 'workstream', title: 'Brain UI Polish', note: 'Personal memory collection.', links: [e1.id] },
+      2000,
+    )!;
+    expect(e2.links).toContain(e1.id);
+    expect(e1.links).toContain(e2.id);
+
+    // Correct entry and change status to stale/completed
+    correctEntry(m, e2.id, { note: 'Work completed.', status: 'stale' }, 3000);
+    expect(e2.status).toBe('stale');
+    expect(e2.note).toBe('Work completed.');
+  });
 });

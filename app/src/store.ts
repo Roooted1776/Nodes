@@ -93,7 +93,11 @@ export interface State {
   flow: Flow[];
   inactiveBots: AgentId[];
   autoUpdateBots: boolean;
+  inspectedBot: AgentId | null;
+  promptDraft: string;
   // actions
+  inspectBot(id: AgentId | null): void;
+  setPromptDraft(q: string): void;
   commit(fn?: (m: Mem) => void): void;
   setLive(p: Partial<LiveCfg>): void;
   setKey(k: string, provider?: ProviderId): void;
@@ -101,9 +105,9 @@ export interface State {
   send(q: string): Promise<void>;
   stop(): void;
   testProvider(provider?: ProviderId): Promise<void>;
-  note(o: { type: EntryType; title: string; note: string }): string | null;
+  note(o: { type: EntryType; title: string; note: string; links?: string[] }): string | null;
   importItems(items: RawMemoryItem[], defaultProject?: string): { added: number; updated: number; total: number };
-  correct(id: string, fix: { title?: string; note: string }): void;
+  correct(id: string, fix: { title?: string; note: string; links?: string[]; status?: 'fresh' | 'stale' }): void;
   remove(id: string): void;
   setSetting(p: Partial<Mem['settings']>): void;
   restore(text: string, passphrase: string): Promise<string>;
@@ -244,6 +248,10 @@ export const useStore = create<State>()((set, get) => {
     flow: [],
     inactiveBots: [],
     autoUpdateBots: true,
+    inspectedBot: null,
+    inspectBot: (id: AgentId | null) => set({ inspectedBot: id }),
+    promptDraft: '',
+    setPromptDraft: (promptDraft: string) => set({ promptDraft }),
     activeProject: 'Brain',
     setActiveProject: p => set({ activeProject: p.trim() || 'Brain' }),
 

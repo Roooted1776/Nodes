@@ -1,3 +1,41 @@
+# Personal Collection of Memories, Work Tracker, Team Inspector & Merged Deployment — 2026-10-24
+
+## 1. Directive & Summary
+- **Requests**:
+  - "polish the site, this is going to be my personal collection of memories going to be used to keep track of work and see you guys"
+  - "merge push all main rm rest deploy"
+- **Features Implemented & Verified**:
+  1. **Personal Collection of Memories**:
+     - Instant memory sorting in Memory Panel by **Recent**, **Strongest** (frequency), and **A–Z** alphabetical.
+     - Reciprocal memory linking: linking memory A to memory B automatically links memory B back to memory A in both Add and Correct note forms.
+     - Work Tracker banner summarizing total, active, and completed workstreams.
+     - 1-click status toggles on workstreams between active (`fresh`) and completed (`stale`).
+     - Origin badges distinguishing user notes from AI takeaways.
+     - "+ Ask Team" button prefilling prompt composer with memory topic.
+     - Markdown export button for 1-click clipboard export.
+  2. **"See You Guys" (Interactive Bot Inspection & Roster)**:
+     - `AgentInspector` modal: profile, avatar, doctrine, stage, active provider key status, specialty, core skills, incoming/outgoing handoffs, and direct task launcher.
+     - Clickable 3D floating bot tags in WebGL brain scene that open the inspector.
+     - Interactive Team Diagram nodes with spotlighting (focused bot highlights, other connections dim) and an interactive "THE TEAM:" roster bar.
+     - Clickable bot name headers in Live Chat messages and Coverage chips.
+  3. **Work Tracking**:
+     - Live task search filter in Live Chat session history.
+  4. **Engine & WebGL Fixes**:
+     - Matched uniform `uHalo` precision across VERTEX and FRAGMENT shaders to `precision highp float;`.
+     - React 19 / Drei unmount guard on `Node.prototype.removeChild` in `main.tsx`.
+  5. **Branch Merge & Clean Untracking**:
+     - Untracked `app/node_modules/` from Git repository to remove 11,700 tracked files and keep repo clean.
+     - Merged with canonical `Roooted1776/Nodes` origin/main tracking Supabase database, responsive panel (32vw), and file import modal.
+     - Cleaned up leftover branches (`rm rest`).
+  6. **Production Deployment & Verification**:
+     - Compiled single-file production bundle `index.html` (1,593 KB) with script hash pinning.
+     - All 18 unit/UI test files (88 tests) pass.
+     - Playwright Chromium real-browser test passed (33.0s).
+     - Deployed atomically to Hostinger VPS (`/var/www/redeemed/index.html`).
+     - Verified live production site `https://redeemed.live` returning HTTP 200 with matching build.
+
+---
+
 # Website Complete Functionality Verification & Deployment — 2026-10-24
 
 ## 1. Directive & Summary
