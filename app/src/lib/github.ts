@@ -450,9 +450,7 @@ export async function fetchGitHubReleases(
         name: String(it.name || it.tag_name || '').trim(),
         body: String(it.body || '').trim(),
         htmlUrl:
-          typeof it.html_url === 'string'
-            ? it.html_url
-            : `https://github.com/${parsed.owner}/${parsed.repo}/releases`,
+          typeof it.html_url === 'string' ? it.html_url : `https://github.com/${parsed.owner}/${parsed.repo}/releases`,
         publishedAt: typeof it.published_at === 'string' ? it.published_at : '',
         prerelease: !!it.prerelease,
       }));
@@ -604,7 +602,7 @@ export function githubToMemoryItems(
   }
 
   // 5. Releases & Milestones
-  for (const rel of (data.releases || []).slice(0, 5)) {
+  for (const rel of releases.slice(0, 5)) {
     const relName = rel.name || rel.tagName;
     const title = `${repoInfo.name} Release ${rel.tagName || relName}`.slice(0, 80);
     const dateStr = rel.publishedAt ? `Published ${rel.publishedAt.slice(0, 10)}` : 'Milestone release';
@@ -650,11 +648,7 @@ export async function fetchAndConvertGitHub(
   const [readme, issues, commits, releases] = await Promise.all([
     includeReadme ? fetchGitHubReadme(repoInput, token, fetchImpl) : Promise.resolve(null),
     includeIssues
-      ? fetchGitHubIssues(
-          repoInput,
-          { token, state: options?.issueState, limit: options?.maxIssues, since },
-          fetchImpl,
-        )
+      ? fetchGitHubIssues(repoInput, { token, state: options?.issueState, limit: options?.maxIssues, since }, fetchImpl)
       : Promise.resolve([]),
     includeCommits
       ? fetchGitHubCommits(repoInput, { token, limit: options?.maxCommits, since }, fetchImpl)

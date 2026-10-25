@@ -196,9 +196,18 @@ export default function Tasks() {
             <strong className="tproj" title={`Project: ${c.project}${c.nodeTitle ? ` · Node: ${c.nodeTitle}` : ''}`}>
               [{c.project}
               {c.nodeTitle && c.nodeTitle.toLowerCase() !== c.project.toLowerCase() ? (
-                <span
+                <button
+                  type="button"
                   className="tnode-badge"
-                  style={{ textDecoration: 'underline', cursor: 'pointer' }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'inherit',
+                    padding: 0,
+                    font: 'inherit',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                  }}
                   title={`Click to filter tasks by node "${c.nodeTitle}"`}
                   onClick={e => {
                     e.stopPropagation();
@@ -206,10 +215,11 @@ export default function Tasks() {
                   }}
                 >
                   {' / ' + c.nodeTitle}
-                </span>
+                </button>
               ) : (
                 ''
-              )}]
+              )}
+              ]
             </strong>
             {c.q}
           </span>

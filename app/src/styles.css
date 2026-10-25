@@ -476,6 +476,12 @@ h2:first-child {
   color: #fff !important;
   transform: translateY(-22px);
 }
+.mem-tag.hotspot {
+  text-shadow:
+    0 0 8px rgba(56, 189, 248, 0.75),
+    0 0 3px #000;
+  border-bottom: 1px dashed rgba(56, 189, 248, 0.6);
+}
 .task-node-tag {
   white-space: nowrap;
   font-size: 13px;

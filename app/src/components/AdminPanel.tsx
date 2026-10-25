@@ -313,19 +313,11 @@ export default function AdminPanel() {
               }}
             >
               <label className="sw sm">
-                <input
-                  type="checkbox"
-                  checked={ghIncReleases}
-                  onChange={e => setGhIncReleases(e.target.checked)}
-                />
+                <input type="checkbox" checked={ghIncReleases} onChange={e => setGhIncReleases(e.target.checked)} />
                 <span>Releases & Milestones</span>
               </label>
               <label className="sw sm">
-                <input
-                  type="checkbox"
-                  checked={ghDifferential}
-                  onChange={e => setGhDifferential(e.target.checked)}
-                />
+                <input type="checkbox" checked={ghDifferential} onChange={e => setGhDifferential(e.target.checked)} />
                 <span>Sync changes only</span>
               </label>
               {s.githubLastSync[ghRepo] && (
