@@ -77,6 +77,10 @@ export async function fakeBackend(context: BrowserContext) {
       return send({ envelope, rev: revision });
     }
     if (url.pathname === '/rest/v1/audit_log') return send([]);
+    if (url.pathname === '/rest/v1/projects') return send([]);
+    if (url.pathname === '/rest/v1/memories') return send([]);
+    if (url.pathname === '/rest/v1/sessions') return send([]);
+    if (url.pathname.startsWith('/rest/v1/rpc/')) return send({ ok: true });
     return send({ error: 'Unhandled fake request' }, 400);
   });
   return { users, getEnvelope: () => envelope };

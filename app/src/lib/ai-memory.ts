@@ -1,6 +1,6 @@
 // Memory is written by the team itself: after a task, Grok Bot (the team head, a real AI call) files what is worth
 // keeping. Brain stores only what the AI wrote. Nothing is made up when the reply cannot be read.
-import { byId, link, type Entry, type EntryType, type Mem, type Msg, type Session } from './memory';
+import { byId, ensureProjectNode, link, type Entry, type EntryType, type Mem, type Msg, type Session } from './memory';
 import { type Tally, upsert } from './learn';
 import { redact } from './redact';
 import { clip, fmtDate, keywords } from './text';
@@ -85,6 +85,11 @@ export function fileMemories(m: Mem, items: AiMemory[], s: Session, t: Tally, no
   }
   for (let i = 0; i < made.length; i++) for (let j = i + 1; j < made.length; j++) link(made[i], made[j]);
   for (const id of s.used || []) for (const e of made) link(e, byId(m, id));
+  if (s.project) {
+    const projNode = ensureProjectNode(m, s.project, s, now);
+    s.projectId = projNode.id;
+    for (const e of made) link(e, projNode);
+  }
   s.learned = true;
   return made;
 }

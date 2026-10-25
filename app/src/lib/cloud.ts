@@ -144,3 +144,49 @@ export async function accountWrap(uid: string) {
   if (error || !data) throw new CloudError('This account has no encrypted memory key. Ask an admin.');
   return data.wrap as import('./vault').Sealed;
 }
+
+/** Persist individual memory entries, projects, and task sessions to the database */
+export async function syncMemoryDatabase(mem: import('./memory').Mem) {
+  const d = db();
+  try {
+    const projects = Array.from(new Set(mem.sessions.map(s => s.project).filter(Boolean)));
+    if (!projects.includes('Brain')) projects.unshift('Brain');
+    for (const p of projects) {
+      try {
+        await d.from('projects').upsert({ id: p, name: p, updated_at: new Date().toISOString() });
+      } catch {
+        /* best-effort row sync */
+      }
+    }
+    for (const e of mem.entries) {
+      try {
+        await d.rpc('upsert_memory', {
+          p_id: e.id,
+          p_key: e.key,
+          p_type: e.type,
+          p_title: e.title,
+          p_note: e.note || '',
+          p_project: e.type === 'workstream' ? e.title : 'Brain',
+          p_body: { links: e.links, strength: e.strength, status: e.status },
+        });
+      } catch {
+        /* best-effort row sync */
+      }
+    }
+    for (const s of mem.sessions) {
+      try {
+        await d.rpc('upsert_session', {
+          p_id: s.id,
+          p_task: s.q,
+          p_project: s.project || 'Brain',
+          p_project_id: s.projectId || null,
+          p_body: { msgs: s.msgs, cover: s.cover, flow: s.flow },
+        });
+      } catch {
+        /* best-effort row sync */
+      }
+    }
+  } catch {
+    // Non-blocking: database sync runs alongside vault update
+  }
+}

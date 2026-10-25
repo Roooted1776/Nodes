@@ -1,7 +1,17 @@
 import { create } from 'zustand';
 import type { AgentId } from './data/team';
 import { addNote, correctEntry, deleteEntry } from './lib/learn';
-import { blankMem, sanitizeMem, type EntryType, type Flow, type Mem, type Msg, type Session } from './lib/memory';
+import {
+  blankMem,
+  loadMem,
+  sanitizeMem,
+  saveMem,
+  type EntryType,
+  type Flow,
+  type Mem,
+  type Msg,
+  type Session,
+} from './lib/memory';
 import { audit } from './lib/audit';
 import { exportBackup, importBackup } from './lib/vault';
 import type { Role } from './lib/auth';
@@ -100,6 +110,8 @@ export interface State {
   setTab(t: Tab): void;
   set(p: Partial<State>): void;
   viewSession(id: string | null): void;
+  activeProject: string;
+  setActiveProject(p: string): void;
 }
 
 let logN = 0,
@@ -189,8 +201,8 @@ export const useStore = create<State>()((set, get) => {
   };
 
   return {
-    // memory stays empty until an account unlocks it
-    mem: blankMem(),
+    // persistent memory restored from storage, or blank if first run / locked
+    mem: ls ? loadMem(ls).mem : blankMem(),
     rev: 0,
     storageOk: true,
     role: 'viewer',
@@ -222,6 +234,8 @@ export const useStore = create<State>()((set, get) => {
     draft: null,
     timing: {},
     flow: [],
+    activeProject: 'Brain',
+    setActiveProject: p => set({ activeProject: p.trim() || 'Brain' }),
 
     set: p => set(p),
     /** Change memory, save it, and publish a fresh snapshot so every view (list, 3D brain) updates. */
@@ -240,6 +254,7 @@ export const useStore = create<State>()((set, get) => {
         rev: s.rev + 1,
       }));
       const st = get();
+      if (!vaultSave && ls) saveMem(ls, m);
       if (vaultSave)
         void vaultSave(m, st.live.remember ? st.keys : {}).then(
           ok => set({ storageOk: ok }),

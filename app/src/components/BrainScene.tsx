@@ -8,7 +8,7 @@ import { AGENTS, isAgent } from '../data/team';
 import { OUTLINE } from '../data/outline';
 import { buildSkull, skullLines } from '../lib/skull';
 import { buildShell, midline, placeMemory, route, station, surfaceFolds, toWorld, type P3 } from '../lib/geometry';
-import { TYPE_LABEL } from '../lib/memory';
+import { TYPE_LABEL, type Session } from '../lib/memory';
 import { PULSE_AFTERGLOW, pulseMs, useMem, useStore, type Pulse } from '../store';
 import { DOT_FRAG, DOT_VERT, RIM_FRAG, RIM_VERT } from '../lib/shaders';
 import { sceneStats } from '../lib/stats';
@@ -420,7 +420,10 @@ function Memories() {
   const mem = useMem(),
     selected = useStore(s => s.selected),
     select = useStore(s => s.select),
-    [hover, setHover] = useState<string | null>(null);
+    viewing = useStore(s => s.viewing),
+    viewSession = useStore(s => s.viewSession),
+    [hover, setHover] = useState<string | null>(null),
+    [hoverTask, setHoverTask] = useState<string | null>(null);
   const pos = useMemo(() => placeMemory(mem.entries), [mem.entries]);
   const top = useMemo(
     () =>
@@ -434,6 +437,49 @@ function Memories() {
   );
   const sel = selected ? mem.entries.find(e => e.id === selected) : undefined;
   const list = useMemo(() => mem.entries.filter(e => pos.has(e.id)), [mem.entries, pos]);
+
+  const taskNodes = useMemo(() => {
+    const items: {
+      session: Session;
+      pos: V3;
+      parentPos: V3;
+    }[] = [];
+    const linkPoints: number[] = [];
+
+    const byProject = new Map<string, Session[]>();
+    for (const s of mem.sessions) {
+      const projKey = (s.projectId || s.project || 'Brain').toLowerCase();
+      const arr = byProject.get(projKey) || [];
+      arr.push(s);
+      byProject.set(projKey, arr);
+    }
+
+    for (const [projKey, sessions] of byProject.entries()) {
+      const pNode =
+        list.find(
+          e => e.type === 'workstream' && (e.id.toLowerCase() === projKey || e.title.toLowerCase() === projKey),
+        ) || list.find(e => e.type === 'workstream');
+
+      if (!pNode || !pos.has(pNode.id)) continue;
+      const parentP3 = toWorld(pos.get(pNode.id)!);
+      const parentPos: V3 = [parentP3[0], parentP3[1], parentP3[2]];
+
+      const total = sessions.length;
+      sessions.forEach((s, idx) => {
+        const phi = (idx / Math.max(1, total)) * Math.PI * 2 + 0.35;
+        const rad = 0.28 + (idx % 2) * 0.08;
+        const taskPos: V3 = [
+          parentPos[0] + Math.cos(phi) * rad,
+          parentPos[1] + Math.sin(phi) * rad * 0.8,
+          parentPos[2] + Math.sin(phi * 2) * 0.12,
+        ];
+        items.push({ session: s, pos: taskPos, parentPos });
+        linkPoints.push(...parentPos, ...taskPos);
+      });
+    }
+
+    return { items, linkLines: new Float32Array(linkPoints) };
+  }, [mem.sessions, list, pos]);
   const mat = useMemo(dotMaterial, []);
   const geo = useMemo(() => {
     const g = dotGeometry(list.length),
@@ -530,6 +576,63 @@ function Memories() {
               <Html center distanceFactor={9} zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>
                 <div className={'mem-tag ' + e.type + (on ? ' on' : '')} title={TYPE_LABEL[e.type]}>
                   {e.title.length > 26 ? e.title.slice(0, 25) + '…' : e.title}
+                </div>
+              </Html>
+            )}
+          </group>
+        );
+      })}
+      {taskNodes.linkLines.length > 0 && (
+        <lineSegments renderOrder={3}>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[taskNodes.linkLines, 3]} />
+          </bufferGeometry>
+          <lineBasicMaterial color="#38bdf8" transparent opacity={0.35} depthTest={false} depthWrite={false} />
+        </lineSegments>
+      )}
+      {taskNodes.items.map(({ session: s, pos: tPos }) => {
+        const isViewing = viewing?.id === s.id;
+        const isHovered = hoverTask === s.id;
+        const showTag = isViewing || isHovered;
+        return (
+          <group key={s.id} position={tPos}>
+            {/* Visual smaller node */}
+            <mesh renderOrder={5}>
+              <sphereGeometry args={[0.055, 12, 12]} />
+              <meshBasicMaterial
+                color={isViewing ? '#ffffff' : isHovered ? '#7dd3fc' : '#38bdf8'}
+                transparent
+                opacity={isViewing ? 1 : 0.85}
+              />
+            </mesh>
+            {/* Hit area for clicking the smaller node to view the task */}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: a three.js mesh, not a DOM element */}
+            <mesh
+              onClick={ev => {
+                ev.stopPropagation();
+                viewSession(viewing?.id === s.id ? null : s.id);
+                useStore.setState(st => ({
+                  tab: 'chat',
+                  sceneFocus: { kind: 'memory', id: s.projectId || s.id, sequence: (st.sceneFocus?.sequence || 0) + 1 },
+                }));
+              }}
+              onPointerOver={ev => {
+                ev.stopPropagation();
+                setHoverTask(s.id);
+                document.body.style.cursor = 'pointer';
+              }}
+              onPointerOut={() => {
+                setHoverTask(null);
+                document.body.style.cursor = '';
+              }}
+            >
+              <sphereGeometry args={[0.09, 8, 8]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+            {showTag && (
+              <Html center distanceFactor={9} zIndexRange={[25, 0]} style={{ pointerEvents: 'none' }}>
+                <div className={'task-node-tag' + (isViewing ? ' on' : '')}>
+                  {s.q.length > 28 ? s.q.slice(0, 26) + '…' : s.q}
                 </div>
               </Html>
             )}

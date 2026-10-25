@@ -74,7 +74,7 @@ export default function Home() {
           </span>
           <b>Brain</b>
           <small>
-            {mem.entries.length} memories · {mem.sessions.length} sessions{busy ? ' · live' : ''}
+            {mem.entries.length} memories · {mem.sessions.length} sessions · One Mind{busy ? ' · live' : ''}
           </small>
         </div>
         <Readout />
@@ -111,7 +111,7 @@ export default function Home() {
           )}
           {view === 'brain' && (
             <>
-              <p className="hint">Drag to turn the brain · scroll to zoom · click a memory</p>
+              <p className="hint">Drag to turn the brain · scroll to zoom · click a smaller node to view task</p>
               <ul className="legend" aria-label="Legend">
                 <li>
                   <i style={{ color: '#81b8ff' }}>●</i>Concept
@@ -120,7 +120,10 @@ export default function Home() {
                   <i style={{ color: '#73dfbd' }}>●</i>Entity
                 </li>
                 <li>
-                  <i style={{ color: '#ffbd70' }}>●</i>Workstream
+                  <i style={{ color: '#ffbd70' }}>●</i>Workstream (Project)
+                </li>
+                <li>
+                  <i style={{ color: '#38bdf8', fontSize: '10px' }}>●</i>Task (smaller node)
                 </li>
                 <li>
                   <i className="bots" aria-hidden="true">

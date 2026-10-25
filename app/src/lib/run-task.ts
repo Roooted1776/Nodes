@@ -7,7 +7,7 @@ import { audit } from './audit';
 import { chainFor, runChain } from './chain';
 import { tally } from './learn';
 import { AI_KEY, MEMORY_SYSTEM, fileMemories, memoryPrompt, parseMemories } from './ai-memory';
-import type { Cover, Flow, Msg, Session } from './memory';
+import { ensureProjectNode, type Cover, type Flow, type Msg, type Session } from './memory';
 import { PROV, ProviderError, callModel } from './providers';
 import { redact } from './redact';
 import { contextBlock, relevant } from './retrieve';
@@ -254,10 +254,13 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
   if (result.completed && !get().incognito && m.settings.brain) {
     const fin = words(result.msgs.filter(x => x.from === 'grokbot').at(-1)?.text) || 0;
     if (fin) set(x => ({ flow: [...x.flow, ['grokbot', 'brain', fin] as Flow] }));
+    const matchProj = q.match(/^\[([^\]]+)\]/);
+    const assignedProj = matchProj ? matchProj[1].trim() : get().activeProject || 'Brain';
     const sess: Session = {
       id: 's' + m.nextSession++,
       ts: Date.now(),
       q: clip(q, 300),
+      project: assignedProj,
       kws: [],
       accepted: [],
       uncovered: [],
@@ -280,6 +283,8 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       ),
     };
     get().commit(mm => {
+      const projNode = ensureProjectNode(mm, assignedProj, sess, sess.ts);
+      sess.projectId = projNode.id;
       mm.sessions.push(sess);
       if (mm.sessions.length > 25) mm.sessions.shift();
     });

@@ -2,7 +2,16 @@ import { create } from 'zustand';
 import { ageBlockedUntil, type Dob } from './lib/age';
 import { audit, setAuditSink } from './lib/audit';
 import { AuthError, IDLE_MS, checkNewAccount, derivePassword, passcodeError, type Role, type User } from './lib/auth';
-import { accounts, signIn, signOut, accountWrap, loadVault, saveVault, writeAudit } from './lib/cloud';
+import {
+  accounts,
+  signIn,
+  signOut,
+  accountWrap,
+  loadVault,
+  saveVault,
+  syncMemoryDatabase,
+  writeAudit,
+} from './lib/cloud';
 import { blankMem, sanitizeMem } from './lib/memory';
 import { mirror, openChannel, publish, type Hub } from './lib/share';
 import { VaultError, decryptVault, encryptVault, newSecrets, openFor, sealFor, type Secrets } from './lib/vault';
@@ -90,6 +99,7 @@ async function unlock(u: User, kek: CryptoKey) {
   }));
   setAuditSink((who, what) => writeAudit(u.id, who, what));
   if (s.priv) {
+    void syncMemoryDatabase(mem);
     const epoch = generation;
     setVault((m, keys) => {
       // Capture now: queued writes must never read a later mutable memory object.
@@ -100,6 +110,7 @@ async function unlock(u: User, kek: CryptoKey) {
         const envelope = await encryptVault(s, { mem: snapshot }, counter + 1);
         if (epoch !== generation) return false;
         revision = await saveVault(envelope, revision);
+        void syncMemoryDatabase(snapshot);
         counter = envelope.n;
         if (epoch !== generation) return false;
         await sealKeys(deviceStore, kek, u.id, localKeys);

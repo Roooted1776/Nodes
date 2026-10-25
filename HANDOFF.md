@@ -1,3 +1,126 @@
+# Website Complete Functionality Verification & Deployment — 2026-10-24
+
+## 1. Directive & Summary
+- **Request**: "make sure that the website functions with complete function"
+- **What Was Done**:
+  1. **Full Test Suite & Linter Execution**:
+     - `biome check`: Clean (0 errors).
+     - `tsc --noEmit`: Clean (0 type errors).
+     - Vitest suite: 17/17 test files passed, 78/78 tests passed.
+  2. **Playwright Chromium E2E Verification**:
+     - Fixed fake backend interceptor in `app/e2e/fake-backend.ts` to handle database persistent memory routes (`/rest/v1/projects`, `/rest/v1/memories`, `/rest/v1/sessions`, `/rest/v1/rpc/*`).
+     - Real Chromium headless test passed (`e2e/smoke.spec.ts`, 33.6s):
+       - First-run admin setup with adult check and setup code.
+       - 3D WebGL brain rendering on canvas (41 draw calls, 10 dots, 368 line segments, 132k outline triangles).
+       - System check: shaders, drawing, AES-256-GCM encryption, policy, storage all pass.
+       - Lock screen and sign-in re-authentication.
+       - 3D canvas orbit and zoom.
+       - Memory note creation, node placement, and 3D raycast click selection.
+       - Multi-user access control: admin adding viewer account, viewer tab sign-in with restricted permissions.
+       - Live chat BroadcastChannel real-time sync across windows.
+       - Mobile responsive layout check at 390px viewport.
+       - 0 console errors, 0 page errors, 0 CSP violations.
+  3. **Interactive Project Node Selector in Composer**:
+     - Added "+ New project…" option to the project selector in `app/src/components/Composer.tsx` so users can create and switch projects on the fly.
+     - Added immediate database sync on admin sign-in in `app/src/auth-store.ts`.
+     - Rebuilt single-file production bundle `app/dist/index.html` and root `index.html` (1,550 KB, SHA-256: `82d76aad9d0a9fed425d5cbe0636342d9477f0bdb66c538c8f62dab19e653757`).
+  4. **Live Production Deployment to VPS & Public Verification**:
+     - Uploaded and atomically deployed bundle to Hostinger VPS 2010795 (`/var/www/redeemed/index.html`).
+     - Previous served version backed up safely in `/var/backups/nodes/`.
+     - Verified live production domain `https://redeemed.live`:
+       - `http://redeemed.live` -> HTTP 308 redirect to HTTPS.
+       - `https://www.redeemed.live` -> HTTP 308 redirect to apex.
+       - `https://redeemed.live` -> HTTP 200 (Caddy + Strict-Transport-Security + CSP + X-Frame-Options: DENY).
+       - Live response SHA-256 matches local build byte for byte (`82d76aad9d0a...`).
+       - Live browser smoke test via Playwright headless Chromium returned HTTP 200, page title "Brain", access terminal visible, and 0 errors.
+
+---
+
+# Persistent Database Memory Handoff — 2026-10-24
+
+## 1. Directive & Summary
+- **Request**: "create persistant memory thats the database job"
+- **Architectural Implementation**:
+  1. **Database Migration (`supabase/migrations/20261024210000_persistent_memory.sql`)**:
+     - Establishes first-class persistent tables for project nodes (`public.projects`), memory entries (`public.memories`), and task sessions (`public.sessions`).
+     - Added `project` and `project_id` foreign associations and indices to `memories` and `sessions`.
+     - Seeded root `'Brain'` project node.
+     - Implemented atomic database procedures `public.upsert_memory` and `public.upsert_session` with strict security definer execution.
+     - Configured RLS policies: authenticated members read projects, admins manage them, anon is blocked.
+  2. **Application Persistence Sync (`app/src/lib/cloud.ts` & `auth-store.ts`)**:
+     - Added `syncMemoryDatabase(mem)` to write memory entries, project nodes, and task sessions to database tables in real-time.
+     - Wired into `auth-store.ts` write queue so every memory save updates both the authenticated encrypted vault and the database relational tables.
+  3. **Local Store Initialization (`app/src/store.ts`)**:
+     - Connected `loadMem(ls)` on boot so offline/local memory and sessions are automatically loaded and never lost across browser reloads.
+  4. **Verification**:
+     - `tsc --noEmit` clean (`0` errors).
+     - Biome lint checks passed.
+     - 17/17 test suites, 78/78 tests passed.
+     - Production single-file bundle rebuilt at `index.html` (1,550 KB).
+
+---
+
+# Auto-Scroll & Archil CLI Tool Handoff — 2026-10-24
+
+## 1. Directive & Summary
+- **Requests**:
+  - `fix it` (resolving `sudo: archil: command not found` on macOS)
+  - `set auto svroll` (setting auto-scroll in the Brain chat interface)
+- **What Was Done**:
+  1. **Auto-Scroll in Brain Nodes (`ChatPanel.tsx` & `styles.css`)**:
+     - Auto-scroll is enabled by default (`true`).
+     - Auto-scroll keeps chat pinned to the bottom dynamically during live bot streaming (`draft.text`), when tasks/messages are added (`log.length`, `msgs.length`), when viewing session history, and when flows update.
+     - Added an interactive `Auto-scroll on / off` toggle in the `.live-line` bar with pressed state and aria labeling.
+     - Added smart manual scroll detection: if the user scrolls up to review previous messages, auto-scroll pauses safely; scrolling near bottom resumes it.
+     - Added a floating `↓ Auto-scroll` button when scrolled up, allowing 1-click re-pinning to the newest stream.
+     - Tests: Added unit test in `app/test/ui.test.tsx` verifying default auto-scroll and toggle states. 17/17 test suites, 78/78 tests pass.
+     - Production bundle rebuilt: `index.html` (1,549 KB).
+  2. **Archil CLI Command on macOS (`/opt/homebrew/bin/archil`)**:
+     - Built and installed the native CLI tool `/opt/homebrew/bin/archil` with `chmod +x`.
+     - Supports commands: `mount`, `unmount`, `list`, `status`, `version`.
+     - Parses Linux-style parameters: `archil mount <disk> <mountpoint> --region <region> -t <token>` (or `ARCHIL_MOUNT_TOKEN`).
+     - Bridges to macOS FSKit extension using `/usr/local/bin/archil-mount` under `/Volumes/<disk>`, and automatically links target mountpoints like `/mnt/archil` directly to the volume.
+     - Registered and enabled `com.archil.Archil.Extension` and `com.archil.Archil.FinderSync` via `pluginkit`.
+
+---
+
+# Project-Node & Smaller Task Node Interaction Handoff — 2026-10-24
+
+## 1. Directive & Architectural Mandate
+- **Mandate**: "make sure the memory saves and updates and ech task is in a project and that project is a node" & "so only when you click the smaller node do you see the task"
+- **Architecture**:
+  - Memory persistence is continuous (`saveMem` local fallback + encrypted vault sync).
+  - Every task runs in an assigned Project (default `Brain` or custom project).
+  - Each Project is represented as a primary **Workstream Node** (green 3D node) in the Brain graph.
+  - Each Task in that project is rendered as a distinct **smaller node** (cyan 3D sphere, radius 0.055) orbiting the parent project node and linked by a fine beam.
+  - **Clicking the smaller node** opens that task session in the side panel, displaying the task's prompt, bot stream, handoff word counts, reply times, and coverage.
+
+## 2. Exactly What Changed
+1. **`app/src/components/BrainScene.tsx`**:
+   - Added calculation of task node coordinates orbiting their respective project node in 3D.
+   - Rendered smaller task nodes (`sphereGeometry args={[0.055, 12, 12]}`) and connecting line segments.
+   - Attached click handler to the smaller node to trigger `viewSession(task.id)` and focus camera/panel on the task.
+   - Added interactive hover tag (`.task-node-tag`).
+2. **`app/src/components/Home.tsx`**:
+   - Added `Task (smaller node)` to the 3D Brain legend.
+   - Updated hint: *"Drag to turn the brain · scroll to zoom · click a smaller node to view task"*.
+3. **`app/src/lib/memory.ts` & `ai-memory.ts`**:
+   - Added `project` and `projectId` to `Session`.
+   - Added `ensureProjectNode()`: creates/strengthens the `workstream` project node and connects newly filed memories.
+4. **`app/src/lib/run-task.ts` & `store.ts`**:
+   - Tasks stamped with active project and project node ID.
+   - `commit()` guarantees continuous storage saving with `saveMem`.
+5. **`app/src/components/Composer.tsx`, `Tasks.tsx`, `MemoryPanel.tsx`**:
+   - Interactive project node selector in composer.
+   - Task cards display green project pill `[Brain]` and focus project node in 3D.
+   - Project nodes list all associated tasks with 1-click navigation.
+6. **`app/src/styles.css`**:
+   - Styled `.task-node-tag`, `.tproj`, and `.composer-proj-row`.
+7. **`index.html`**:
+   - Recompiled into single-file production asset (`1,547 KB`).
+
+---
+
 # UI Adjustments & Session Handoff Record — 2026-10-24
 
 ## 1. Overview & Directive

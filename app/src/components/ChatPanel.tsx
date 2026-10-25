@@ -3,6 +3,7 @@ import { pulseMs, type Pulse } from '../store';
 import { colorOf } from '../data/colors';
 import { AGENT, isAgent } from '../data/team';
 import { fmtDate } from '../lib/text';
+import type { Msg } from '../lib/memory';
 import { useStore } from '../store';
 import Composer from './Composer';
 import Coverage, { fromSession } from './Coverage';
@@ -40,13 +41,37 @@ export default function ChatPanel() {
   const focusedAgent = sceneFocus?.kind === 'agent' && isAgent(sceneFocus.id) ? AGENT[sceneFocus.id] : null;
   const ready = useStore(s => !!s.keys[s.live.provider]),
     end = useRef<HTMLDivElement>(null),
+    msgsRef = useRef<HTMLDivElement>(null),
+    [autoScroll, setAutoScroll] = useState(true),
     draft = useStore(s => s.draft),
     flow = useStore(s => s.flow),
     timing = useStore(s => s.timing);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: these values only trigger the scroll; the effect does not read them
-  useEffect(() => {
+
+  const scrollToBottom = () => {
+    const el = msgsRef.current;
+    if (typeof el?.scrollTo === 'function') {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
     end.current?.scrollIntoView?.({ block: 'end' });
-  }, [log.length, viewing, draft?.from]);
+  };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: these values trigger the scroll into view
+  useEffect(() => {
+    if (!autoScroll) return;
+    scrollToBottom();
+  }, [log.length, viewing, draft?.text, draft?.from, flow.length, autoScroll]);
+
+  const onScroll = () => {
+    const el = msgsRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    if (isNearBottom !== autoScroll) {
+      setAutoScroll(isNearBottom);
+    }
+  };
+
   // the chat shows only what the AI team wrote; Brain's own notes live in the status line
   const msgs = (
     viewing ? viewing.msgs.map((m, i) => ({ ...m, id: i, cls: undefined as 'warn' | undefined })) : log
@@ -80,6 +105,19 @@ export default function ChatPanel() {
                 ? 'Watching live. Nothing is running now.'
                 : status}
         </span>
+        <button
+          type="button"
+          className={`link auto-scroll-btn${autoScroll ? ' on' : ''}`}
+          onClick={() => {
+            const next = !autoScroll;
+            setAutoScroll(next);
+            if (next) scrollToBottom();
+          }}
+          title={autoScroll ? 'Auto-scroll is on (click to pause)' : 'Click to turn auto-scroll on'}
+          aria-pressed={autoScroll}
+        >
+          {autoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
+        </button>
         {viewing && (
           <button type="button" className="link" onClick={() => viewSession(null)}>
             Back to live
@@ -89,7 +127,7 @@ export default function ChatPanel() {
       {!viewing && <Handoff />}
       <Tasks />
       <Coverage cov={viewing ? fromSession(viewing) : undefined} />
-      <div className="msgs" aria-live="off">
+      <div className="msgs" ref={msgsRef} onScroll={onScroll} aria-live="off">
         {msgs.length === 0 && (
           <p className="empty">
             {role === 'viewer'
@@ -116,6 +154,7 @@ export default function ChatPanel() {
                 {a && <span>{a.role}</span>}
                 {t && <em>{t}</em>}
                 <CopyButton text={m.text} />
+                {a && role === 'admin' && <TeamLearnAction msg={m} who={who} />}
               </header>
               <p>{m.text}</p>
             </article>
@@ -142,6 +181,19 @@ export default function ChatPanel() {
           <FlowBox flow={viewing.flow} ms={viewing.ms} />
         ) : (
           !busy && flow.length > 0 && <FlowBox flow={flow} ms={timing} />
+        )}
+        {!autoScroll && (
+          <button
+            type="button"
+            className="scroll-bottom-pill"
+            onClick={() => {
+              setAutoScroll(true);
+              scrollToBottom();
+            }}
+            title="Scroll to bottom and turn auto-scroll on"
+          >
+            ↓ Auto-scroll
+          </button>
         )}
         <div ref={end} />
       </div>
@@ -177,5 +229,96 @@ function Handoff() {
         Handoff from {nameOf(p.from)} to {nameOf(p.to)}
       </span>
     </div>
+  );
+}
+
+function TeamLearnAction({ msg, who }: { msg: Msg; who: string }) {
+  const [open, setOpen] = useState<'idea' | 'mistake' | null>(null);
+  const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
+  const [status, setStatus] = useState('');
+  const noteFn = useStore(s => s.note);
+
+  const onOpen = (type: 'idea' | 'mistake') => {
+    setOpen(type);
+    setTitle(type === 'idea' ? `${who}: Breakthrough` : `Fix: ${who}`);
+    setNote(msg.text.slice(0, 240));
+    setStatus('');
+  };
+
+  const onSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !note.trim()) return;
+    const id = noteFn({
+      type: 'concept',
+      title: title.trim(),
+      note: (open === 'mistake' ? '[MISTAKE & CORRECTION] ' : '[TEAM BREAKTHROUGH] ') + note.trim(),
+    });
+    if (id) {
+      setStatus(open === 'idea' ? 'Idea saved to memory!' : 'Lesson recorded! Team will remember this.');
+      setTimeout(() => setOpen(null), 1800);
+    } else {
+      setStatus('Could not save (duplicate title).');
+    }
+  };
+
+  return (
+    <>
+      <div className="msg-learn-actions">
+        <button
+          type="button"
+          className="learn-btn idea"
+          title="Save this breakthrough so the whole team learns it"
+          onClick={() => onOpen('idea')}
+        >
+          💡 Save Idea
+        </button>
+        <button
+          type="button"
+          className="learn-btn mistake"
+          title="Flag a mistake & teach the team how to fix it"
+          onClick={() => onOpen('mistake')}
+        >
+          ⚠️ Teach Mistake
+        </button>
+      </div>
+      {open && (
+        <form className={`msg-learn-box ${open}`} onSubmit={onSave}>
+          <div className="msg-learn-header">
+            <b>{open === 'idea' ? '💡 Teach Team Great Idea' : '⚠️ Record Mistake & Correction'}</b>
+            <button type="button" className="link" onClick={() => setOpen(null)}>
+              Cancel
+            </button>
+          </div>
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder={open === 'idea' ? 'Idea Title' : 'What was the mistake?'}
+            maxLength={80}
+            required
+            aria-label="Title"
+          />
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder={
+              open === 'idea'
+                ? 'What should the team remember from this?'
+                : 'How should the team fix this in the future?'
+            }
+            maxLength={500}
+            rows={2}
+            required
+            aria-label="Note"
+          />
+          <div className="row">
+            <button type="submit" className={open === 'idea' ? 'primary' : 'danger'}>
+              {open === 'idea' ? 'Save to Memory' : 'Commit Correction'}
+            </button>
+            {status && <span className="learn-status">{status}</span>}
+          </div>
+        </form>
+      )}
+    </>
   );
 }
