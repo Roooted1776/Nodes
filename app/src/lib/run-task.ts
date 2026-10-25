@@ -45,13 +45,12 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       m.filtered += r.n;
     });
   }
-  const pv: ProviderId = (s.keys[s.live.provider] && !s.dead[s.live.provider])
-    ? s.live.provider
-    : (PROVIDERS.find(p => !!s.keys[p] && !s.dead[p]) || s.live.provider);
-  if (!s.keys[pv])
-    return set({ status: `Add your ${PROV[s.live.provider].label} key in Settings. Nothing was sent.` });
-  if (s.dead[pv])
-    return set({ status: `${PROV[pv].label} rejected the key. Reload to try again.` });
+  const pv: ProviderId =
+    s.keys[s.live.provider] && !s.dead[s.live.provider]
+      ? s.live.provider
+      : PROVIDERS.find(p => !!s.keys[p] && !s.dead[p]) || s.live.provider;
+  if (!s.keys[pv]) return set({ status: `Add your ${PROV[s.live.provider].label} key in Settings. Nothing was sent.` });
+  if (s.dead[pv]) return set({ status: `${PROV[pv].label} rejected the key. Reload to try again.` });
   if (s.tasks >= 1) return set({ status: 'One live task per page load. Reload to start another.' });
   if (s.calls >= s.live.callCap)
     return set({ status: 'The call budget for this page load is used. Reload to reset it.' });
@@ -130,7 +129,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
         }
       : undefined;
     const botProv = bot && (AGENT[bot]?.provider as ProviderId | undefined);
-    const activeProv = (botProv && st.keys[botProv] && !st.dead[botProv]) ? botProv : pv;
+    const activeProv = botProv && st.keys[botProv] && !st.dead[botProv] ? botProv : pv;
     const activeKey = st.keys[activeProv] || st.keys[pv] || '';
     const activeModel = st.live.models[activeProv] || PROV[activeProv].model;
     try {
