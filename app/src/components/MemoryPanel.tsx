@@ -457,12 +457,13 @@ function ImportModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div
-      className="import-overlay"
-      onClick={e => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <div className="import-overlay">
+      <button
+        type="button"
+        className="import-backdrop"
+        onClick={onClose}
+        aria-label="Close modal backdrop"
+      />
       <div className="import-modal" role="dialog" aria-modal="true" aria-label="Import Memory Files">
         <header className="import-header">
           <div>
@@ -507,7 +508,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 
         {tab === 'files' ? (
           <div className="import-files-section">
-            <div
+            <label
               className={`dropzone ${isDragging ? 'dragging' : ''}`}
               onDragOver={e => {
                 e.preventDefault();
@@ -522,30 +523,28 @@ function ImportModal({ onClose }: { onClose: () => void }) {
             >
               <div className="dropzone-icon">📥</div>
               <p className="dropzone-text">Drag and drop memory files here, or</p>
-              <label className="btn-browse">
-                Browse Files
-                <input
-                  type="file"
-                  multiple
-                  accept=".json,.md,.markdown,.txt,.csv"
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    if (e.target.files) void handleFiles(e.target.files);
-                    e.target.value = '';
-                  }}
-                />
-              </label>
+              <span className="btn-browse">Browse Files</span>
+              <input
+                type="file"
+                multiple
+                accept=".json,.md,.markdown,.txt,.csv"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  if (e.target.files) void handleFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
               <p className="dropzone-hint">
                 Supports: JSON (backups, lists, dictionaries), Markdown (sections, docs), CSV tables, Text notes.
               </p>
-            </div>
+            </label>
 
             {parsedFiles.length > 0 && (
               <div className="parsed-list">
                 <h4>Detected Files ({parsedFiles.length})</h4>
                 <ul>
-                  {parsedFiles.map((f, i) => (
-                    <li key={`${f.name}-${i}`}>
+                  {parsedFiles.map(f => (
+                    <li key={`${f.name}-${f.items.length}`}>
                       <span className="file-name">{f.name}</span>
                       <span className="file-count">
                         {f.count > 0 ? `${f.count} ${f.count === 1 ? 'memory' : 'memories'}` : '0 items found'}
@@ -559,7 +558,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
         ) : (
           <div className="import-paste-section">
             <div className="paste-format-row">
-              <label>Format:</label>
+              <span className="format-label">Format:</span>
               {(['json', 'md', 'csv'] as const).map(fmt => (
                 <button
                   type="button"
