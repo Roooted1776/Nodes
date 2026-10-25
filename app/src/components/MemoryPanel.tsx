@@ -116,6 +116,7 @@ export default function MemoryPanel() {
           <li key={e.id}>
             <button
               type="button"
+              data-scene-entry={`memory:${e.id}`}
               className={e.id === selected ? 'on' : ''}
               onClick={() => select(e.id === selected ? null : e.id)}
             >
@@ -144,7 +145,12 @@ function Detail({ e, onSession }: { e: Entry; onSession(id: string): void }) {
     [title, setTitle] = useState(e.title),
     [sure, setSure] = useState(false);
   return (
-    <article className="detail">
+    <article
+      tabIndex={-1}
+      data-scene-entry={`memory:${e.id}`}
+      className="detail"
+      style={{ borderColor: TYPE_COLOR[e.type] }}
+    >
       <header>
         <span className="type" style={{ color: TYPE_COLOR[e.type] }}>
           {TYPE_LABEL[e.type]}
