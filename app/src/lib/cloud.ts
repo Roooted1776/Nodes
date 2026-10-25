@@ -145,48 +145,74 @@ export async function accountWrap(uid: string) {
   return data.wrap as import('./vault').Sealed;
 }
 
-/** Persist individual memory entries, projects, and task sessions to the database */
-export async function syncMemoryDatabase(mem: import('./memory').Mem) {
-  const d = db();
-  try {
-    const projects = Array.from(new Set(mem.sessions.map(s => s.project).filter(Boolean)));
-    if (!projects.includes('Brain')) projects.unshift('Brain');
-    for (const p of projects) {
-      try {
-        await d.from('projects').upsert({ id: p, name: p, updated_at: new Date().toISOString() });
-      } catch {
-        /* best-effort row sync */
-      }
+export interface SyncResult {
+  saved: number;
+  failed: number;
+  firstError: string;
+}
+const cut = (t: string, n: number) => (t.length > n ? t.slice(0, n) : t);
+const BODY_LIMIT = 200_000; // the sessions table refuses bodies near 256 KB
+
+/** Persist memory entries, projects and task sessions to the database. Reports what really saved. */
+export async function syncMemoryDatabase(mem: import('./memory').Mem, d: Db = db()): Promise<SyncResult> {
+  const out: SyncResult = { saved: 0, failed: 0, firstError: '' };
+  // The database answers with an error value instead of throwing, so check it every time.
+  const track = async (job: PromiseLike<{ error: { message?: string } | null }>) => {
+    try {
+      const { error } = await job;
+      if (error) throw new Error(error.message);
+      out.saved++;
+    } catch (e) {
+      out.failed++;
+      out.firstError ||= why(e as Error);
     }
-    for (const e of mem.entries) {
-      try {
-        await d.rpc('upsert_memory', {
-          p_id: e.id,
-          p_key: e.key,
-          p_type: e.type,
-          p_title: e.title,
-          p_note: e.note || '',
-          p_project: e.type === 'workstream' ? e.title : 'Brain',
-          p_body: { links: e.links, strength: e.strength, status: e.status },
-        });
-      } catch {
-        /* best-effort row sync */
-      }
-    }
-    for (const s of mem.sessions) {
-      try {
-        await d.rpc('upsert_session', {
-          p_id: s.id,
-          p_task: s.q,
-          p_project: s.project || 'Brain',
-          p_project_id: s.projectId || null,
-          p_body: { msgs: s.msgs, cover: s.cover, flow: s.flow },
-        });
-      } catch {
-        /* best-effort row sync */
-      }
-    }
-  } catch {
-    // Non-blocking: database sync runs alongside vault update
+  };
+  const names = new Set<string>(['Brain']);
+  for (const s of mem.sessions) if (s.project) names.add(s.project);
+  for (const e of mem.entries) names.add(e.project || (e.type === 'workstream' ? e.title : 'Brain'));
+  const now = new Date().toISOString();
+  for (const n of names) {
+    const id = cut(n, 80);
+    await track(d.from('projects').upsert({ id, name: id, updated_at: now }, { onConflict: 'id' }));
   }
+  for (const e of mem.entries) {
+    await track(
+      d.rpc('upsert_memory', {
+        p_id: e.id,
+        p_key: cut(e.key, 120),
+        p_type: e.type,
+        p_title: cut(e.title, 80),
+        p_note: cut(e.note || '', 600),
+        p_project: cut(e.project || (e.type === 'workstream' ? e.title : 'Brain'), 80),
+        p_body: {
+          links: e.links,
+          strength: e.strength,
+          status: e.status,
+          created: e.created,
+          seen: e.seen,
+          corrected: e.corrected,
+          skill: e.skill,
+          prog: e.prog,
+          manual: e.manual,
+          kws: e.kws,
+          sources: e.sources.slice(0, 20),
+        },
+      }),
+    );
+  }
+  for (const s of mem.sessions) {
+    let body: object = { ...s, msgs: s.msgs };
+    if (JSON.stringify(body).length > BODY_LIMIT)
+      body = { ...s, msgs: s.msgs.map(m => ({ ...m, text: cut(m.text, 2000) })) };
+    await track(
+      d.rpc('upsert_session', {
+        p_id: s.id,
+        p_task: cut(s.q, 300),
+        p_project: cut(s.project || 'Brain', 80),
+        p_project_id: s.projectId || null,
+        p_body: body,
+      }),
+    );
+  }
+  return out;
 }
