@@ -308,12 +308,13 @@ export async function callModel(o: CallOpts): Promise<CallResult> {
     if (res.ok && o.onDelta && res.body && /event-stream/i.test(res.headers.get('content-type') || ''))
       streamed = await readStream(o.provider, res, o.onDelta, o.key);
     else raw = await res.text();
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof ProviderError) throw e;
+    const isAbort = e instanceof Error && e.name === 'AbortError';
     throw new ProviderError(
       o.signal?.aborted
         ? 'stopped by you'
-        : e?.name === 'AbortError'
+        : isAbort
           ? 'no answer after 30 seconds'
           : 'the browser blocked the call (open index.html from your computer and check your internet)',
     );

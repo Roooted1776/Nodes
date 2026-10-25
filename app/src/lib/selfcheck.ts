@@ -105,8 +105,8 @@ export async function checkVault(): Promise<Check> {
           status: 'fail',
           detail: refused ? 'Opened data did not match.' : 'A changed copy was not refused.',
         };
-  } catch (e: any) {
-    return { name: 'Encryption', status: 'fail', detail: e?.message || String(e) };
+  } catch (e: unknown) {
+    return { name: 'Encryption', status: 'fail', detail: e instanceof Error ? e.message : String(e) };
   }
 }
 

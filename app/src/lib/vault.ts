@@ -143,13 +143,20 @@ export async function exportBackup(passphrase: string, data: unknown, iter = 600
   });
 }
 export async function importBackup(passphrase: string, text: string): Promise<unknown> {
-  let d: any;
+  let d: (Sealed & { brainBackup?: number; salt?: string; iter?: number }) | null = null;
   try {
     d = JSON.parse(text);
   } catch {
     throw new VaultError('That is not backup text.', 'format');
   }
-  if (d?.brainBackup !== 1 || typeof d.salt !== 'string' || !Number.isFinite(d.iter))
+  if (
+    d?.brainBackup !== 1 ||
+    typeof d.salt !== 'string' ||
+    typeof d.iter !== 'number' ||
+    !Number.isFinite(d.iter) ||
+    typeof d.iv !== 'string' ||
+    typeof d.ct !== 'string'
+  )
     throw new VaultError('That is not an encrypted Brain backup.', 'format');
   const key = await passKey(passphrase, unb64(d.salt), Math.min(5_000_000, Math.max(1000, d.iter)));
   return JSON.parse(

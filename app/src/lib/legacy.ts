@@ -74,8 +74,8 @@ export async function openLegacy(s: Pick<Storage, 'getItem'>, name: string, pass
       if (d.keys && typeof d.keys === 'object')
         for (const [p, k] of Object.entries(d.keys)) if (typeof k === 'string') keys[p as keyof Keys] = k.slice(0, 300);
       return { mem: sanitizeMem(d.mem) || blankMem(), keys };
-    } catch (e: any) {
-      throw new LegacyError(e?.message || 'The old memory could not be opened.');
+    } catch (e: unknown) {
+      throw new LegacyError(e instanceof Error ? e.message : 'The old memory could not be opened.');
     }
   }
   const plain = s.getItem(OLD_MEM);

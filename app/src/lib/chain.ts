@@ -20,7 +20,7 @@ export interface ChainResult {
 
 export const chainFor = (task: string, inactiveBots?: ReadonlySet<AgentId> | AgentId[]): AgentId[] => {
   const inactiveSet = Array.isArray(inactiveBots) ? new Set(inactiveBots) : inactiveBots;
-  return LIVE_ORDER.filter(id => (id !== 'xcode' || IOS_RE.test(task)) && (!inactiveSet || !inactiveSet.has(id)));
+  return LIVE_ORDER.filter(id => (id !== 'xcode' || IOS_RE.test(task)) && !inactiveSet?.has(id));
 };
 
 export async function runChain(

@@ -54,7 +54,8 @@ export interface Hub {
   subscribe(fn: (s: Live, prev: Live) => void): () => void;
 }
 
-const valid = (d: any): d is Wire => !!d && typeof d === 'object' && typeof d.t === 'string';
+const valid = (d: unknown): d is Wire =>
+  !!d && typeof d === 'object' && 't' in d && typeof (d as { t: unknown }).t === 'string';
 /** Admin side: send every change of the live chat. Keys and settings are never part of what is sent. */
 export function publish(hub: Hub, ch: Chan): () => void {
   ch.onmessage = e => {
