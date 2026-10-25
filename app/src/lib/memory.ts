@@ -405,7 +405,7 @@ export function agentActivityScores(m: Mem): Map<string, number> {
       const hasAgentWork = agentDoneCount > 0 || s.msgs.some(msg => isAgent(msg.from));
       if (!hasAgentWork) continue;
 
-      if (s.projectId === node.id || (s as { nodeId?: string }).nodeId === node.id) {
+      if (s.projectId === node.id || s.nodeId === node.id) {
         score += 15 + agentDoneCount * 2;
       }
       if (s.used && s.used.includes(node.id)) {
@@ -414,7 +414,7 @@ export function agentActivityScores(m: Mem): Map<string, number> {
       if (node.sources && node.sources.some(src => src.kind === 'session' && src.ref === s.id)) {
         score += 8;
       }
-      if (s.flow && (s.projectId === node.id || (s as { nodeId?: string }).nodeId === node.id || (s.used && s.used.includes(node.id)))) {
+      if (s.flow && (s.projectId === node.id || s.nodeId === node.id || (s.used && s.used.includes(node.id)))) {
         const words = s.flow.reduce((acc, f) => acc + (isAgent(f[0]) || isAgent(f[1]) ? f[2] : 0), 0);
         score += Math.min(20, Math.floor(words / 50));
       }
@@ -542,6 +542,8 @@ export function saveImportedListAsTask(
     q: clip(q, 300),
     project: proj,
     projectId: targetNode.id,
+    nodeId: targetNode.id,
+    nodeTitle: targetNode.title,
     kws: [proj.toLowerCase(), 'tasks', targetNode.title.toLowerCase(), ...(meta?.sourceKind ? [meta.sourceKind] : [])],
     accepted: [],
     uncovered: [],
