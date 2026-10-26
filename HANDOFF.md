@@ -14,6 +14,34 @@
 
 ---
 
+# Handoff from Cursor — Oct 25, 2026 (EDT): redeemed.live deployed from main
+
+## Overview & Request
+Owner finished HOSTINGER_API_TOKEN secret + external action; continue setup and deploy.
+
+## What Changed & Why
+- Authenticated to Hostinger VPS API (`developers.hostinger.com`) with the new secret (Bearer + User-Agent).
+- Replaced **only** `brain-site` compose on VM `2010795` with updated `BUILD_URL` / `BUILD_SHA256`. Did **not** touch `redmed-mcp`, `redmed-store`, traefik, or vpn.
+- Init log: `deployed d6d89231b1664745a44d4a7b2c32c98eca9a2754ad01ba6c2a641951cbc944b4 (was 6c65fac4…)`. Live https://redeemed.live SHA-256 matches main `index.html`.
+
+## Pin
+- Commit: `a61b27901fbd56baada40ab22f0c726ddd288105`
+- `BUILD_URL`: `https://raw.githubusercontent.com/Roooted1776/ch29ouy/a61b27901fbd56baada40ab22f0c726ddd288105/index.html`
+- `BUILD_SHA256`: `d6d89231b1664745a44d4a7b2c32c98eca9a2754ad01ba6c2a641951cbc944b4`
+
+## Checks
+- Hostinger action `docker_compose_up` id 121936094 sent/ok
+- Live HTTPS 200; body hash match
+- RedMed projects left running unchanged
+
+## Environment setup
+- Install proposal already validated earlier (`cd app` / `npm ci` / `npx playwright install chromium`). Press **Save** on the Environment card if not already saved.
+
+## Git State
+- Docs update on `main` for the live pin.
+
+---
+
 # Handoff from Cursor — Oct 25, 2026 (EDT): merged keys-on-device onto main
 
 ## Overview & Request
