@@ -72,10 +72,11 @@ export function pickTopic(s: State, rand: () => number): HuddleTopic {
   const mem = s.mem;
   const fresh = mem.entries.filter(e => e.status === 'fresh');
   const stale = mem.entries.filter(e => e.status === 'stale');
-  const last = mem.sessions[mem.sessions.length - 1];
+  // Chat sessions are casual talk, not team tasks — only real tasks (or legacy sessions without kind) feed the "task" huddle topic.
+  const lastTask = [...mem.sessions].reverse().find(x => x.kind !== 'chat');
   const kinds: HuddleTopic['kind'][] = [];
   if (fresh.length) kinds.push('memory');
-  if (last) kinds.push('task');
+  if (lastTask) kinds.push('task');
   if (stale.length || mem.inbox.length) kinds.push('attention');
   if (!kinds.length)
     return {
@@ -93,12 +94,14 @@ export function pickTopic(s: State, rand: () => number): HuddleTopic {
         'Ask the team: is this still true, what is missing from it, and what should be checked?',
     };
   }
-  if (kind === 'task' && last) {
-    const sum = last.sum ? ` One-line summary of that session: ${last.sum}` : '';
-    const open = last.uncovered?.length ? ` Left uncovered last time: ${last.uncovered.slice(0, 3).join('; ')}.` : '';
+  if (kind === 'task' && lastTask) {
+    const sum = lastTask.sum ? ` One-line summary of that session: ${lastTask.sum}` : '';
+    const open = lastTask.uncovered?.length
+      ? ` Left uncovered last time: ${lastTask.uncovered.slice(0, 3).join('; ')}.`
+      : '';
     return {
       kind,
-      text: `The team's most recent task was: "${clip(last.q, 200)}".${sum}${open} Revisit the open thread: what still needs an answer?`,
+      text: `The team's most recent task was: "${clip(lastTask.q, 200)}".${sum}${open} Revisit the open thread: what still needs an answer?`,
     };
   }
   if (stale.length)

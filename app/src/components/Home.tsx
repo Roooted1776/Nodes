@@ -46,7 +46,8 @@ export default function Home() {
     if (!admin || !ready || !banterOn) return;
     const t = setInterval(() => {
       const st = useStore.getState();
-      if (!st.busy && !st.dreaming && !st.bantering) void st.banter();
+      // stopped stays set after Stop live — do not keep starting huddles that immediately no-op
+      if (!st.busy && !st.dreaming && !st.bantering && !st.stopped) void st.banter();
     }, 5000);
     return () => clearInterval(t);
   }, [admin, ready, banterOn]);

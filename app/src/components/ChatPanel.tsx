@@ -296,14 +296,22 @@ export default function ChatPanel() {
 function BanterBar() {
   const on = useStore(s => s.live.banter),
     setLive = useStore(s => s.setLive),
-    bantering = useStore(s => s.bantering);
+    bantering = useStore(s => s.bantering),
+    stop = useStore(s => s.stop);
   return (
     <div className="banter-bar">
       <label className="sw">
         <input type="checkbox" checked={on} onChange={e => setLive({ banter: e.target.checked })} />
         <span>Team huddles when idle</span>
       </label>
-      {on && bantering ? <span className="doing">huddling…</span> : null}
+      {on && bantering ? (
+        <>
+          <span className="doing">huddling…</span>
+          <button type="button" className="sm link" onClick={() => stop()} title="Stop this huddle">
+            Stop
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }
