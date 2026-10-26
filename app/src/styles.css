@@ -831,6 +831,18 @@ h2:first-child {
   display: grid;
   gap: 6px;
 }
+.banter-bar {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.banter-bar .sw {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
 .composer-proj-row {
   display: flex;
   align-items: center;
