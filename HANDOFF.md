@@ -186,6 +186,8 @@
 
 # Persistent Database API Keys & Latest Task Replay — Oct 25, 2026
 
+> **Superseded (branch `cursor/keys-on-device`, plan step 2):** keys no longer follow Owner to a new device or browser. AI keys and the GitHub token are kept on this device only, sealed with the admin's passcode (`app/src/lib/keystore.ts`), and never go into the shared vault or the database. On the admin's next unlock, keys found in an old vault are moved to the device and the vault is saved again without them. Enter keys once on each new device. Item 1 below is kept as history.
+
 ## 1. What Changed
 1. **Encrypted Database Vault Persistence for API Keys (`auth-store.ts`, `store.ts`)**:
    - The encrypted vault envelope stored in PostgreSQL (`public.vaults`) now bundles `{ mem, keys }` protected with client-side AES-256-GCM encryption.
