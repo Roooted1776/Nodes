@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# scripts/push-work.sh — Automated, verified push to GitHub
-# Aligned with Owner's Oct 24 auto-push authorization in AGENTS.md
+# scripts/push-work.sh — Verified push of the current work branch to GitHub
+# Pushes only the current branch (never main) and prints the draft-PR command.
+# Only Owner merges into main (AGENTS.md).
 
 set -euo pipefail
 
@@ -17,40 +18,30 @@ Usage:
   ./scripts/push-work.sh [OPTIONS] [COMMIT_MESSAGE]
 
 Options:
-  --install-hook   Install git post-commit hook for 100% automated push on every commit
   --no-verify      Skip test/build checks (use with extreme caution)
   --help           Show this message
 
 Examples:
   ./scripts/push-work.sh "feat: add user profile"
   ./scripts/push-work.sh
-  ./scripts/push-work.sh --install-hook
 EOF
   exit 0
 }
 
-# Handle --install-hook
-if [[ "${1:-}" == "--install-hook" ]]; then
-  HOOK_PATH="$GIT_COMMON_DIR/hooks/post-commit"
-  mkdir -p "$(dirname "$HOOK_PATH")"
-  cat > "$HOOK_PATH" << 'HOOK_EOF'
-#!/usr/bin/env bash
-# Auto-push hook installed by push-work.sh
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-echo "==> [post-commit hook] Automatically pushing to GitHub..."
-git push origin HEAD:main || {
-  echo "==> [post-commit hook] Warning: Automatic push failed. Run './scripts/push-work.sh' to re-verify and push."
-}
-HOOK_EOF
-  chmod +x "$HOOK_PATH"
-  echo "✓ Successfully installed git post-commit hook at $HOOK_PATH"
-  echo "Every future git commit will now automatically push to GitHub!"
-  exit 0
-fi
-
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   usage
 fi
+
+# Refuse to work on main: work goes on its own branch with a draft pull request.
+refuse_main() {
+  local branch="$1"
+  if [[ "$branch" == "main" || "$branch" == "HEAD" ]]; then
+    echo "ERROR: Refusing to push from '$branch'. Never push to main." >&2
+    echo "Create your own branch (git switch -c <branch>), push it, and open a draft pull request into main. Only Owner merges." >&2
+    exit 1
+  fi
+}
+refuse_main "$(git rev-parse --abbrev-ref HEAD)"
 
 SKIP_VERIFY=0
 COMMIT_MSG=""
@@ -66,7 +57,7 @@ done
 cd "$REPO_ROOT"
 
 echo "=========================================="
-echo "    Brain / Nodes — Automated GitHub Push "
+echo "    Brain / Nodes — Push work branch      "
 echo "=========================================="
 
 # 1. Hard rule check: RedMed isolation
@@ -155,16 +146,19 @@ if ! git merge-base --is-ancestor origin/main HEAD; then
   git rebase origin/main
 fi
 
-# 5. Push to GitHub
-echo "==> 5. Pushing to GitHub (origin/main)..."
+# 5. Push the work branch (never main)
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-git push origin "$CURRENT_BRANCH:main"
+refuse_main "$CURRENT_BRANCH"
+echo "==> 5. Pushing branch '$CURRENT_BRANCH' to GitHub..."
+git push -u origin "HEAD:refs/heads/$CURRENT_BRANCH"
 
 LATEST_SHA="$(git rev-parse --short HEAD)"
 LATEST_MSG="$(git log -1 --pretty=%B | head -n 1)"
 
 echo "=========================================="
-echo "✓ SUCCESS: Pushed to GitHub main successfully!"
+echo "✓ SUCCESS: Pushed branch '$CURRENT_BRANCH'."
 echo "  Commit: $LATEST_SHA - $LATEST_MSG"
 echo "  Remote: $(git remote get-url origin)"
+echo "  Next: open a draft pull request (only Owner merges):"
+echo "    gh pr create --draft --base main --head $CURRENT_BRANCH"
 echo "=========================================="
