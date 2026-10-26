@@ -210,6 +210,43 @@ const VOICE: Record<AgentId, string> = {
   xcode: 'an Apple purist with opinions about every device',
   muse: 'a blunt, deadpan auditor',
 };
+
+/**
+ * Conversational register per bot (Owner, Oct 2026: "some AI are more casual, some serious —
+ * assign it based on personality"). A fixed trait derived from each bot's voice above: it never
+ * changes per line or per session; the variety is the spread across the roster, not a dice roll.
+ */
+export type Tone = 'serious' | 'balanced' | 'casual';
+
+const TONE: Record<AgentId, Tone> = {
+  grokbot: 'serious', // a dry, decisive captain: clipped calls, no chatter
+  grok: 'casual', // a cheeky contrarian: teasing is the register
+  claude: 'balanced', // thoughtful and warm: happy to joke, still measured
+  cursor: 'serious', // a practical engineer with no patience for fluff
+  gemini: 'casual', // curious and upbeat: bright and chatty
+  chatgpt: 'balanced', // an energetic organizer: lively, but it lands as a plan
+  perplexity: 'balanced', // a precise fact-checker whose one running joke stays dry
+  xcode: 'balanced', // an opinionated purist: firm views, delivered straight
+  muse: 'serious', // a blunt, deadpan auditor: flat and clipped
+};
+
+/** The register instruction every chat prompt carries, so a bot's tone holds in tasks and huddles alike. */
+export const TONE_LINE: Record<Tone, string> = {
+  serious:
+    'Your register is serious: clipped, formal and precise. Plain statements, no slang, no jokes, no exclamation marks; dry understatement is the most humour you allow.',
+  balanced:
+    'Your register is balanced: professional but human. Plain words and contractions are fine, a light remark now and then, never slangy, gushing or stiff.',
+  casual:
+    'Your register is casual: relaxed and chatty. Contractions, everyday words and a little humour are welcome; still kind, clear and work-safe.',
+};
+
+export function toneOf(id: AgentId): Tone {
+  return TONE[id];
+}
+
+export function toneLine(id: AgentId): string {
+  return TONE_LINE[TONE[id]];
+}
 const WEB_ON =
   ' You can search the web. Search when current facts would make the answer better, then name the sources you used with their links. Never invent a link or a result.';
 const WEB_OFF = ' You cannot browse here: never claim to have searched.';
@@ -218,13 +255,62 @@ export function systemPrompt(id: AgentId, web = false): string {
   const a = AGENT[id];
   return (
     `You are ${a.name} (${a.company}) (${a.role.toLowerCase()}), one of nine agents on Owner's team. Your specialty: ${a.specialty}. ${STAGE[id]}` +
-    ` Your voice in the chat: ${VOICE[id]}. Banter with your teammates by name: tease, react, agree or push back, kindly and work-safe. Keep the jokes short and the work real.` +
+    ` Your voice in the chat: ${VOICE[id]}. ${toneLine(id)} Banter with your teammates by name: tease, react, agree or push back, kindly and work-safe. Keep the jokes short and the work real.` +
     (web ? WEB_ON : WEB_OFF) +
     ' We are all one team of people and bots. Never hide information out of emotion; complete your task fully and push it across the desk to the next teammate.' +
     " Follow Owner's pipeline: Collect --> Review --> Edit --> Review --> Pass to next --> Review." +
     ' Deploy the concrete step of attack: examine target, review incoming handoff, execute surgical edit, review output, and pass to next worker.' +
     ' LIVE CHAT RULE: The live chat is for passes, common interactions, and team chatter. DO NOT OUTPUT CODE BLOCKS (never use ``` or raw code dumps). Describe any logic or edits in plain conversational words.' +
     ' You have no repo access here: never claim to read files, make changes or run tests. State blockers and uncertainty. Do not invent sources, results, keys or passwords.'
+  );
+}
+
+/** What a huddle line is doing: Grok Bot opens with a topic, teammates answer it, Grok Bot closes. */
+export type HuddleRole = 'open' | 'respond' | 'close';
+/** The working topic of an idle huddle, drawn from Brain's own records (never invented). */
+export interface HuddleTopic {
+  kind: 'memory' | 'task' | 'attention' | 'checkin';
+  text: string;
+}
+
+/** Idle huddles: Grok Bot leads a short working talk on a real topic (Owner, Oct 2026). */
+export function huddleSystem(id: AgentId, role: HuddleRole): string {
+  const a = AGENT[id];
+  const job =
+    role === 'open'
+      ? ' You called this team huddle: put the topic brief to the team as ONE real working question. Set it up in one or two short sentences and say what you want the team to weigh in on.'
+      : role === 'close'
+        ? ' You led this huddle: close it with ONE line that collects what the team surfaced — the finding, any disagreement, and what it means for Owner. Add no new claims.'
+        : ' You are answering in a team huddle led by Grok Bot: say what you actually know about the topic from the brief, what you would check next, and where you disagree with a teammate if you do. Substantive, not small talk.';
+  return (
+    `You are ${a.name} (${a.company}) (${a.role.toLowerCase()}), one of nine agents on Owner's team. Your specialty: ${a.specialty}.` +
+    ` Your voice in the chat: ${VOICE[id]}. ${toneLine(id)}` +
+    job +
+    ' One or two short sentences. No code blocks and no lists. Do not invent facts, sources or events beyond the brief, and make no work claims: do not say you did, checked or will do any task outside this chat.'
+  );
+}
+
+export function huddlePrompt(
+  id: AgentId,
+  role: HuddleRole,
+  topic: HuddleTopic,
+  lines: { from: AgentId; text: string }[],
+): string {
+  const room = lines.length ? lines.map(l => `${AGENT[l.from].name}: ${l.text}`).join('\n') : '(nothing said yet)';
+  const head = `TEAM HUDDLE TOPIC (from Brain's own records):\n${topic.text}\n\nHUDDLE SO FAR:\n${room}\n\n`;
+  if (role === 'open')
+    return (
+      head +
+      `Open the huddle as ${AGENT[id].name}: put the topic to the team as one clear working question, in your voice. One or two sentences, plain words, no code blocks.`
+    );
+  if (role === 'close')
+    return (
+      head +
+      `Close the huddle as ${AGENT[id].name}: one line only, collecting what the team surfaced — the finding, any disagreement, and what it means for Owner. Plain words, no code blocks.`
+    );
+  return (
+    head +
+    `Answer the huddle topic as ${AGENT[id].name}: what you know about it from the brief, what you would check, where you disagree. One or two short sentences, in your voice, plain words, no code blocks.`
   );
 }
 
@@ -252,6 +338,6 @@ export function stagePrompt(
     'OPERATING PIPELINE: Collect --> Review --> Edit --> Review --> Pass to next --> Review.\n' +
     'STEP OF ATTACK DEPLOYED: Target Recon -> Threat Audit -> Tactical Plan -> Surgical Strike -> Verification.\n' +
     'CRITICAL FORMAT RULE: NO CODE BLOCKS. Never output markdown code fences (```). The live chat is for common interactions, team chatter, and passes between teammates. Explain your work and plans in natural conversational words.\n' +
-    `Talk like a lively team group chat: open with a quick line of banter to ${incomingFrom} or anyone above, do your work in natural words, then pass to ${handTo} with a short send-off. Text only, no code blocks.`
+    `Talk like a lively team group chat: open with a quick line of banter to ${incomingFrom} or anyone above, do your work in natural words, then pass to ${handTo} with a short send-off. Text only, no code blocks. ${toneLine(id)}`
   );
 }

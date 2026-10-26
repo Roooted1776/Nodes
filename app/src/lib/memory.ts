@@ -56,6 +56,8 @@ export interface Msg {
 export type Cover = 'done' | 'failed' | 'skipped';
 /** What really passed in one handoff: sender, receiver and the number of words. 'memory' and 'brain' are Brain's own ends. */
 export type Flow = [string, string, number];
+/** task = full team run; chat = single-model talk (not auto-filed to wiki). */
+export type SessionKind = 'task' | 'chat';
 export interface Session {
   id: string;
   ts: number;
@@ -76,6 +78,8 @@ export interface Session {
   grokFinalReview?: string;
   /** One-sentence summary written by Dream. */
   sum?: string;
+  /** Defaults to task when missing (older saves). */
+  kind?: SessionKind;
 }
 export interface Settings {
   brain: boolean;
@@ -127,8 +131,8 @@ export const blankMem = (): Mem => ({
 // A reply from any connected provider counts as live; the labels come from the provider list so new ones are never dropped
 const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const LABELS = PROVIDERS.map(p => esc(PROV[p].label)).join('|');
-export const LIVE_TAG = new RegExp(`^live · (${LABELS}) · `);
-const TAG_RE = new RegExp(`^(live · (${LABELS}) · [A-Za-z0-9._:/-]{1,80}(?: · unverified)?|page|page checks)$`);
+export const LIVE_TAG = new RegExp(`^(live|chat) · (${LABELS}) · `);
+const TAG_RE = new RegExp(`^((live|chat) · (${LABELS}) · [A-Za-z0-9._:/-]{1,80}(?: · unverified)?|page|page checks)$`);
 const SPEAKER_RE = /^(owner|brain|queue|grok|grokbot|claude|cursor|gemini|chatgpt|perplexity|xcode|muse)$/;
 const DEMO_LABEL = /Owner's team chart|Starter skills list|Docs connector \(sample\)|Issue tracker \(sample\)/i;
 const okTs = (v: unknown) => {
@@ -291,6 +295,7 @@ export function sanitizeMem(d: any, fromBackup = false): Mem | null {
       project: typeof s.project === 'string' ? scrub(s.project.slice(0, 80)) : undefined,
       ...(typeof s.sum === 'string' ? { sum: scrub(s.sum.slice(0, 300)) } : {}),
       projectId: typeof s.projectId === 'string' ? scrub(s.projectId.slice(0, 40)) : undefined,
+      ...(s.kind === 'chat' || s.kind === 'task' ? { kind: s.kind as SessionKind } : {}),
       used: Array.isArray(s.used)
         ? s.used.filter((u: unknown) => typeof u === 'string' && ids.has(u as string)).slice(0, 12)
         : [],
