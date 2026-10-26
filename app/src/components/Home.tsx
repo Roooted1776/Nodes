@@ -1,4 +1,5 @@
-import { Component, lazy, Suspense, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { dreamDue } from '../lib/dream';
 import { useAuth } from '../auth-store';
 import { useStore } from '../store';
 import AdminPanel from './AdminPanel';
@@ -31,6 +32,12 @@ export default function Home() {
     inspectedBot = useStore(s => s.inspectedBot),
     inspectBot = useStore(s => s.inspectBot);
   const admin = user?.role === 'admin';
+  // Dream runs by itself at most once a day, after sign-in, when something waits in the inbox
+  const ready = useStore(s => !!s.keys[s.live.provider] || Object.values(s.keys).some(Boolean)),
+    due = useStore(s => dreamDue(s.mem, Date.now()));
+  useEffect(() => {
+    if (admin && ready && due) void useStore.getState().dream(true);
+  }, [admin, ready, due]);
   return (
     <div className={'home single' + (admin ? ' with-admin' : '')}>
       <section className="workspace" aria-label="Visualization">

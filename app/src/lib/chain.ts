@@ -33,6 +33,8 @@ export async function runChain(
     perTaskCap?: number;
     clean?: (t: string) => string;
     inactiveBots?: ReadonlySet<AgentId> | AgentId[];
+    /** Bots may search the web. */
+    web?: boolean;
   } = {},
 ): Promise<ChainResult> {
   const bots = chainFor(task, opts.inactiveBots),
@@ -82,7 +84,16 @@ export async function runChain(
     try {
       let r: { text: string; why: string };
       try {
-        r = await call(systemPrompt(bot), stagePrompt(bot, task, incomingFrom, incoming, next, ctx));
+        // the last few replies, so bots can talk to each other and not only to the one before them
+        const chatter = msgs
+          .filter(x => x.tag === tag && x.from !== bots[i - 1])
+          .slice(-3)
+          .map(x => `${AGENT[x.from as AgentId]?.name || x.from}: ${x.text.slice(0, 300)}`)
+          .join('\n');
+        r = await call(
+          systemPrompt(bot, !!opts.web),
+          stagePrompt(bot, task, incomingFrom, incoming, next, ctx, chatter),
+        );
       } finally {
         hooks.active(null);
       }
@@ -111,7 +122,7 @@ export async function runChain(
     say({
       from: 'brain',
       tag: 'page',
-      text: `${completed} stage(s) done. Model text is unverified. Brain changed no files and ran no tools.`,
+      text: `${completed} stage(s) done. Model text is unverified. Brain changed no files.${opts.web ? ' Bots could search the web; check their links.' : ''}`,
     });
   return { msgs, completed, failed };
 }

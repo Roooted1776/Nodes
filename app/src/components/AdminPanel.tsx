@@ -92,6 +92,11 @@ export default function AdminPanel() {
           </p>
         </Card>
         <Card title="Provider" hint="One provider powers all nine roles.">
+          <Switch
+            on={live.web}
+            set={v => s.setLive({ web: v })}
+            label="Bots can search the web (Anthropic, OpenAI, Google, xAI, Groq)"
+          />
           <select
             aria-label="Provider"
             value={live.provider}
@@ -378,7 +383,19 @@ export default function AdminPanel() {
 
       <p className="group">Brain</p>
       <div className="cards">
-        <Card title="Memory" hint="Written by Grok Bot (AI) after each task, plus your own notes.">
+        <Card
+          title="Memory"
+          hint="Works like Perplexity Brain: tasks, files, GitHub and your corrections wait in an inbox. Dream (one AI call) turns them into linked pages that cite their sources. It runs by itself once a day."
+        >
+          <p className="mini">
+            Inbox: {mem.inbox.length} waiting · {mem.entries.length} pages · last Dream{' '}
+            {mem.lastDream ? new Date(mem.lastDream).toLocaleString() : 'never'}
+          </p>
+          <div className="row">
+            <button type="button" disabled={s.dreaming || !mem.inbox.length} onClick={() => void s.dream()}>
+              {s.dreaming ? 'Dreaming…' : 'Dream now'}
+            </button>
+          </div>
           <Switch on={mem.settings.brain} set={v => s.setSetting({ brain: v })} label="Save new tasks" />
           <Switch
             on={!!mem.settings.useMemory}
