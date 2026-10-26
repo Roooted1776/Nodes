@@ -1,6 +1,6 @@
 # redeemed.live deployment
 
-Repository: https://github.com/Roooted1776/Nodes. Local branch: `codex/redeemed-deployment`.
+Repository: https://github.com/Roooted1776/ch29ouy (renamed from Nodes). Work on `main` only.
 
 ## Layout
 
@@ -61,6 +61,7 @@ Codex checked the layout and integration. Gemini context review, Muse audit, col
 ## Single page, simple login and pinned deploys (2026-10-24, Claude)
 
 - **Deploy:** the `brain-site` compose project's `init` container downloads `index.html` from a pinned GitHub commit (`BUILD_URL`), checks `BUILD_SHA256`, backs up the served file to `/var/backups/nodes/` and swaps it in atomically. On any failure it keeps the current page. To deploy: push to `main`, then update `BUILD_URL`/`BUILD_SHA256` in the compose project (Hostinger `vps_docker_create` with the same name) and check the `init` log line `deployed <sha>`.
+- **Current main pin (2026-10-25, EDT — awaiting Hostinger update):** commit `badf52ffcb1f8618e7a512bf74465f2636be4e85`; `BUILD_URL`=`https://raw.githubusercontent.com/Roooted1776/ch29ouy/badf52ffcb1f8618e7a512bf74465f2636be4e85/index.html`; `BUILD_SHA256`=`4372d659a61d4b1359a9eaa02677a6b5bfd08483f3a8d6caa8c52606005937ac`.
 - **Login:** username + password only (6+ characters). No setup code and no date-of-birth check: while Brain has no accounts, the first visitor creates the admin (`claim_open_setup` lease). Admins add users. `accounts` function v5, migration `open_first_setup`.
 - **Screen:** one page. 3D brain (unchanged), live chat beside it, admin panel as a horizontal strip along the bottom. No text outside the chat. Bot names use their node colours with a fixed pixel icon; a bot that hits a token/rate/credit limit shows a red name until it answers again.
 - **Favicon:** pixel brain, inline data URI (`app/src/assets/favicon.svg`).
