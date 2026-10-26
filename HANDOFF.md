@@ -31,9 +31,9 @@ Owner: "main only branch, merge all remove res after, deploy once done."
 - Deploy path: Hostinger VPS 2010795 `brain-site` init pin (`BUILD_URL` + `BUILD_SHA256`). This cloud run has **no** `HOSTINGER_API_TOKEN`, **no** Hostinger-vps MCP, and **no** SSH key to `2.25.249.204` (ports 22/443 reachable; auth denied).
 - Setup actions requested for Owner: add secret `HOSTINGER_API_TOKEN` and attach Hostinger-vps MCP.
 
-### Pin values for the next deploy (main tip)
-- Commit: `badf52ffcb1f8618e7a512bf74465f2636be4e85`
-- `BUILD_URL`: `https://raw.githubusercontent.com/Roooted1776/ch29ouy/badf52ffcb1f8618e7a512bf74465f2636be4e85/index.html`
+### Pin values for the next deploy (main tip; index.html unchanged since badf52f)
+- Commit: `a353b16` (or `badf52f` — same `index.html` bytes)
+- `BUILD_URL`: `https://raw.githubusercontent.com/Roooted1776/ch29ouy/a353b16/index.html`
 - `BUILD_SHA256`: `4372d659a61d4b1359a9eaa02677a6b5bfd08483f3a8d6caa8c52606005937ac`
 - After Hostinger `vps_docker_create` (same project name `brain-site`): confirm init log `deployed 4372d659…`, then `curl -sL https://redeemed.live/ | sha256sum` must match.
 
