@@ -6,6 +6,7 @@ import AdminPanel from './AdminPanel';
 import AgentInspector from './AgentInspector';
 import ChatPanel from './ChatPanel';
 import FlowPane from './FlowPane';
+import SearchBar from './SearchBar';
 
 const BrainScene = lazy(() => import('./BrainScene'));
 
@@ -47,6 +48,7 @@ export default function Home() {
               <BrainScene />
             </Suspense>
           </Boundary>
+          {admin && <SearchBar />}
           {inspectedBot && <AgentInspector id={inspectedBot} onClose={() => inspectBot(null)} />}
           <button type="button" className="icon-btn lock-btn" onClick={() => logout()} aria-label="Lock" title="Lock">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" shapeRendering="crispEdges">

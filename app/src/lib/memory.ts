@@ -242,12 +242,27 @@ export function sanitizeMem(d: any, fromBackup = false): Mem | null {
       t.links = e.links.slice(0, 60).filter(l => typeof l === 'string' && ids.has(l) && l !== e.id);
   }
   // only AI-written memories and the Owner's own notes are live; anything else is archived (Owner, Oct 2026: "no results unless AI")
-  const isAiOrOwner = (e: Entry) => e.key.startsWith('ai:') || e.manual || e.key.startsWith('note:');
+  // project pages hold a project's tasks together, so they are live too
+  const isAiOrOwner = (e: Entry) =>
+    e.key.startsWith('ai:') || e.manual || e.key.startsWith('note:') || e.key.startsWith('project:');
   const arch = m.entries.filter(e => !isAiOrOwner(e));
   m.entries = m.entries.filter(isAiOrOwner);
+  // project pages archived by an earlier version come back
+  for (const e of Array.isArray(d.archived) ? (d.archived as Entry[]).filter(validEntry) : [])
+    if (e.key.startsWith('project:') && !ids.has(e.id) && !m.entries.some(x => x.key === e.key)) {
+      ids.add(e.id);
+      m.entries.push({
+        ...e,
+        title: scrub(String(e.title).slice(0, 80)),
+        note: scrub(String(e.note).slice(0, 600)),
+        links: [],
+      });
+    }
   const live = new Set(m.entries.map(e => e.id));
   for (const e of m.entries) e.links = e.links.filter(id => live.has(id));
-  const prev = Array.isArray(d.archived) ? (d.archived as Entry[]).filter(validEntry) : [];
+  const prev = Array.isArray(d.archived)
+    ? (d.archived as Entry[]).filter(validEntry).filter(e => !m.entries.some(x => x.id === e.id))
+    : [];
   m.archived = [...prev, ...arch]
     .filter((e, i, a) => a.findIndex(x => x.id === e.id) === i)
     .slice(-MAX_ENTRIES)
