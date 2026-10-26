@@ -25,6 +25,7 @@ import { CAN_SEARCH } from './lib/providers';
 import { MODEL_RE, PROV, PROVIDERS, ProviderError, callModel, type ProviderId, RETIRED } from './lib/providers';
 import { redact } from './lib/redact';
 import { transitMs } from './lib/geometry';
+import { runChat } from './lib/run-chat';
 import { NOT_ADMIN, runTask } from './lib/run-task';
 import { importMemoryItems, type RawMemoryItem } from './lib/file-import';
 import {
@@ -128,9 +129,15 @@ export interface State {
   autoUpdateBots: boolean;
   inspectedBot: AgentId | null;
   promptDraft: string;
+  /** Composer mode: team task (multi-bot) or single-model chat. */
+  composerMode: 'task' | 'chat';
+  /** Active chat thread session id (kind chat); null starts a new thread. */
+  chatThreadId: string | null;
   // actions
   inspectBot(id: AgentId | null): void;
   setPromptDraft(q: string): void;
+  setComposerMode(mode: 'task' | 'chat'): void;
+  newChatThread(): void;
   commit(fn?: (m: Mem) => void): void;
   setLive(p: Partial<LiveCfg>): void;
   setKey(k: string, provider?: ProviderId): void;
@@ -386,6 +393,11 @@ export const useStore = create<State>()((set, get) => {
     inspectBot: (id: AgentId | null) => set({ inspectedBot: id }),
     promptDraft: '',
     setPromptDraft: (promptDraft: string) => set({ promptDraft }),
+    composerMode: 'task',
+    chatThreadId: null,
+    setComposerMode: mode => set({ composerMode: mode }),
+    newChatThread: () =>
+      set({ chatThreadId: null, log: [], viewing: null, status: 'New chat. Messages stay out of wiki memory.' }),
     activeProject: 'Brain',
     setActiveProject: p => set({ activeProject: p.trim() || 'Brain' }),
     githubRepo: gh.repo,
@@ -481,7 +493,9 @@ export const useStore = create<State>()((set, get) => {
     },
 
     async send(raw) {
-      return runTask(raw, { get, set, say, clean, addPulse, words, speedFor, liveReady, admin, ctls, ls });
+      const deps = { get, set, say, clean, addPulse, words, speedFor, liveReady, admin, ctls, ls };
+      if (get().composerMode === 'chat') return runChat(raw, deps);
+      return runTask(raw, deps);
     },
     stop() {
       if (!admin()) {

@@ -231,6 +231,7 @@
 }
 .composer.minimal {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
   margin: 0;
@@ -239,6 +240,38 @@
   border: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0;
+}
+.composer-modes {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  order: -1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.composer-modes .mode-btn {
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 10px;
+  color: #888;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0;
+  cursor: pointer;
+}
+.composer-modes .mode-btn.on {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.composer-modes .mode-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.msg.chat-turn .doing {
+  color: #9aa3b4;
 }
 .composer.minimal textarea {
   flex: 1;
