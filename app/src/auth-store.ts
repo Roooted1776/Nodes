@@ -16,9 +16,8 @@ import {
 import { blankMem, sanitizeMem } from './lib/memory';
 import { mirror, openChannel, publish, type Hub } from './lib/share';
 import { VaultError, decryptVault, encryptVault, newSecrets, openFor, sealFor, type Secrets } from './lib/vault';
-import { openKeys, sealKeys } from './lib/keystore';
-import type { ProviderId } from './lib/providers';
-import { setVault, useStore } from './store';
+import { GITHUB_ENTRY, KEYS_KEY, type Keys, openKeys, sealKeys } from './lib/keystore';
+import { setKeySave, setVault, takePlainGithubToken, useStore } from './store';
 
 export const VAULT_KEY = 'brain.vault.v1',
   HIDE_LOCK_MS = 60_000,
@@ -119,11 +118,7 @@ async function unlock(u: User, kek: CryptoKey) {
   secrets = await openFor(kek, await accountWrap(u.id));
   const s = secrets,
     remote = await loadVault();
-  const data = (await decryptVault(s, remote.envelope)) as {
-    mem?: unknown;
-    keys?: Partial<Record<ProviderId, string>>;
-    deviceKeys?: string;
-  };
+  const data = (await decryptVault(s, remote.envelope)) as { mem?: unknown; keys?: unknown; deviceKeys?: unknown };
   let mem = sanitizeMem(data.mem);
   if (!mem) throw new VaultError('The encrypted memory has an invalid format.', 'format');
   // The vault came back empty (wiped or new). The database copy is the backup: rebuild memory from it.
@@ -142,60 +137,69 @@ async function unlock(u: User, kek: CryptoKey) {
   counter = remote.envelope.n;
   revision = remote.rev;
   chain = Promise.resolve();
-  // Provider keys are encrypted inside the database vault (AES-256-GCM) for persistent cross-device restore.
-  // Device keys from local cache are also merged as a local fallback:
-  let deviceKeys = typeof data.deviceKeys === 'string' ? data.deviceKeys : '{}';
-  try {
-    const cached = JSON.parse(ls.getItem(VAULT_KEY) || 'null');
-    if (cached) {
-      const local = (await decryptVault(s, cached)) as {
-        deviceKeys?: string;
-        keys?: Partial<Record<ProviderId, string>>;
-      };
-      if (typeof local.deviceKeys === 'string') deviceKeys = local.deviceKeys;
+  // Provider keys and the GitHub token stay on this device only, sealed with this admin's passcode
+  // (keystore.ts). They never go into the shared vault, which every viewer can open.
+  let saved: Keys = {};
+  if (s.priv) {
+    // An older Brain kept the sealed copy inside the local vault cache (`deviceKeys`): move it to the keystore.
+    try {
+      const cached = JSON.parse(ls.getItem(VAULT_KEY) || 'null');
+      if (cached && ls.getItem(KEYS_KEY) === null) {
+        const old = (await decryptVault(s, cached)) as { deviceKeys?: unknown };
+        if (typeof old.deviceKeys === 'string' && old.deviceKeys !== '{}') ls.setItem(KEYS_KEY, old.deviceKeys);
+      }
+    } catch {
+      /* an unusable cache never replaces the verified database copy */
     }
-  } catch {
-    /* an unusable cache never replaces the verified database copy */
-  }
-  const deviceStore = {
-    getItem: () => deviceKeys,
-    setItem: (_key: string, value: string) => {
-      deviceKeys = value;
-    },
-    removeItem: () => {
-      deviceKeys = '{}';
-    },
-  };
-  const deviceSaved = s.priv ? await openKeys(deviceStore, kek, u.id) : {};
-  const remoteKeys = data.keys && typeof data.keys === 'object' ? data.keys : {};
-  const saved: Partial<Record<ProviderId, string>> = s.priv ? { ...deviceSaved, ...remoteKeys } : {};
-  if (s.priv) ls.setItem(VAULT_KEY, JSON.stringify(await encryptVault(s, { mem, keys: saved, deviceKeys }, counter)));
-  else if (!ls.getItem(VAULT_KEY)) ls.setItem(VAULT_KEY, JSON.stringify(remote.envelope));
+    const onDevice = await openKeys(ls, kek, u.id);
+    // An older vault may still hold keys: keep them on this device, then take them out of the vault below.
+    const fromVault: Keys = {};
+    if (data.keys && typeof data.keys === 'object')
+      for (const [p, k] of Object.entries(data.keys)) if (typeof k === 'string' && k) fromVault[p as keyof Keys] = k;
+    const plainToken = takePlainGithubToken(); // a plain copy found in this browser on load
+    saved = {
+      ...(plainToken ? { [GITHUB_ENTRY]: plainToken } : {}),
+      ...fromVault,
+      ...onDevice,
+    };
+    if (Object.keys(fromVault).length || (plainToken && !onDevice[GITHUB_ENTRY])) await sealKeys(ls, kek, u.id, saved);
+    // Re-save the shared vault without keys, so the database copy no longer holds any.
+    if ('keys' in data || 'deviceKeys' in data) {
+      try {
+        const clean = await encryptVault(s, { mem }, counter + 1);
+        revision = await saveVault(clean, revision);
+        counter = clean.n;
+      } catch {
+        /* tried again on the next save, which also writes memory only */
+      }
+    }
+    ls.setItem(VAULT_KEY, JSON.stringify(await encryptVault(s, { mem }, counter)));
+  } else if (!ls.getItem(VAULT_KEY)) ls.setItem(VAULT_KEY, JSON.stringify(remote.envelope));
+  const { [GITHUB_ENTRY]: githubToken = '', ...providerKeys } = saved;
   useStore.setState(st => ({
     role: u.role,
     who: u.name,
     mem,
     rev: st.rev + 1,
-    keys: u.role === 'admin' ? saved : {},
-    live: u.role === 'admin' && Object.keys(saved).length > 0 ? { ...st.live, remember: true } : st.live,
+    keys: u.role === 'admin' ? providerKeys : {},
+    githubToken: u.role === 'admin' ? githubToken : '',
+    live: u.role === 'admin' && Object.keys(providerKeys).length > 0 ? { ...st.live, remember: true } : st.live,
     storageOk: true,
   }));
   setAuditSink((who, what) => writeAudit(u.id, who, what));
   if (s.priv) {
     const epoch = generation;
-    setVault((m, keys) => {
+    setVault(m => {
       // Capture now: queued writes must never read a later mutable memory object.
-      const snapshot = structuredClone(m),
-        localKeys = { ...keys };
+      const snapshot = structuredClone(m);
       const job = chain.then(async () => {
         if (epoch !== generation) return false;
-        const envelope = await encryptVault(s, { mem: snapshot, keys: localKeys }, counter + 1);
+        const envelope = await encryptVault(s, { mem: snapshot }, counter + 1);
         if (epoch !== generation) return false;
         revision = await saveVault(envelope, revision);
         counter = envelope.n;
         if (epoch !== generation) return false;
-        await sealKeys(deviceStore, kek, u.id, localKeys);
-        const local = await encryptVault(s, { mem: snapshot, keys: localKeys, deviceKeys }, envelope.n);
+        const local = await encryptVault(s, { mem: snapshot }, envelope.n);
         if (epoch !== generation) return false;
         ls.setItem(VAULT_KEY, JSON.stringify(local));
         return true;
@@ -204,7 +208,21 @@ async function unlock(u: User, kek: CryptoKey) {
       chain = job;
       return job;
     });
-  } else setVault(null);
+    // Keys are sealed one save at a time, so a slower earlier save never overwrites a newer one.
+    let keyChain: Promise<void> = Promise.resolve();
+    setKeySave(keys => {
+      const copy = { ...keys };
+      keyChain = keyChain
+        .catch(() => undefined)
+        .then(async () => {
+          if (epoch === generation) await sealKeys(ls, kek, u.id, copy);
+        });
+      return keyChain;
+    });
+  } else {
+    setVault(null);
+    setKeySave(null);
+  }
   enter(u);
   if (restored) {
     useStore.setState({ status: `Memory restored from the database backup (${restored} items).` });
@@ -284,6 +302,7 @@ function leave(keepKey = false) {
   resetMirror();
   setAuditSink(null);
   setVault(null);
+  setKeySave(null);
   if (useStore.getState().busy) useStore.getState().stop(); // a running task is cancelled on lock
   useStore.setState(st => ({
     role: 'viewer',
@@ -291,6 +310,7 @@ function leave(keepKey = false) {
     mem: blankMem(),
     rev: st.rev + 1,
     keys: {},
+    githubToken: '',
     log: [],
     viewing: null,
     selected: null,
@@ -384,7 +404,7 @@ export const useAuth = create<AuthState>()((set, get) => {
           name,
           password,
           wrap: await sealFor(kek, sec, true),
-          envelope: await encryptVault(sec, { mem: blankMem(), keys: {} }, 1),
+          envelope: await encryptVault(sec, { mem: blankMem() }, 1),
         });
         return await login(name, i.passcode);
       } catch (e) {
