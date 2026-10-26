@@ -125,6 +125,8 @@ export interface CallOpts {
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** Let the model search the web with its company's own search tool, where it has one. */
+  web?: boolean;
   /** When set, the reply is streamed and this is called with the text so far as it arrives. */
   onDelta?: (textSoFar: string) => void;
 }
@@ -141,8 +143,10 @@ function httpMessage(status: number, body: string, key: string) {
 }
 
 /** Build the request for one provider. Exported for tests. */
+/** Providers whose own API can search the web. Checked Oct 2026 against each company's docs; see WEB_TOOL. */
+export const CAN_SEARCH = new Set<ProviderId>(['anthropic', 'openai', 'xai', 'google', 'groq']);
 export function buildRequest(
-  o: Pick<CallOpts, 'provider' | 'key' | 'model' | 'system' | 'user' | 'maxTokens'>,
+  o: Pick<CallOpts, 'provider' | 'key' | 'model' | 'system' | 'user' | 'maxTokens' | 'web'>,
   stream = false,
 ): { url: string; headers: Record<string, string>; body: unknown } {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -158,6 +162,7 @@ export function buildRequest(
         max_tokens: o.maxTokens,
         system: o.system,
         messages: [{ role: 'user', content: o.user }],
+        ...(o.web ? { tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 2 }] } : {}),
         ...(stream ? { stream: true } : {}),
       },
     };
@@ -177,6 +182,7 @@ export function buildRequest(
         ],
         max_completion_tokens: reasoning ? o.maxTokens + 1024 : o.maxTokens,
         ...(reasoning ? { reasoning_effort: 'low' } : {}),
+        ...(o.web && o.provider === 'groq' && /gpt-oss/i.test(o.model) ? { tools: [{ type: 'browser_search' }] } : {}),
         ...(stream ? { stream: true } : {}),
       },
     };
@@ -192,6 +198,7 @@ export function buildRequest(
       max_output_tokens: o.maxTokens,
     };
     if (o.provider === 'openai') body.store = false;
+    if (o.web) body.tools = [{ type: 'web_search' }];
     if (stream) body.stream = true;
     return {
       url: o.provider === 'openai' ? 'https://api.openai.com/v1/responses' : 'https://api.x.ai/v1/responses',
@@ -210,6 +217,7 @@ export function buildRequest(
       systemInstruction: { parts: [{ text: o.system }] },
       contents: [{ role: 'user', parts: [{ text: o.user }] }],
       generationConfig: { maxOutputTokens: o.maxTokens },
+      ...(o.web ? { tools: [{ google_search: {} }] } : {}),
     },
   };
 }
@@ -350,7 +358,8 @@ async function readStream(
 export async function callModel(o: CallOpts): Promise<CallResult> {
   const req = buildRequest(o, !!o.onDelta),
     ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), o.timeoutMs ?? 30000);
+  const wait = o.timeoutMs ?? (o.web ? 60000 : 30000);
+  const timer = setTimeout(() => ctl.abort(), wait);
   const onStop = () => ctl.abort();
   o.signal?.addEventListener('abort', onStop);
   let res: Response,
@@ -373,7 +382,7 @@ export async function callModel(o: CallOpts): Promise<CallResult> {
       o.signal?.aborted
         ? 'stopped by you'
         : isAbort
-          ? 'no answer after 30 seconds'
+          ? `no answer after ${Math.round(wait / 1000)} seconds`
           : 'the browser blocked the call (open index.html from your computer and check your internet)',
     );
   } finally {

@@ -475,7 +475,7 @@ h2:first-child {
 }
 .task-node-tag {
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 14px;
   padding: 1px 7px;
   border-radius: 4px;
   background: rgba(8, 14, 28, 0.88);
@@ -543,7 +543,7 @@ h2:first-child {
   margin-left: 0;
 }
 .auto-scroll-btn {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   cursor: pointer;
 }
@@ -560,7 +560,7 @@ h2:first-child {
   color: var(--accent);
   border: 1px solid var(--line);
   border-radius: 14px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
@@ -741,7 +741,7 @@ h2:first-child {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 1px 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   cursor: pointer;
   display: inline-flex;
@@ -782,7 +782,7 @@ h2:first-child {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: 14px;
 }
 .msg-learn-box input,
 .msg-learn-box textarea {
@@ -791,11 +791,11 @@ h2:first-child {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 4px 8px;
-  font: 13px var(--mono);
+  font: 14px var(--mono);
   color: var(--fg);
 }
 .learn-status {
-  font-size: 12px;
+  font-size: 13px;
   color: #4ade80;
   margin-left: 8px;
   align-self: center;
@@ -841,7 +841,7 @@ h2:first-child {
 .composer-proj-row label {
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  font-size: 13px;
+  font-size: 14px;
   color: #8d8d95;
 }
 .composer-proj-row select,
@@ -1113,7 +1113,7 @@ summary {
 }
 .tnode b small.bot-co {
   display: block;
-  font-size: 10px;
+  font-size: 11.5px;
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1127,7 +1127,7 @@ summary {
 }
 .badge-nocredit {
   display: inline-block;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1439,13 +1439,13 @@ body.veiled .veil {
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
-  font-size: 12.5px;
+  font-size: 13.5px;
   line-height: 1.35;
 }
 .panel.admin .group,
 .admin .group {
   margin: 10px 2px 4px;
-  font: 11px / 1 var(--mono);
+  font: 12px / 1 var(--mono);
   letter-spacing: 0.8px;
   text-transform: uppercase;
   color: #8d8d95;
@@ -1470,7 +1470,7 @@ body.veiled .veil {
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.025);
   min-width: 0;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .panel.admin .card2.wide,
 .admin .card2.wide {
@@ -1483,7 +1483,7 @@ body.veiled .veil {
 .panel.admin .card2 h3,
 .admin .card2 h3 {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: 0;
   color: var(--accent);
@@ -1491,7 +1491,7 @@ body.veiled .veil {
 .panel.admin .card2 .hint2,
 .admin .card2 .hint2 {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.3;
   color: var(--muted);
 }
@@ -1502,14 +1502,14 @@ body.veiled .veil {
 .admin select,
 .admin textarea {
   padding: 4px 6px !important;
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
   line-height: 16px !important;
   border-radius: 5px;
 }
 .panel.admin button,
 .admin button {
   padding: 3px 8px !important;
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
   line-height: 16px !important;
   border-radius: 5px;
 }
@@ -1522,7 +1522,7 @@ body.veiled .veil {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: #d4d4da;
 }
 .panel.admin .sw input,
@@ -1539,7 +1539,7 @@ body.veiled .veil {
 .admin .card2 .mini,
 .admin small {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: #8d8d95;
   line-height: 1.3;
 }
@@ -1549,13 +1549,13 @@ body.veiled .veil {
   grid-template-columns: 1fr 64px;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: #c4c4ca;
 }
 .panel.admin .mini-field input,
 .admin .mini-field input {
   padding: 2px 4px !important;
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
 }
 .panel.admin .pill,
 .admin .pill {
@@ -1563,7 +1563,7 @@ body.veiled .veil {
   margin: 0;
   padding: 1px 6px;
   border-radius: 99px;
-  font: 11px / 1.4 var(--mono);
+  font: 12px / 1.4 var(--mono);
   border: 1px solid;
 }
 .panel.admin .pill.ok,
@@ -1584,43 +1584,43 @@ body.veiled .veil {
 }
 .panel.admin .stat small,
 .admin .stat small {
-  font-size: 12px var(--font);
+  font-size: 13px var(--font);
   color: color-mix(in srgb, var(--accent) 45%, var(--muted));
 }
 .panel.admin .card2 .users li,
 .admin .card2 .users li {
   padding: 3px 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .panel.admin .card2 .checks li,
 .admin .card2 .checks li {
   padding: 3px 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .panel.admin .card2 details,
 .admin .card2 details {
   margin: 0;
   padding: 4px 6px;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .panel.admin .card2 .addnote,
 .admin .card2 .addnote {
   margin-top: 2px;
   gap: 5px;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .panel.admin .btnlink,
 .panel.admin a.btnlink,
 .admin .btnlink,
 .admin a.btnlink {
-  font-size: 11.5px !important;
+  font-size: 12.5px !important;
   padding: 2px 6px !important;
 }
 .panel.admin button.sm,
 .panel.admin .btnlink.sm,
 .admin button.sm,
 .admin .btnlink.sm {
-  font-size: 11px !important;
+  font-size: 12px !important;
   padding: 2px 5px !important;
 }
 
@@ -1636,12 +1636,12 @@ body.veiled .veil {
   border-radius: 5px;
   background: rgba(125, 255, 224, 0.05);
   border: 1px solid rgba(125, 255, 224, 0.2);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .panel.admin .bot-auto-update-bar button.sm,
 .admin .bot-auto-update-bar button.sm {
   padding: 2px 6px !important;
-  font-size: 11.5px !important;
+  font-size: 12.5px !important;
 }
 .panel.admin .bot-credits-list,
 .admin .bot-credits-list {
@@ -1660,7 +1660,7 @@ body.veiled .veil {
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--line2);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .panel.admin .company-keys-list,
 .admin .company-keys-list {
@@ -1678,7 +1678,7 @@ body.veiled .veil {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .panel.admin .company-key-head,
 .admin .company-key-head {
@@ -1686,7 +1686,7 @@ body.veiled .veil {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .panel.admin .company-tag,
 .admin .company-tag {
@@ -1695,12 +1695,12 @@ body.veiled .veil {
   gap: 6px;
   padding-left: 5px;
   border-left: 3px solid var(--fg);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .panel.admin .company-tag small,
 .admin .company-tag small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .panel.admin .company-key-row,
 .admin .company-key-row {
@@ -1713,7 +1713,7 @@ body.veiled .veil {
 .admin .company-key-row input {
   flex: 1;
   min-width: 130px;
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
 }
 /* chat and memory: tighter boxes */
 .msg {
@@ -2656,7 +2656,7 @@ legend {
 }
 .import-sub {
   margin: 4px 0 0 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 .close-btn {
@@ -2682,7 +2682,7 @@ legend {
 }
 .import-project-row label {
   color: var(--accent);
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .import-project-row select,
@@ -2753,7 +2753,7 @@ legend {
   background: var(--accent);
   color: var(--bg);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s ease;
@@ -2770,7 +2770,7 @@ legend {
 }
 .dropzone-hint {
   margin: 4px 0 0 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .parsed-list {
@@ -2783,7 +2783,7 @@ legend {
 }
 .parsed-list h4 {
   margin: 0 0 6px 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--accent);
 }
 .parsed-list ul {
@@ -2796,7 +2796,7 @@ legend {
 .parsed-list li {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 14px;
   padding: 3px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -2809,20 +2809,20 @@ legend {
 }
 .parsed-list .file-count {
   color: var(--live);
-  font-size: 12px;
+  font-size: 13px;
 }
 .paste-format-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
 }
 .paste-format-row label {
   color: var(--muted);
 }
 .paste-format-row button {
   padding: 3px 8px;
-  font-size: 12px;
+  font-size: 13px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--line);
@@ -2837,7 +2837,7 @@ legend {
 .paste-area {
   width: 100%;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 14px;
   padding: 8px;
   background: var(--bg);
   border: 1px solid var(--line);
@@ -2848,7 +2848,7 @@ legend {
 .parse-btn {
   align-self: flex-start;
   padding: 6px 12px;
-  font-size: 13px;
+  font-size: 14px;
   background: rgba(154, 168, 255, 0.15);
   border: 1px solid var(--line2);
   color: var(--fg);
@@ -2861,7 +2861,7 @@ legend {
   border-top: 1px solid rgba(125, 255, 224, 0.25);
   border-bottom: 1px solid rgba(125, 255, 224, 0.25);
   color: var(--live);
-  font-size: 13px;
+  font-size: 14px;
 }
 .import-footer {
   display: flex;
@@ -2919,7 +2919,7 @@ legend {
   margin-top: 4px;
 }
 .gh-type-badge {
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 5px;
   border-radius: 4px;
   border: 1px solid var(--line);
@@ -3051,7 +3051,7 @@ legend {
   border-left: 3px solid var(--workstream) !important;
 }
 .entry-tag.manual {
-  font-size: 12px;
+  font-size: 13px;
   padding: 1px 4px;
   border-radius: 3px;
   background: rgba(129, 184, 255, 0.15);
@@ -3156,7 +3156,7 @@ legend {
   text-decoration: line-through;
 }
 .roster-pill small {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .edge.edge-spotlight {
@@ -3277,7 +3277,7 @@ legend {
 }
 .ai-tile .lbl,
 .ai-section .lbl {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -3288,7 +3288,7 @@ legend {
 }
 .ai-tile .desc {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   line-height: 1.3;
 }
@@ -3309,7 +3309,7 @@ legend {
   border-radius: 4px;
   background: rgba(154, 168, 255, 0.08);
   border: 1px solid var(--line);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--fg);
 }
 .ai-handoffs {

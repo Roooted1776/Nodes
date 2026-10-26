@@ -10,7 +10,7 @@ import { AI_KEY, MEMORY_SYSTEM, fileMemories, memoryPrompt, parseMemories } from
 import { ensureProjectNode, findMostWorkedNode, type Cover, type Flow, type Msg, type Session } from './memory';
 import { PROV, PROVIDERS, ProviderError, callModel, isLimitError, type ProviderId } from './providers';
 import { redact } from './redact';
-import { contextBlock, relevant } from './retrieve';
+import { contextBlock, indexTitles, relevant } from './retrieve';
 import { clip } from './text';
 
 export const NOT_ADMIN = 'Only admins can change Brain. You can watch the live chat and read the memory.';
@@ -109,7 +109,10 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
           ['memory', bots[0], hits.reduce((n, h) => n + (words(h.e.title + ' ' + h.e.note) || 0), 0)] as Flow,
         ],
       }));
-    ctxBlock = contextBlock(hits.map(h => h.e));
+    ctxBlock = contextBlock(
+      hits.map(h => h.e),
+      indexTitles(s.mem),
+    );
     notes.push(hits.length ? `${hits.length} memories sent as context` : 'no memory matched');
   }
   const callAs = async (system: string, user: string, isStage = true) => {
@@ -149,6 +152,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
         system,
         user,
         maxTokens: st.live.maxTokens,
+        web: isStage && st.live.web,
         signal: ctl.signal,
         onDelta,
       });
@@ -267,7 +271,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
         }));
       },
     },
-    { brainContext: ctxBlock, clean, inactiveBots: get().inactiveBots },
+    { brainContext: ctxBlock, clean, inactiveBots: get().inactiveBots, web: get().live.web },
   );
   set(x => ({
     stages: Object.fromEntries(Object.entries(x.stages).map(([k, v]) => [k, v === 'waiting' ? 'skipped' : v])),
@@ -329,6 +333,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       sess.projectId = targetNode.id;
       mm.sessions.push(sess);
       if (mm.sessions.length > 25) mm.sessions.shift();
+      mm.inbox.push({ kind: 'session', ref: sess.id }); // Dream reads it later
     });
     await fileByAi(sess, result.msgs);
   } else if (result.completed)

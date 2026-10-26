@@ -161,3 +161,18 @@ describe('saved flow', () => {
     expect(m.sessions[0].ms).toEqual({ gemini: 2400 });
   });
 });
+
+describe('web search', () => {
+  const base = { key: 'k', model: 'm', system: 's', user: 'u', maxTokens: 50, web: true };
+  it("asks each company's own search tool, and nothing when it is off", () => {
+    expect((buildRequest({ provider: 'anthropic', ...base }).body as any).tools[0].type).toBe('web_search_20250305');
+    expect((buildRequest({ provider: 'openai', ...base }).body as any).tools[0].type).toBe('web_search');
+    expect((buildRequest({ provider: 'xai', ...base }).body as any).tools[0].type).toBe('web_search');
+    expect((buildRequest({ provider: 'google', ...base }).body as any).tools[0]).toEqual({ google_search: {} });
+    expect((buildRequest({ provider: 'groq', ...base, model: 'openai/gpt-oss-120b' }).body as any).tools[0].type).toBe(
+      'browser_search',
+    );
+    expect((buildRequest({ provider: 'cerebras', ...base }).body as any).tools).toBeUndefined();
+    expect((buildRequest({ provider: 'anthropic', ...base, web: false }).body as any).tools).toBeUndefined();
+  });
+});

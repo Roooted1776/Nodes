@@ -17,6 +17,8 @@ import {
 import { audit } from './lib/audit';
 import { exportBackup, importBackup } from './lib/vault';
 import type { Role } from './lib/auth';
+import { DREAM_SYSTEM, applyDream, dreamPrompt, gatherInbox, parseDream } from './lib/dream';
+import { tally } from './lib/learn';
 import { MODEL_RE, PROV, PROVIDERS, ProviderError, callModel, type ProviderId, RETIRED } from './lib/providers';
 import { redact } from './lib/redact';
 import { transitMs } from './lib/geometry';
@@ -59,6 +61,8 @@ export interface LiveCfg {
   provider: ProviderId;
   models: Record<ProviderId, string>;
   maxTokens: number;
+  /** Bots may search the web with their company's own search tool. */
+  web: boolean;
   callCap: number;
   remember: boolean;
 }
@@ -117,6 +121,10 @@ export interface State {
   send(q: string): Promise<void>;
   stop(): void;
   testProvider(provider?: ProviderId): Promise<void>;
+  /** Run Dream: one real AI call turns the inbox into cited, linked wiki pages. */
+  dream(auto?: boolean): Promise<void>;
+  dreaming: boolean;
+  dreams: number;
   note(o: { type: EntryType; title: string; note: string; links?: string[] }): string | null;
   importItems(
     items: RawMemoryItem[],
@@ -154,6 +162,7 @@ export interface State {
 let logN = 0,
   pulseN = 0;
 const ctls = new Set<AbortController>();
+const DREAM_RUNS = 3;
 const ls: Storage | null = typeof localStorage !== 'undefined' ? localStorage : null;
 
 function loadLive(): { live: LiveCfg; keys: Partial<Record<ProviderId, string>> } {
@@ -161,7 +170,8 @@ function loadLive(): { live: LiveCfg; keys: Partial<Record<ProviderId, string>> 
     on: true,
     provider: 'openai',
     models: Object.fromEntries(PROVIDERS.map(p => [p, PROV[p].model])) as Record<ProviderId, string>,
-    maxTokens: 120,
+    maxTokens: 220,
+    web: true,
     callCap: 9,
     remember: true,
   };
@@ -171,7 +181,10 @@ function loadLive(): { live: LiveCfg; keys: Partial<Record<ProviderId, string>> 
     if (d && typeof d === 'object') {
       live.remember = !!d.remember;
       if (d.provider in PROV) live.provider = d.provider;
-      if (Number.isFinite(d.maxTokens)) live.maxTokens = Math.max(20, Math.min(150, Math.round(d.maxTokens)));
+      // 120 was the old default; replies now get room to talk
+      if (Number.isFinite(d.maxTokens) && d.maxTokens !== 120)
+        live.maxTokens = Math.max(20, Math.min(400, Math.round(d.maxTokens)));
+      if (typeof d.web === 'boolean') live.web = d.web;
       if (Number.isFinite(d.callCap)) live.callCap = Math.max(1, Math.min(9, Math.round(d.callCap)));
       for (const p of PROVIDERS)
         if (typeof d.models?.[p] === 'string' && MODEL_RE.test(d.models[p]) && !RETIRED.has(d.models[p]))
@@ -191,6 +204,7 @@ function saveLive(live: LiveCfg, keys: Partial<Record<ProviderId, string>>) {
         remember: live.remember,
         provider: live.provider,
         maxTokens: live.maxTokens,
+        web: live.web,
         callCap: live.callCap,
         models: live.models,
       }),
@@ -301,6 +315,8 @@ export const useStore = create<State>()((set, get) => {
     mem: ls ? loadMem(ls).mem : blankMem(),
     rev: 0,
     storageOk: true,
+    dreaming: false,
+    dreams: 0,
     role: 'viewer',
     who: '',
     notes: {},
@@ -442,6 +458,73 @@ export const useStore = create<State>()((set, get) => {
       set({ stopped: true, status: 'Stopped. No more calls will be made.' });
       ctls.forEach(c => c.abort());
       ctls.clear();
+    },
+    async dream(auto = false) {
+      if (!admin()) {
+        if (!auto) set({ status: NOT_ADMIN });
+        return;
+      }
+      const s = get();
+      if (s.dreaming || s.busy || s.incognito) return;
+      if (!s.mem.inbox.length) {
+        if (!auto) set({ status: 'Dream: the inbox is empty, so there is nothing new to file.' });
+        return;
+      }
+      // Dream has its own small budget, apart from the task calls
+      if (s.dreams >= DREAM_RUNS) {
+        if (!auto) set({ status: 'Dream already ran three times this page load. Reload to run it again.' });
+        return;
+      }
+      const pv =
+        s.keys[s.live.provider] && !s.dead[s.live.provider]
+          ? s.live.provider
+          : PROVIDERS.find(p => !!s.keys[p] && !s.dead[p]);
+      if (!pv) {
+        if (!auto) set({ status: 'Dream needs a working API key. Add one under API keys.' });
+        return;
+      }
+      const cites = gatherInbox(s.mem);
+      if (!cites.length) return;
+      set({
+        dreaming: true,
+        dreams: s.dreams + 1,
+        status: `Dream: reading ${cites.length} inbox item(s) with ${PROV[pv].label}…`,
+      });
+      try {
+        const r = await callModel({
+          provider: pv,
+          key: s.keys[pv]!,
+          model: s.live.models[pv] || PROV[pv].model,
+          system: DREAM_SYSTEM,
+          user: dreamPrompt(s.mem, cites, s.mem.settings.instructions),
+          maxTokens: 900,
+          timeoutMs: 60000,
+        });
+        const plan = parseDream(
+          r.text,
+          cites.length,
+          s.mem.blocked.map(k => k.split(':').slice(2).join(':')),
+        );
+        let made = 0,
+          t = tally();
+        get().commit(m => {
+          const out = applyDream(m, plan, gatherInbox(m), Date.now());
+          made = out.pages.length;
+          t = out.t;
+        });
+        set(x => ({
+          tin: x.tin + r.tin,
+          tout: x.tout + r.tout,
+          status: `Dream filed ${made} page(s): ${t.fresh} new, ${t.updated + t.reinforced} updated, ${t.stale} marked stale, from ${cites.length} inbox item(s).`,
+        }));
+      } catch (e: unknown) {
+        if (e instanceof ProviderError && e.rejected) set(x => ({ dead: { ...x.dead, [pv]: true } }));
+        set({
+          status: 'Dream could not run: ' + clean(e instanceof Error ? e.message : String(e)) + '. The inbox was kept.',
+        });
+      } finally {
+        set({ dreaming: false });
+      }
     },
     async testProvider(prov) {
       if (!admin()) {

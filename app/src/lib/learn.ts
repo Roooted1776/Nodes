@@ -4,6 +4,7 @@ import {
   MAX_ENTRIES,
   byId,
   byKey,
+  keepHistory,
   link,
   mkEntry,
   type Entry,
@@ -78,6 +79,7 @@ export function upsert(m: Mem, spec: Spec, t: Tally, now: number): Entry | null 
     if (spec.kws) e.kws = [...new Set([...(spec.kws || []), ...(e.kws || [])])].slice(0, 12);
     const merged = e.corrected ? e.note : mergeNote(spec.note, e.note);
     if (merged !== e.note) {
+      keepHistory(e, spec.sources[0]?.kind || 'session', now);
       e.note = merged;
       t.updated++;
     } else if (wasStale) t.updated++;
@@ -143,7 +145,9 @@ export function correctEntry(
   const e = byId(m, id);
   if (!e) return;
   if (fix.title?.trim()) e.title = redact(fix.title.trim()).text.slice(0, 80);
-  e.note = redact(fix.note).text.slice(0, 600);
+  const note = redact(fix.note).text.slice(0, 600);
+  if (note !== e.note) keepHistory(e, 'correction', now);
+  e.note = note;
   e.corrected = true;
   e.seen = now;
   if (fix.status) e.status = fix.status;

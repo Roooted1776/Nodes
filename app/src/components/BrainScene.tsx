@@ -8,7 +8,7 @@ import { AGENT, AGENTS, isAgent } from '../data/team';
 import { OUTLINE } from '../data/outline';
 import { buildSkull, skullLines } from '../lib/skull';
 import { buildShell, midline, placeMemory, route, station, surfaceFolds, toWorld, type P3 } from '../lib/geometry';
-import { TYPE_LABEL, agentActivityScores, type Session } from '../lib/memory';
+import { TYPE_LABEL, agentActivityScores, nodeSize, weight, type Session } from '../lib/memory';
 import { PULSE_AFTERGLOW, pulseMs, useMem, useStore, type Pulse } from '../store';
 import { DOT_FRAG, DOT_VERT, RIM_FRAG, RIM_VERT } from '../lib/shaders';
 import { sceneStats } from '../lib/stats';
@@ -435,7 +435,7 @@ function Memories() {
     () =>
       new Set(
         [...mem.entries]
-          .sort((a, b) => b.strength - a.strength)
+          .sort((a, b) => weight(b) - weight(a))
           .slice(0, 12)
           .map(e => e.id),
       ),
@@ -512,7 +512,7 @@ function Memories() {
         i,
         toWorld(pos.get(e.id)!),
         c,
-        (0.1 + 0.02 * e.strength) * (on ? 1.5 : grey ? 0.8 : isTopActive ? 1.25 : e.id === hover ? 1.15 : 1),
+        nodeSize(e) * (on ? 1.5 : grey ? 0.8 : isTopActive ? 1.25 : e.id === hover ? 1.15 : 1),
         e.status === 'stale' ? 0.4 : grey ? 0.7 : 1,
       );
     });
