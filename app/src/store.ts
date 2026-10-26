@@ -16,6 +16,7 @@ import {
 } from './lib/memory';
 import { audit } from './lib/audit';
 import { exportBackup, importBackup } from './lib/vault';
+import { GITHUB_ENTRY, type Keys } from './lib/keystore';
 import type { Role } from './lib/auth';
 import { DREAM_SYSTEM, applyDream, dreamPrompt, gatherInbox, parseDream } from './lib/dream';
 import { tally } from './lib/learn';
@@ -34,12 +35,26 @@ import {
 } from './lib/github';
 
 const LKEY = 'brain.live.v1';
-/** Saves memory and remembered keys into the encrypted vault. Set by the sign-in code while an admin is unlocked. */
-export type VaultSave = (mem: Mem, keys: Partial<Record<ProviderId, string>>) => Promise<boolean>;
+/** Saves memory into the encrypted vault. Set by the sign-in code while an admin is unlocked. */
+export type VaultSave = (mem: Mem) => Promise<boolean>;
 let vaultSave: VaultSave | null = null;
 export const setVault = (fn: VaultSave | null) => {
   vaultSave = fn;
 };
+/**
+ * Seals remembered keys and the GitHub token on this device only (keystore.ts), never in the shared vault.
+ * Set by the sign-in code while an admin is unlocked.
+ */
+export type KeySave = (keys: Keys) => Promise<void>;
+let keySave: KeySave | null = null;
+export const setKeySave = (fn: KeySave | null) => {
+  keySave = fn;
+};
+/** What is kept on this device: the remembered provider keys plus the GitHub token. */
+const deviceKeys = (st: Pick<State, 'live' | 'keys' | 'githubToken'>): Keys => ({
+  ...(st.live.remember !== false ? st.keys : {}),
+  ...(st.githubToken ? { [GITHUB_ENTRY]: st.githubToken } : {}),
+});
 export type View = 'brain' | 'team';
 export type Tab = 'chat' | 'memory' | 'admin';
 export interface LogMsg extends Msg {
@@ -241,12 +256,16 @@ function loadGithub(): {
         const recent = Array.isArray(d.recentRepos)
           ? d.recentRepos.filter((r: unknown): r is string => typeof r === 'string' && !!r.trim())
           : [repo];
-        return {
+        const out = {
           repo,
           token: typeof d.token === 'string' ? d.token : '',
           recentRepos: Array.from(new Set([repo, ...recent])).slice(0, 10),
           lastSync: d.lastSync && typeof d.lastSync === 'object' ? d.lastSync : {},
         };
+        // An older Brain kept the token here in plain text. Delete that copy now; the token stays in memory
+        // only until an admin unlocks, which seals it on this device (keystore.ts).
+        if ('token' in d) saveGithub(out);
+        return out;
       }
     }
   } catch {
@@ -255,14 +274,16 @@ function loadGithub(): {
   return { repo: 'Roooted1776/Brain', token: '', recentRepos: ['Roooted1776/Brain'], lastSync: {} };
 }
 
+/** Saves the repo list and sync times. The token is never written here: it is sealed by keystore.ts. */
 function saveGithub(data: {
   repo: string;
-  token: string;
+  token?: string;
   recentRepos: string[];
   lastSync: Record<string, GitHubSyncRecord>;
 }) {
+  const { repo, recentRepos, lastSync } = data;
   try {
-    ls?.setItem(GH_KEY, JSON.stringify(data));
+    ls?.setItem(GH_KEY, JSON.stringify({ repo, recentRepos, lastSync }));
   } catch {
     /* storage blocked */
   }
@@ -270,6 +291,13 @@ function saveGithub(data: {
 
 const lv = loadLive();
 const gh = loadGithub();
+let plainGithubToken = gh.token;
+/** Hands over (once) a GitHub token found in plain text on load, so the admin's unlock can seal it on this device. */
+export const takePlainGithubToken = () => {
+  const t = plainGithubToken;
+  plainGithubToken = '';
+  return t;
+};
 
 export const useStore = create<State>()((set, get) => {
   const keyList = () => Object.values(get().keys).filter(Boolean) as string[];
@@ -361,7 +389,7 @@ export const useStore = create<State>()((set, get) => {
     activeProject: 'Brain',
     setActiveProject: p => set({ activeProject: p.trim() || 'Brain' }),
     githubRepo: gh.repo,
-    githubToken: gh.token,
+    githubToken: '', // filled from this device's sealed keys when an admin unlocks
     githubStatus: '',
     githubRecentRepos: gh.recentRepos,
     githubLastSync: gh.lastSync,
@@ -385,10 +413,11 @@ export const useStore = create<State>()((set, get) => {
       const st = get();
       if (!vaultSave && ls) saveMem(ls, m);
       if (vaultSave)
-        void vaultSave(m, st.live.remember !== false ? st.keys : {}).then(
+        void vaultSave(m).then(
           ok => set({ storageOk: ok }),
           () => set({ storageOk: false }),
         );
+      if (keySave) void keySave(deviceKeys(st)).catch(() => set({ storageOk: false }));
     },
     setLive(p) {
       if (!admin()) {
@@ -798,10 +827,10 @@ export const useStore = create<State>()((set, get) => {
       set({ githubRepo: nextRepo, githubToken: nextToken });
       saveGithub({
         repo: nextRepo,
-        token: nextToken,
         recentRepos: get().githubRecentRepos,
         lastSync: get().githubLastSync,
       });
+      if (cfg.token !== undefined && keySave) void keySave(deviceKeys(get())).catch(() => set({ storageOk: false }));
     },
     addRecentGithubRepo(repoInput) {
       const repo = repoInput.trim();
@@ -811,12 +840,15 @@ export const useStore = create<State>()((set, get) => {
       set({ githubRecentRepos: updated });
       saveGithub({
         repo: get().githubRepo,
-        token: get().githubToken,
         recentRepos: updated,
         lastSync: get().githubLastSync,
       });
     },
     async testGithub(repoInput, tokenInput) {
+      if (!admin()) {
+        set({ status: NOT_ADMIN });
+        return { ok: false, status: 'error', message: NOT_ADMIN };
+      }
       const repo = (repoInput ?? get().githubRepo).trim();
       const token = (tokenInput ?? get().githubToken).trim();
       const res = await testGitHubConnection(repo, token);
@@ -852,7 +884,6 @@ export const useStore = create<State>()((set, get) => {
         get().addRecentGithubRepo(repo);
         saveGithub({
           repo,
-          token,
           recentRepos: get().githubRecentRepos,
           lastSync: updatedSync,
         });

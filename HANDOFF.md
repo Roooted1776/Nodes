@@ -14,6 +14,28 @@
 
 ---
 
+# Handoff from Cursor — Oct 25, 2026 (EDT): merged keys-on-device onto main
+
+## Overview & Request
+Owner main-only: merge remaining open work, remove branches, deploy. Env setup: secrets skipped; Hostinger external action marked complete.
+
+## What Changed & Why
+- Merged `cursor/keys-on-device` (PR #11) into `main`: AI keys + GitHub token stay on this device only (`keystore.ts` / `brain.keys.v1`), never in the shared vault. Old vault keys migrate out on next admin unlock. Plain `brain.github.v1` token cleared.
+- Rebuilt root `index.html` after merge (conflict was only in built HTML).
+- Checks: format OK; lint warnings only (baseline); typecheck OK; **134/134** unit tests; build OK. e2e running separately.
+
+## Deploy
+- Still needs Hostinger pin update. `HOSTINGER_API_TOKEN` was skipped by Owner; Hostinger-vps MCP not visible in this run's tool catalog after the external action.
+- New pin after this merge (update after commit): see DEPLOYMENT.md tip values.
+
+## Files Touched
+- `app/src/auth-store.ts`, `app/src/lib/keystore.ts`, `app/src/lib/vault.ts`, `app/src/store.ts`, `app/test/ui.test.tsx`, `HANDOFF.md`, `index.html`, `app/dist/index.html`
+
+## Git State
+- Merge commit on `main`; then delete `cursor/keys-on-device` and close PR #11.
+
+---
+
 # Handoff from Cursor — Oct 25, 2026 (EDT): main-only merge cleanup; deploy blocked
 
 ## Overview & Request
@@ -227,6 +249,8 @@ Owner: "main only branch, merge all remove res after, deploy once done."
 ---
 
 # Persistent Database API Keys & Latest Task Replay — Oct 25, 2026
+
+> **Superseded (branch `cursor/keys-on-device`, plan step 2):** keys no longer follow Owner to a new device or browser. AI keys and the GitHub token are kept on this device only, sealed with the admin's passcode (`app/src/lib/keystore.ts`), and never go into the shared vault or the database. On the admin's next unlock, keys found in an old vault are moved to the device and the vault is saved again without them. Enter keys once on each new device. Item 1 below is kept as history.
 
 ## 1. What Changed
 1. **Encrypted Database Vault Persistence for API Keys (`auth-store.ts`, `store.ts`)**:
