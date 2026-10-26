@@ -14,6 +14,147 @@
 
 ---
 
+# Handoff from Cursor — Oct 25, 2026 (EDT): Chat + banter review on main
+
+## Overview & Request
+Owner: merge all to main and remove other branches (after Cursor/Muse joint look at Chat + idle huddles).
+
+## What Changed & Why
+- Merged `cursor/chat-banter-review-621a` (PR #14) onto `main`: keep Chat and idle huddles from colliding.
+- `pickTopic` skips chat sessions; Chat/Task/Search (and huddles-off) abort in-flight banter; Home skips banter when `stopped`; Banter bar has Stop while huddling.
+- Rebuilt root `index.html` after merge.
+
+## Checks
+- typecheck OK; **152** unit tests; build OK (`index.html` SHA-256 `98e9ebd39a00288857143864faec2a2f128cfe0962371d129ae5364e148f8786`).
+
+## Git State
+- Fast-forward + rebuild commit on `main`; delete feature branch; close PR #14. Main only.
+
+---
+
+# Handoff from Cursor — Oct 25, 2026 (EDT): merge all to main
+
+## What
+- Fast-forwarded `ren/idle-banter` (PR #13) onto `main`: idle team huddles + personality tones.
+- Checks: typecheck OK, **152** tests, build next.
+- Delete leftover branches after push; main only.
+
+---
+
+# Handoff from Cursor — Oct 25, 2026 (EDT): Chat mode
+
+## Overview & Request
+Owner: build chat mode (single-model talk vs team Task).
+
+## What Changed & Why
+- Composer **Task | Chat | New** toggle. Chat = one `callModel` reply (`run-chat.ts`), no tools, no Grok Bot memory filing, no Dream inbox.
+- Sessions get `kind: 'chat' | 'task'`. Chat tags `chat · Provider · model · unverified` kept by `sanitizeMem`.
+- Failures still persist the owner message in the chat session.
+- Dream / team Task paths unchanged.
+
+## Files
+- `app/src/lib/run-chat.ts` (new), `memory.ts`, `run-task.ts`, `store.ts`, `Composer.tsx`, `ChatPanel.tsx`, `chat.css`, `auth-store.ts`, `app/test/chat.test.ts`
+
+## Checks
+- format, typecheck, lint (warnings only), **137** unit tests, build OK.
+
+## Git / deploy
+- Push `main`, pin Hostinger `brain-site` to new `index.html` SHA.
+
+---
+
+# Handoff from Cursor — Oct 25, 2026 (EDT): redeemed.live deployed from main
+
+## Overview & Request
+Owner finished HOSTINGER_API_TOKEN secret + external action; continue setup and deploy.
+
+## What Changed & Why
+- Authenticated to Hostinger VPS API (`developers.hostinger.com`) with the new secret (Bearer + User-Agent).
+- Replaced **only** `brain-site` compose on VM `2010795` with updated `BUILD_URL` / `BUILD_SHA256`. Did **not** touch `redmed-mcp`, `redmed-store`, traefik, or vpn.
+- Init log: `deployed d6d89231b1664745a44d4a7b2c32c98eca9a2754ad01ba6c2a641951cbc944b4 (was 6c65fac4…)`. Live https://redeemed.live SHA-256 matches main `index.html`.
+
+## Pin
+- Commit: `a61b27901fbd56baada40ab22f0c726ddd288105`
+- `BUILD_URL`: `https://raw.githubusercontent.com/Roooted1776/ch29ouy/a61b27901fbd56baada40ab22f0c726ddd288105/index.html`
+- `BUILD_SHA256`: `d6d89231b1664745a44d4a7b2c32c98eca9a2754ad01ba6c2a641951cbc944b4`
+
+## Checks
+- Hostinger action `docker_compose_up` id 121936094 sent/ok
+- Live HTTPS 200; body hash match
+- RedMed projects left running unchanged
+
+## Environment setup
+- Install proposal already validated earlier (`cd app` / `npm ci` / `npx playwright install chromium`). Press **Save** on the Environment card if not already saved.
+
+## Git State
+- Docs update on `main` for the live pin.
+
+---
+
+# Handoff from Cursor — Oct 25, 2026 (EDT): merged keys-on-device onto main
+
+## Overview & Request
+Owner main-only: merge remaining open work, remove branches, deploy. Env setup: secrets skipped; Hostinger external action marked complete.
+
+## What Changed & Why
+- Merged `cursor/keys-on-device` (PR #11) into `main`: AI keys + GitHub token stay on this device only (`keystore.ts` / `brain.keys.v1`), never in the shared vault. Old vault keys migrate out on next admin unlock. Plain `brain.github.v1` token cleared.
+- Rebuilt root `index.html` after merge (conflict was only in built HTML).
+- Checks: format OK; lint warnings only (baseline); typecheck OK; **134/134** unit tests; build OK. e2e running separately.
+
+## Deploy
+- Still needs Hostinger pin update. `HOSTINGER_API_TOKEN` was skipped by Owner; Hostinger-vps MCP not visible in this run's tool catalog after the external action.
+- New pin after this merge (update after commit): see DEPLOYMENT.md tip values.
+
+## Files Touched
+- `app/src/auth-store.ts`, `app/src/lib/keystore.ts`, `app/src/lib/vault.ts`, `app/src/store.ts`, `app/test/ui.test.tsx`, `HANDOFF.md`, `index.html`, `app/dist/index.html`
+
+## Git State
+- Merge commit on `main`; then delete `cursor/keys-on-device` and close PR #11.
+
+---
+
+# Handoff from Cursor — Oct 25, 2026 (EDT): main-only merge cleanup; deploy blocked
+
+## Overview & Request
+Owner: "main only branch, merge all remove res after, deploy once done."
+
+## What Changed & Why
+- All feature work was already squash-merged into `main` (PRs #1–#8, #10). No further code merges needed.
+- Closed open PR #9 (`cursor/rules-draft-prs-only`) without merging — it would have forced draft-PRs-only and refused pushes to `main`, which conflicts with Owner's main-only / auto-push rule.
+- Deleted leftover remote branches after merge: `claude/brain-like-perplexity`, `claude/modern-look`, `claude/peaceful-bell-q659g1`, `claude/relaxed-euler-3wz8rk`, `claude/search-under-brain`, `claude/simplify-keys`, `cursor/rules-draft-prs-only`.
+- Pointed `origin` at the renamed repo `Roooted1776/ch29ouy` (GitHub redirect from Nodes).
+- Only remote branch remaining: `main` at `badf52f`.
+
+## Deploy status (blocker — honest)
+- Live https://redeemed.live still serves older HTML (`6c65fac4…`, 1,639,700 bytes). Main tip `index.html` is `4372d659…` (1,645,010 bytes).
+- Deploy path: Hostinger VPS 2010795 `brain-site` init pin (`BUILD_URL` + `BUILD_SHA256`). This cloud run has **no** `HOSTINGER_API_TOKEN`, **no** Hostinger-vps MCP, and **no** SSH key to `2.25.249.204` (ports 22/443 reachable; auth denied).
+- Setup actions requested for Owner: add secret `HOSTINGER_API_TOKEN` and attach Hostinger-vps MCP.
+
+### Pin values for the next deploy (main tip; index.html unchanged since badf52f)
+- Commit: `a353b16` (or `badf52f` — same `index.html` bytes)
+- `BUILD_URL`: `https://raw.githubusercontent.com/Roooted1776/ch29ouy/a353b16/index.html`
+- `BUILD_SHA256`: `4372d659a61d4b1359a9eaa02677a6b5bfd08483f3a8d6caa8c52606005937ac`
+- After Hostinger `vps_docker_create` (same project name `brain-site`): confirm init log `deployed 4372d659…`, then `curl -sL https://redeemed.live/ | sha256sum` must match.
+
+## Files Touched
+- `HANDOFF.md` (this entry)
+- `DEPLOYMENT.md` (current pin values + main-only note)
+
+## Checks & Real Results
+- Git: `origin/main` only; open PRs: none.
+- Live HTTPS: 200 (stale build vs main tip).
+- App format/lint/typecheck/test/build/e2e: not re-run (no app code change this turn).
+
+## How the Next AI Should Check It
+1. `git branch -r` → only `origin/main`
+2. With Hostinger-vps + token: update `brain-site` pins to values above; verify live SHA-256
+3. Do not reopen PR #9 or recreate deleted branches unless Owner asks
+
+## Git State
+- On `main`, push of this handoff pending. Deploy not completed (Hostinger connector missing).
+
+---
+
 # Handoff from Claude — Oct 25, 2026: constant memory sync + restore from database
 
 ## What changed
@@ -185,6 +326,8 @@
 ---
 
 # Persistent Database API Keys & Latest Task Replay — Oct 25, 2026
+
+> **Superseded (branch `cursor/keys-on-device`, plan step 2):** keys no longer follow Owner to a new device or browser. AI keys and the GitHub token are kept on this device only, sealed with the admin's passcode (`app/src/lib/keystore.ts`), and never go into the shared vault or the database. On the admin's next unlock, keys found in an old vault are moved to the device and the vault is saved again without them. Enter keys once on each new device. Item 1 below is kept as history.
 
 ## 1. What Changed
 1. **Encrypted Database Vault Persistence for API Keys (`auth-store.ts`, `store.ts`)**:

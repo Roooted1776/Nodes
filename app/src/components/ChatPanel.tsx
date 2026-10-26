@@ -143,8 +143,17 @@ export default function ChatPanel() {
           }}
         >
           <span>
-            {viewing ? 'Past task: ' : 'Latest task: '}
+            {viewing
+              ? currentSession.kind === 'chat'
+                ? 'Past chat: '
+                : 'Past task: '
+              : currentSession.kind === 'chat'
+                ? 'Latest chat: '
+                : 'Latest task: '}
             <strong style={{ color: '#fff' }}>{currentSession.q}</strong>
+            {currentSession.kind === 'chat' ? (
+              <small style={{ marginLeft: 8, color: '#888' }}>not wiki memory</small>
+            ) : null}
           </span>
           {viewing ? (
             <button
@@ -169,7 +178,7 @@ export default function ChatPanel() {
           const passTo = m.from;
           return (
             <Fragment key={m.id}>
-              {showPass && (
+              {showPass && !(typeof m.tag === 'string' && m.tag.startsWith('chat ·')) && (
                 <div className="chat-pass" role="status">
                   <span className="pass-pill">PASS</span>
                   <span className="pass-end" style={{ color: colorOf(passFrom) }}>
@@ -188,7 +197,7 @@ export default function ChatPanel() {
               <article
                 tabIndex={-1}
                 data-scene-entry={a ? `agent:${a.id}` : undefined}
-                className={`msg ${a ? 'bot ' + a.kind : m.from}${m.cls === 'warn' ? ' warn' : ''}`}
+                className={`msg ${a ? 'bot ' + a.kind : m.from}${m.cls === 'warn' ? ' warn' : ''}${typeof m.tag === 'string' && m.tag.startsWith('chat ·') ? ' chat-turn' : ''}`}
                 style={a ? ({ '--c': colorOf(a.id) } as CSSProperties) : undefined}
               >
                 <header>
@@ -198,7 +207,11 @@ export default function ChatPanel() {
                   ) : (
                     <b>{m.from === 'owner' ? 'You' : 'Brain'}</b>
                   )}
-                  {a && <span className="doing">{a.role}</span>}
+                  {a && (
+                    <span className="doing">
+                      {typeof m.tag === 'string' && m.tag.startsWith('chat ·') ? 'chat' : a.role}
+                    </span>
+                  )}
                   {a && !viewing && via(a.id)}
                 </header>
                 <p>
@@ -272,9 +285,34 @@ export default function ChatPanel() {
         )}
         <div ref={end} />
       </div>
+      {role === 'admin' && <BanterBar />}
       {role === 'admin' && <Composer />}
       {busy ? <span className="sr">The team is working.</span> : null}
     </section>
+  );
+}
+
+/** The huddle switch, right by the chat: on, Grok Bot leads team huddles when idle; off, the room stays quiet. */
+function BanterBar() {
+  const on = useStore(s => s.live.banter),
+    setLive = useStore(s => s.setLive),
+    bantering = useStore(s => s.bantering),
+    stop = useStore(s => s.stop);
+  return (
+    <div className="banter-bar">
+      <label className="sw">
+        <input type="checkbox" checked={on} onChange={e => setLive({ banter: e.target.checked })} />
+        <span>Team huddles when idle</span>
+      </label>
+      {on && bantering ? (
+        <>
+          <span className="doing">huddling…</span>
+          <button type="button" className="sm link" onClick={() => stop()} title="Stop this huddle">
+            Stop
+          </button>
+        </>
+      ) : null}
+    </div>
   );
 }
 

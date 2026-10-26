@@ -16,6 +16,7 @@ import {
 } from './lib/memory';
 import { audit } from './lib/audit';
 import { exportBackup, importBackup } from './lib/vault';
+import { GITHUB_ENTRY, type Keys } from './lib/keystore';
 import type { Role } from './lib/auth';
 import { DREAM_SYSTEM, applyDream, dreamPrompt, gatherInbox, parseDream } from './lib/dream';
 import { tally } from './lib/learn';
@@ -24,7 +25,9 @@ import { CAN_SEARCH } from './lib/providers';
 import { MODEL_RE, PROV, PROVIDERS, ProviderError, callModel, type ProviderId, RETIRED } from './lib/providers';
 import { redact } from './lib/redact';
 import { transitMs } from './lib/geometry';
+import { runChat } from './lib/run-chat';
 import { NOT_ADMIN, runTask } from './lib/run-task';
+import { runBanter, type BanterOpts } from './lib/banter';
 import { importMemoryItems, type RawMemoryItem } from './lib/file-import';
 import {
   testGitHubConnection,
@@ -34,12 +37,26 @@ import {
 } from './lib/github';
 
 const LKEY = 'brain.live.v1';
-/** Saves memory and remembered keys into the encrypted vault. Set by the sign-in code while an admin is unlocked. */
-export type VaultSave = (mem: Mem, keys: Partial<Record<ProviderId, string>>) => Promise<boolean>;
+/** Saves memory into the encrypted vault. Set by the sign-in code while an admin is unlocked. */
+export type VaultSave = (mem: Mem) => Promise<boolean>;
 let vaultSave: VaultSave | null = null;
 export const setVault = (fn: VaultSave | null) => {
   vaultSave = fn;
 };
+/**
+ * Seals remembered keys and the GitHub token on this device only (keystore.ts), never in the shared vault.
+ * Set by the sign-in code while an admin is unlocked.
+ */
+export type KeySave = (keys: Keys) => Promise<void>;
+let keySave: KeySave | null = null;
+export const setKeySave = (fn: KeySave | null) => {
+  keySave = fn;
+};
+/** What is kept on this device: the remembered provider keys plus the GitHub token. */
+const deviceKeys = (st: Pick<State, 'live' | 'keys' | 'githubToken'>): Keys => ({
+  ...(st.live.remember !== false ? st.keys : {}),
+  ...(st.githubToken ? { [GITHUB_ENTRY]: st.githubToken } : {}),
+});
 export type View = 'brain' | 'team';
 export type Tab = 'chat' | 'memory' | 'admin';
 export interface LogMsg extends Msg {
@@ -65,6 +82,8 @@ export interface LiveCfg {
   maxTokens: number;
   /** Bots may search the web with their company's own search tool. */
   web: boolean;
+  /** Idle huddles: Grok Bot leads short working talks on its own small budget when no task runs (Owner, Oct 2026). */
+  banter: boolean;
   callCap: number;
   remember: boolean;
 }
@@ -87,6 +106,10 @@ export interface State {
   tout: number;
   stopped: boolean;
   busy: boolean;
+  /** Idle free chat: a stretch is running, how many ran this page load, and when the last one started. */
+  bantering: boolean;
+  banterSessions: number;
+  lastBanterAt: number;
   incognito: boolean;
   log: LogMsg[];
   viewing: Session | null;
@@ -113,14 +136,22 @@ export interface State {
   autoUpdateBots: boolean;
   inspectedBot: AgentId | null;
   promptDraft: string;
+  /** Composer mode: team task (multi-bot) or single-model chat. */
+  composerMode: 'task' | 'chat';
+  /** Active chat thread session id (kind chat); null starts a new thread. */
+  chatThreadId: string | null;
   // actions
   inspectBot(id: AgentId | null): void;
   setPromptDraft(q: string): void;
+  setComposerMode(mode: 'task' | 'chat'): void;
+  newChatThread(): void;
   commit(fn?: (m: Mem) => void): void;
   setLive(p: Partial<LiveCfg>): void;
   setKey(k: string, provider?: ProviderId): void;
   forgetKey(provider?: ProviderId): void;
   send(q: string): Promise<void>;
+  /** One stretch of idle free chat, if the room is idle and the budget allows. Driven by a timer in Home. */
+  banter(opts?: BanterOpts): Promise<void>;
   stop(): void;
   testProvider(provider?: ProviderId): Promise<void>;
   /** Run Dream: one real AI call turns the inbox into cited, linked wiki pages. */
@@ -176,6 +207,7 @@ function loadLive(): { live: LiveCfg; keys: Partial<Record<ProviderId, string>> 
     models: Object.fromEntries(PROVIDERS.map(p => [p, PROV[p].model])) as Record<ProviderId, string>,
     maxTokens: 220,
     web: true,
+    banter: true,
     callCap: 9,
     remember: true,
   };
@@ -189,6 +221,7 @@ function loadLive(): { live: LiveCfg; keys: Partial<Record<ProviderId, string>> 
       if (Number.isFinite(d.maxTokens) && d.maxTokens !== 120)
         live.maxTokens = Math.max(20, Math.min(400, Math.round(d.maxTokens)));
       if (typeof d.web === 'boolean') live.web = d.web;
+      if (typeof d.banter === 'boolean') live.banter = d.banter;
       if (Number.isFinite(d.callCap)) live.callCap = Math.max(1, Math.min(9, Math.round(d.callCap)));
       for (const p of PROVIDERS)
         if (typeof d.models?.[p] === 'string' && MODEL_RE.test(d.models[p]) && !RETIRED.has(d.models[p]))
@@ -209,6 +242,7 @@ function saveLive(live: LiveCfg, keys: Partial<Record<ProviderId, string>>) {
         provider: live.provider,
         maxTokens: live.maxTokens,
         web: live.web,
+        banter: live.banter,
         callCap: live.callCap,
         models: live.models,
       }),
@@ -241,12 +275,16 @@ function loadGithub(): {
         const recent = Array.isArray(d.recentRepos)
           ? d.recentRepos.filter((r: unknown): r is string => typeof r === 'string' && !!r.trim())
           : [repo];
-        return {
+        const out = {
           repo,
           token: typeof d.token === 'string' ? d.token : '',
           recentRepos: Array.from(new Set([repo, ...recent])).slice(0, 10),
           lastSync: d.lastSync && typeof d.lastSync === 'object' ? d.lastSync : {},
         };
+        // An older Brain kept the token here in plain text. Delete that copy now; the token stays in memory
+        // only until an admin unlocks, which seals it on this device (keystore.ts).
+        if ('token' in d) saveGithub(out);
+        return out;
       }
     }
   } catch {
@@ -255,14 +293,16 @@ function loadGithub(): {
   return { repo: 'Roooted1776/Brain', token: '', recentRepos: ['Roooted1776/Brain'], lastSync: {} };
 }
 
+/** Saves the repo list and sync times. The token is never written here: it is sealed by keystore.ts. */
 function saveGithub(data: {
   repo: string;
-  token: string;
+  token?: string;
   recentRepos: string[];
   lastSync: Record<string, GitHubSyncRecord>;
 }) {
+  const { repo, recentRepos, lastSync } = data;
   try {
-    ls?.setItem(GH_KEY, JSON.stringify(data));
+    ls?.setItem(GH_KEY, JSON.stringify({ repo, recentRepos, lastSync }));
   } catch {
     /* storage blocked */
   }
@@ -270,6 +310,13 @@ function saveGithub(data: {
 
 const lv = loadLive();
 const gh = loadGithub();
+let plainGithubToken = gh.token;
+/** Hands over (once) a GitHub token found in plain text on load, so the admin's unlock can seal it on this device. */
+export const takePlainGithubToken = () => {
+  const t = plainGithubToken;
+  plainGithubToken = '';
+  return t;
+};
 
 export const useStore = create<State>()((set, get) => {
   const keyList = () => Object.values(get().keys).filter(Boolean) as string[];
@@ -333,6 +380,9 @@ export const useStore = create<State>()((set, get) => {
     tout: 0,
     stopped: false,
     busy: false,
+    bantering: false,
+    banterSessions: 0,
+    lastBanterAt: 0,
     incognito: false,
     log: [],
     viewing: null,
@@ -358,10 +408,15 @@ export const useStore = create<State>()((set, get) => {
     inspectBot: (id: AgentId | null) => set({ inspectedBot: id }),
     promptDraft: '',
     setPromptDraft: (promptDraft: string) => set({ promptDraft }),
+    composerMode: 'task',
+    chatThreadId: null,
+    setComposerMode: mode => set({ composerMode: mode }),
+    newChatThread: () =>
+      set({ chatThreadId: null, log: [], viewing: null, status: 'New chat. Messages stay out of wiki memory.' }),
     activeProject: 'Brain',
     setActiveProject: p => set({ activeProject: p.trim() || 'Brain' }),
     githubRepo: gh.repo,
-    githubToken: gh.token,
+    githubToken: '', // filled from this device's sealed keys when an admin unlocks
     githubStatus: '',
     githubRecentRepos: gh.recentRepos,
     githubLastSync: gh.lastSync,
@@ -385,10 +440,11 @@ export const useStore = create<State>()((set, get) => {
       const st = get();
       if (!vaultSave && ls) saveMem(ls, m);
       if (vaultSave)
-        void vaultSave(m, st.live.remember !== false ? st.keys : {}).then(
+        void vaultSave(m).then(
           ok => set({ storageOk: ok }),
           () => set({ storageOk: false }),
         );
+      if (keySave) void keySave(deviceKeys(st)).catch(() => set({ storageOk: false }));
     },
     setLive(p) {
       if (!admin()) {
@@ -402,6 +458,11 @@ export const useStore = create<State>()((set, get) => {
       }; /* Brain only uses real AI (Owner, Oct 2026): there is no off switch */
       if (p.provider && p.provider !== get().live.provider) {
         set({ dead: {} });
+      }
+      // Switching huddles off ends an in-flight huddle at once (same as Stop for that stream).
+      if (p.banter === false && get().bantering) {
+        ctls.forEach(c => c.abort());
+        ctls.clear();
       }
       set({ live });
       saveLive(live, get().keys);
@@ -452,7 +513,18 @@ export const useStore = create<State>()((set, get) => {
     },
 
     async send(raw) {
-      return runTask(raw, { get, set, say, clean, addPulse, words, speedFor, liveReady, admin, ctls, ls });
+      const deps = { get, set, say, clean, addPulse, words, speedFor, liveReady, admin, ctls, ls };
+      if (get().composerMode === 'chat') return runChat(raw, deps);
+      return runTask(raw, deps);
+    },
+    async banter(opts) {
+      if (get().bantering) return;
+      set({ bantering: true });
+      try {
+        await runBanter({ get, set, say, clean, admin, ctls }, opts);
+      } finally {
+        set({ bantering: false });
+      }
     },
     stop() {
       if (!admin()) {
@@ -475,12 +547,16 @@ export const useStore = create<State>()((set, get) => {
       if (!pv) return set({ status: 'Search needs a working API key. Add one under API keys.' });
       if (s.calls >= s.live.callCap + 3)
         return set({ status: 'The call budget for this page load is used. Reload to reset it.' });
+      // End any idle huddle in flight so search owns the draft stream.
+      ctls.forEach(c => c.abort());
+      ctls.clear();
       const web = s.live.web && CAN_SEARCH.has(pv),
         model = s.live.models[pv] || PROV[pv].model,
         tag = `live · ${PROV[pv].label} · ${model} · unverified`;
       const hits = s.mem.settings.useMemory === false ? [] : searchMemory(s.mem, q);
       set({
         busy: true,
+        stopped: false,
         calls: s.calls + 1,
         active: 'perplexity',
         status: `Searching with ${PROV[pv].label}${web ? ' and the web' : ''}…`,
@@ -798,10 +874,10 @@ export const useStore = create<State>()((set, get) => {
       set({ githubRepo: nextRepo, githubToken: nextToken });
       saveGithub({
         repo: nextRepo,
-        token: nextToken,
         recentRepos: get().githubRecentRepos,
         lastSync: get().githubLastSync,
       });
+      if (cfg.token !== undefined && keySave) void keySave(deviceKeys(get())).catch(() => set({ storageOk: false }));
     },
     addRecentGithubRepo(repoInput) {
       const repo = repoInput.trim();
@@ -811,12 +887,15 @@ export const useStore = create<State>()((set, get) => {
       set({ githubRecentRepos: updated });
       saveGithub({
         repo: get().githubRepo,
-        token: get().githubToken,
         recentRepos: updated,
         lastSync: get().githubLastSync,
       });
     },
     async testGithub(repoInput, tokenInput) {
+      if (!admin()) {
+        set({ status: NOT_ADMIN });
+        return { ok: false, status: 'error', message: NOT_ADMIN };
+      }
       const repo = (repoInput ?? get().githubRepo).trim();
       const token = (tokenInput ?? get().githubToken).trim();
       const res = await testGitHubConnection(repo, token);
@@ -852,7 +931,6 @@ export const useStore = create<State>()((set, get) => {
         get().addRecentGithubRepo(repo);
         saveGithub({
           repo,
-          token,
           recentRepos: get().githubRecentRepos,
           lastSync: updatedSync,
         });
