@@ -14,6 +14,15 @@
 
 ---
 
+# Handoff from Cursor — Oct 25, 2026 (EDT): merge all to main
+
+## What
+- Fast-forwarded `ren/idle-banter` (PR #13) onto `main`: idle team huddles + personality tones.
+- Checks: typecheck OK, **152** tests, build next.
+- Delete leftover branches after push; main only.
+
+---
+
 # Handoff from Cursor — Oct 25, 2026 (EDT): Chat mode
 
 ## Overview & Request
