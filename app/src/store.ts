@@ -459,6 +459,11 @@ export const useStore = create<State>()((set, get) => {
       if (p.provider && p.provider !== get().live.provider) {
         set({ dead: {} });
       }
+      // Switching huddles off ends an in-flight huddle at once (same as Stop for that stream).
+      if (p.banter === false && get().bantering) {
+        ctls.forEach(c => c.abort());
+        ctls.clear();
+      }
       set({ live });
       saveLive(live, get().keys);
       if ('remember' in p || p.provider) get().commit();
@@ -542,12 +547,16 @@ export const useStore = create<State>()((set, get) => {
       if (!pv) return set({ status: 'Search needs a working API key. Add one under API keys.' });
       if (s.calls >= s.live.callCap + 3)
         return set({ status: 'The call budget for this page load is used. Reload to reset it.' });
+      // End any idle huddle in flight so search owns the draft stream.
+      ctls.forEach(c => c.abort());
+      ctls.clear();
       const web = s.live.web && CAN_SEARCH.has(pv),
         model = s.live.models[pv] || PROV[pv].model,
         tag = `live · ${PROV[pv].label} · ${model} · unverified`;
       const hits = s.mem.settings.useMemory === false ? [] : searchMemory(s.mem, q);
       set({
         busy: true,
+        stopped: false,
         calls: s.calls + 1,
         active: 'perplexity',
         status: `Searching with ${PROV[pv].label}${web ? ' and the web' : ''}…`,

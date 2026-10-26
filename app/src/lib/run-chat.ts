@@ -38,6 +38,10 @@ export async function runChat(raw: string, d: TaskDeps): Promise<void> {
   if (s.calls >= s.live.callCap)
     return set({ status: 'The call budget for this page load is used. Reload to reset it.' });
 
+  // End any idle huddle in flight so its draft and tokens never mix into this chat.
+  ctls.forEach(c => c.abort());
+  ctls.clear();
+
   const model = s.live.models[pv] || PROV[pv].model,
     tag = `chat · ${PROV[pv].label} · ${model} · unverified`;
   const matchProj = q.match(/^\[([^\]]+)\]/);
