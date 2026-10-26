@@ -167,10 +167,11 @@ describe('setup and login', () => {
 
 describe('who can do what', () => {
   /** Accounts and an encrypted vault made the way the app makes them, then a real sign-in through the store. */
-  async function asRole(role: 'admin' | 'viewer', seed?: object, vaultKeys?: object) {
+  async function asRole(role: 'admin' | 'viewer', seed?: object, vaultKeys?: object, prep?: () => void) {
     vi.resetModules();
     localStorage.clear();
     sessionStorage.clear();
+    prep?.();
     const { derivePassword } = await import('../src/lib/auth');
     const { newSecrets, encryptVault, sealFor } = await import('../src/lib/vault');
     const { blankMem } = await import('../src/lib/memory');
@@ -201,7 +202,7 @@ describe('who can do what', () => {
           role === 'admin' ? 'correct horse battery' : 'visitor pass phrase',
         );
     });
-    return { ...m, u: userEvent.setup() };
+    return { ...m, u: userEvent.setup(), sec };
   }
   it('a viewer sees only the brain and the live chat: no composer, no admin panel, no way to change anything', async () => {
     const { App, store } = await asRole('viewer', {
@@ -327,6 +328,82 @@ describe('who can do what', () => {
     const { store } = await asRole('admin', {}, { openai: 'sk-test-openai-persisted' });
     expect(store.useStore.getState().keys.openai).toBe('sk-test-openai-persisted');
   });
+
+  it('takes keys out of an old shared vault on the admin unlock and keeps them on this device only', async () => {
+    const { store, auth, sec } = await asRole('admin', {}, { openai: 'sk-test-old-vault-key' });
+    const { decryptVault } = await import('../src/lib/vault');
+    expect(store.useStore.getState().keys.openai).toBe('sk-test-old-vault-key');
+    // the re-saved shared vault (the database copy) has no keys, also when opened with a viewer's secrets
+    expect(server.rev).toBe(2);
+    const viewer = { dek: sec.dek, pub: sec.pub };
+    const shared = (await decryptVault(viewer, server.vault)) as Record<string, unknown>;
+    expect(Object.keys(shared)).toEqual(['mem']);
+    expect(JSON.stringify(shared)).not.toContain('sk-test-old-vault-key');
+    const local = (await decryptVault(viewer, JSON.parse(localStorage.getItem('brain.vault.v1')!))) as object;
+    expect(Object.keys(local)).toEqual(['mem']);
+    // a key added now is sealed on this device and never reaches the shared vault
+    act(() => store.useStore.getState().setKey('sk-test-new-key', 'anthropic'));
+    await waitFor(() => expect(server.rev).toBe(3));
+    await waitFor(() => expect(localStorage.getItem('brain.keys.v1')).toBeTruthy());
+    const after = (await decryptVault(viewer, server.vault)) as Record<string, unknown>;
+    expect(Object.keys(after)).toEqual(['mem']);
+    expect(JSON.stringify(after)).not.toMatch(/sk-test/);
+    const everything = Object.keys(localStorage)
+      .map(k => localStorage.getItem(k))
+      .join('\n');
+    expect(everything).not.toMatch(/sk-test/); // sealed, never plain
+    // lock and unlock on the same device: the keys come back from the device copy
+    act(() => auth.useAuth.getState().logout());
+    expect(store.useStore.getState().keys).toEqual({});
+    await act(async () => {
+      await auth.useAuth.getState().login('Owner', 'correct horse battery');
+    });
+    expect(store.useStore.getState().keys).toEqual({
+      openai: 'sk-test-old-vault-key',
+      anthropic: 'sk-test-new-key',
+    });
+  }, 30000);
+
+  it('never keeps the GitHub token in plain localStorage, and it survives lock on this device', async () => {
+    const plain = JSON.stringify({
+      repo: 'Roooted1776/Brain',
+      token: 'ghp_plainOldToken',
+      recentRepos: [],
+      lastSync: {},
+    });
+    const { store, auth, sec } = await asRole('admin', {}, undefined, () =>
+      localStorage.setItem('brain.github.v1', plain),
+    );
+    const { decryptVault } = await import('../src/lib/vault');
+    const dump = () =>
+      Object.keys(localStorage)
+        .map(k => localStorage.getItem(k))
+        .join('\n');
+    // the plain copy found on load is gone, and the admin unlock sealed it on this device
+    expect(localStorage.getItem('brain.github.v1')).not.toContain('token');
+    expect(store.useStore.getState().githubToken).toBe('ghp_plainOldToken');
+    expect(dump()).not.toContain('ghp_');
+    act(() => store.useStore.getState().setGithubConfig({ token: 'ghp_typedNewToken' }));
+    await new Promise(r => setTimeout(r, 50));
+    expect(dump()).not.toContain('ghp_');
+    const shared = (await decryptVault({ dek: sec.dek, pub: sec.pub }, server.vault)) as Record<string, unknown>;
+    expect(JSON.stringify(shared)).not.toContain('ghp_');
+    act(() => auth.useAuth.getState().logout());
+    expect(store.useStore.getState().githubToken).toBe('');
+    await act(async () => {
+      await auth.useAuth.getState().login('Owner', 'correct horse battery');
+    });
+    expect(store.useStore.getState().githubToken).toBe('ghp_typedNewToken');
+  }, 30000);
+
+  it('a viewer cannot test the GitHub connection and gets no keys or token', async () => {
+    const { store } = await asRole('viewer', {}, { openai: 'sk-test-viewer-should-not-get' });
+    expect(store.useStore.getState().keys).toEqual({});
+    expect(store.useStore.getState().githubToken).toBe('');
+    const r = await store.useStore.getState().testGithub('Roooted1776/ch29ouy', 'ghp_x');
+    expect(r.ok).toBe(false);
+    expect(store.useStore.getState().status).toMatch(/Only admins/);
+  }, 30000);
 
   it('displays past session where bots worked on a task and were talking when opening Brain', async () => {
     const pastSession = {

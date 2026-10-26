@@ -1,5 +1,5 @@
 // Browser-side AES-256-GCM vaults, signed by admins. The database receives memory ciphertext only.
-// Account-specific sealed provider keys remain inside the signed local vault, never in the database.
+// The vault holds memory only. Provider keys and the GitHub token are kept on the device by keystore.ts.
 export class VaultError extends Error {
   constructor(
     msg: string,
