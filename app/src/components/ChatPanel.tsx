@@ -285,9 +285,26 @@ export default function ChatPanel() {
         )}
         <div ref={end} />
       </div>
+      {role === 'admin' && <BanterBar />}
       {role === 'admin' && <Composer />}
       {busy ? <span className="sr">The team is working.</span> : null}
     </section>
+  );
+}
+
+/** The huddle switch, right by the chat: on, Grok Bot leads team huddles when idle; off, the room stays quiet. */
+function BanterBar() {
+  const on = useStore(s => s.live.banter),
+    setLive = useStore(s => s.setLive),
+    bantering = useStore(s => s.bantering);
+  return (
+    <div className="banter-bar">
+      <label className="sw">
+        <input type="checkbox" checked={on} onChange={e => setLive({ banter: e.target.checked })} />
+        <span>Team huddles when idle</span>
+      </label>
+      {on && bantering ? <span className="doing">huddling…</span> : null}
+    </div>
   );
 }
 

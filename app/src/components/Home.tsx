@@ -39,6 +39,17 @@ export default function Home() {
   useEffect(() => {
     if (admin && ready && due) void useStore.getState().dream(true);
   }, [admin, ready, due]);
+  // Idle huddles: while an admin is signed in with a key and nothing is running, Grok Bot leads
+  // short team huddles on its own small budget (lib/banter). A task, Stop, lock or the switch ends it.
+  const banterOn = useStore(s => s.live.banter);
+  useEffect(() => {
+    if (!admin || !ready || !banterOn) return;
+    const t = setInterval(() => {
+      const st = useStore.getState();
+      if (!st.busy && !st.dreaming && !st.bantering) void st.banter();
+    }, 5000);
+    return () => clearInterval(t);
+  }, [admin, ready, banterOn]);
   return (
     <div className={'home single' + (admin ? ' with-admin' : '')}>
       <section className="workspace" aria-label="Visualization">

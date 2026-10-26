@@ -27,6 +27,7 @@ import { redact } from './lib/redact';
 import { transitMs } from './lib/geometry';
 import { runChat } from './lib/run-chat';
 import { NOT_ADMIN, runTask } from './lib/run-task';
+import { runBanter, type BanterOpts } from './lib/banter';
 import { importMemoryItems, type RawMemoryItem } from './lib/file-import';
 import {
   testGitHubConnection,
@@ -81,6 +82,8 @@ export interface LiveCfg {
   maxTokens: number;
   /** Bots may search the web with their company's own search tool. */
   web: boolean;
+  /** Idle huddles: Grok Bot leads short working talks on its own small budget when no task runs (Owner, Oct 2026). */
+  banter: boolean;
   callCap: number;
   remember: boolean;
 }
@@ -103,6 +106,10 @@ export interface State {
   tout: number;
   stopped: boolean;
   busy: boolean;
+  /** Idle free chat: a stretch is running, how many ran this page load, and when the last one started. */
+  bantering: boolean;
+  banterSessions: number;
+  lastBanterAt: number;
   incognito: boolean;
   log: LogMsg[];
   viewing: Session | null;
@@ -143,6 +150,8 @@ export interface State {
   setKey(k: string, provider?: ProviderId): void;
   forgetKey(provider?: ProviderId): void;
   send(q: string): Promise<void>;
+  /** One stretch of idle free chat, if the room is idle and the budget allows. Driven by a timer in Home. */
+  banter(opts?: BanterOpts): Promise<void>;
   stop(): void;
   testProvider(provider?: ProviderId): Promise<void>;
   /** Run Dream: one real AI call turns the inbox into cited, linked wiki pages. */
@@ -198,6 +207,7 @@ function loadLive(): { live: LiveCfg; keys: Partial<Record<ProviderId, string>> 
     models: Object.fromEntries(PROVIDERS.map(p => [p, PROV[p].model])) as Record<ProviderId, string>,
     maxTokens: 220,
     web: true,
+    banter: true,
     callCap: 9,
     remember: true,
   };
@@ -211,6 +221,7 @@ function loadLive(): { live: LiveCfg; keys: Partial<Record<ProviderId, string>> 
       if (Number.isFinite(d.maxTokens) && d.maxTokens !== 120)
         live.maxTokens = Math.max(20, Math.min(400, Math.round(d.maxTokens)));
       if (typeof d.web === 'boolean') live.web = d.web;
+      if (typeof d.banter === 'boolean') live.banter = d.banter;
       if (Number.isFinite(d.callCap)) live.callCap = Math.max(1, Math.min(9, Math.round(d.callCap)));
       for (const p of PROVIDERS)
         if (typeof d.models?.[p] === 'string' && MODEL_RE.test(d.models[p]) && !RETIRED.has(d.models[p]))
@@ -231,6 +242,7 @@ function saveLive(live: LiveCfg, keys: Partial<Record<ProviderId, string>>) {
         provider: live.provider,
         maxTokens: live.maxTokens,
         web: live.web,
+        banter: live.banter,
         callCap: live.callCap,
         models: live.models,
       }),
@@ -368,6 +380,9 @@ export const useStore = create<State>()((set, get) => {
     tout: 0,
     stopped: false,
     busy: false,
+    bantering: false,
+    banterSessions: 0,
+    lastBanterAt: 0,
     incognito: false,
     log: [],
     viewing: null,
@@ -496,6 +511,15 @@ export const useStore = create<State>()((set, get) => {
       const deps = { get, set, say, clean, addPulse, words, speedFor, liveReady, admin, ctls, ls };
       if (get().composerMode === 'chat') return runChat(raw, deps);
       return runTask(raw, deps);
+    },
+    async banter(opts) {
+      if (get().bantering) return;
+      set({ bantering: true });
+      try {
+        await runBanter({ get, set, say, clean, admin, ctls }, opts);
+      } finally {
+        set({ bantering: false });
+      }
     },
     stop() {
       if (!admin()) {
