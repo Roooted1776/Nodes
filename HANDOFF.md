@@ -14,6 +14,28 @@
 
 ---
 
+# Handoff from Cursor — Oct 25, 2026 (EDT): Chat mode
+
+## Overview & Request
+Owner: build chat mode (single-model talk vs team Task).
+
+## What Changed & Why
+- Composer **Task | Chat | New** toggle. Chat = one `callModel` reply (`run-chat.ts`), no tools, no Grok Bot memory filing, no Dream inbox.
+- Sessions get `kind: 'chat' | 'task'`. Chat tags `chat · Provider · model · unverified` kept by `sanitizeMem`.
+- Failures still persist the owner message in the chat session.
+- Dream / team Task paths unchanged.
+
+## Files
+- `app/src/lib/run-chat.ts` (new), `memory.ts`, `run-task.ts`, `store.ts`, `Composer.tsx`, `ChatPanel.tsx`, `chat.css`, `auth-store.ts`, `app/test/chat.test.ts`
+
+## Checks
+- format, typecheck, lint (warnings only), **137** unit tests, build OK.
+
+## Git / deploy
+- Push `main`, pin Hostinger `brain-site` to new `index.html` SHA.
+
+---
+
 # Handoff from Cursor — Oct 25, 2026 (EDT): redeemed.live deployed from main
 
 ## Overview & Request

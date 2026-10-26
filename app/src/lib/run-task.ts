@@ -304,6 +304,7 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       id: 's' + m.nextSession++,
       ts: Date.now(),
       q: clip(q, 300),
+      kind: 'task',
       project: assignedProj,
       kws: [],
       accepted: [],

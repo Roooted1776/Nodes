@@ -318,6 +318,8 @@ function leave(keepKey = false) {
     stages: {},
     notes: {},
     active: null,
+    chatThreadId: null,
+    composerMode: 'task',
     status: 'Locked.',
   }));
 }

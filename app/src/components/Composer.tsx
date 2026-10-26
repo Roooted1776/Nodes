@@ -8,7 +8,11 @@ export default function Composer() {
     stop = useStore(s => s.stop),
     ready = useStore(s => Object.values(s.keys).some(Boolean)),
     promptDraft = useStore(s => s.promptDraft),
-    setPromptDraft = useStore(s => s.setPromptDraft);
+    setPromptDraft = useStore(s => s.setPromptDraft),
+    mode = useStore(s => s.composerMode),
+    setMode = useStore(s => s.setComposerMode),
+    newChat = useStore(s => s.newChatThread),
+    chatThreadId = useStore(s => s.chatThreadId);
 
   useEffect(() => {
     if (promptDraft) {
@@ -29,19 +33,60 @@ export default function Composer() {
         go();
       }}
     >
+      <fieldset className="composer-modes">
+        <legend className="sr-only">Send as</legend>
+        <button
+          type="button"
+          className={'mode-btn' + (mode === 'task' ? ' on' : '')}
+          aria-pressed={mode === 'task'}
+          disabled={busy}
+          onClick={() => setMode('task')}
+          title="Full team task (uses the call budget and may file memory)"
+        >
+          Task
+        </button>
+        <button
+          type="button"
+          className={'mode-btn' + (mode === 'chat' ? ' on' : '')}
+          aria-pressed={mode === 'chat'}
+          disabled={busy}
+          onClick={() => setMode('chat')}
+          title="Single reply; saved as chat, not filed to wiki memory"
+        >
+          Chat
+        </button>
+        {mode === 'chat' && (
+          <button
+            type="button"
+            className="mode-btn"
+            disabled={busy || !chatThreadId}
+            onClick={() => newChat()}
+            title="Start a new chat thread"
+          >
+            New
+          </button>
+        )}
+      </fieldset>
       <textarea
         value={q}
         onChange={e => setQ(e.target.value)}
         rows={1}
         maxLength={2000}
         disabled={busy || !ready}
+        placeholder={
+          !ready
+            ? 'Add an API key to send'
+            : mode === 'chat'
+              ? 'Chat with one model… (not filed to wiki)'
+              : 'Task for the team…'
+        }
+        aria-label={mode === 'chat' ? 'Chat message' : 'Task for the team'}
         onKeyDown={e => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             go();
           }
         }}
-        aria-label="Task for the team"
       />
       {busy ? (
         <button type="button" className="icon-btn stop" onClick={stop} aria-label="Stop" title="Stop">
