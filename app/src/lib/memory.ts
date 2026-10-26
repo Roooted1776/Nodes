@@ -1,9 +1,12 @@
 import { isAgent } from '../data/team';
+import { PROV, PROVIDERS } from './providers';
 import { redact } from './redact';
 import { clip } from './text';
 
 // Same storage format as the earlier single-file page (brain.mem.v2), so saved memory carries over.
 export const KEY = 'brain.mem.v2';
+export const HIST_MAX = 5,
+  INBOX_MAX = 200;
 export const STALE_DAYS = 30,
   MAX_ENTRIES = 10000,
   MAX_SESSIONS = 25;
@@ -12,6 +15,7 @@ export const TYPES: EntryType[] = ['concept', 'entity', 'workstream'];
 export const TYPE_LABEL: Record<EntryType, string> = { concept: 'Concept', entity: 'Entity', workstream: 'Workstream' };
 
 export type SourceKind = 'session' | 'file' | 'correction' | 'tool' | 'github';
+export const SOURCE_KINDS: SourceKind[] = ['session', 'file', 'correction', 'tool', 'github'];
 export interface Source {
   kind: SourceKind;
   label: string;
@@ -36,6 +40,13 @@ export interface Entry {
   kws: string[] | null;
   manual: boolean;
   project?: string;
+  /** Earlier versions of the note, newest last (the page's change log). */
+  hist?: Hist[];
+}
+export interface Hist {
+  t: number;
+  note: string;
+  by: SourceKind;
 }
 export interface Msg {
   from: string;
@@ -63,6 +74,8 @@ export interface Session {
   nodeId?: string;
   nodeTitle?: string;
   grokFinalReview?: string;
+  /** One-sentence summary written by Dream. */
+  sum?: string;
 }
 export interface Settings {
   brain: boolean;
@@ -74,7 +87,7 @@ export interface Settings {
   useMemory?: boolean;
 }
 export interface Inbox {
-  kind: 'session' | 'file' | 'correction';
+  kind: 'session' | 'file' | 'correction' | 'github';
   ref: string;
 }
 export interface Mem {
@@ -90,6 +103,8 @@ export interface Mem {
   filtered: number;
   settings: Settings;
   lastRun?: number;
+  /** When the last Dream pass turned the inbox into wiki pages. */
+  lastDream?: number;
   /** Memories made before Brain went AI-only (local text analysis). Kept so nothing is lost, but never shown or sent. */
   archived: Entry[];
 }
@@ -109,8 +124,11 @@ export const blankMem = (): Mem => ({
   settings: { brain: true, sources: true, docs: true, msgs: false, tracker: true, instructions: '', useMemory: true },
 });
 
-export const LIVE_TAG = /^live · (Anthropic|OpenAI|Google|xAI) · /;
-const TAG_RE = /^(live · (Anthropic|OpenAI|Google|xAI) · [A-Za-z0-9._:-]{1,80}(?: · unverified)?|page|page checks)$/;
+// A reply from any connected provider counts as live; the labels come from the provider list so new ones are never dropped
+const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const LABELS = PROVIDERS.map(p => esc(PROV[p].label)).join('|');
+export const LIVE_TAG = new RegExp(`^live · (${LABELS}) · `);
+const TAG_RE = new RegExp(`^(live · (${LABELS}) · [A-Za-z0-9._:/-]{1,80}(?: · unverified)?|page|page checks)$`);
 const SPEAKER_RE = /^(owner|brain|queue|grok|grokbot|claude|cursor|gemini|chatgpt|perplexity|xcode|muse)$/;
 const DEMO_LABEL = /Owner's team chart|Starter skills list|Docs connector \(sample\)|Issue tracker \(sample\)/i;
 const okTs = (v: unknown) => {
@@ -195,7 +213,7 @@ export function sanitizeMem(d: any, fromBackup = false): Mem | null {
           s =>
             s &&
             typeof s.label === 'string' &&
-            ['session', 'tool', 'file', 'correction', 'github'].includes(s.kind) &&
+            SOURCE_KINDS.includes(s.kind) &&
             !(e.corrected && DEMO_LABEL.test(s.label)),
         )
         .slice(0, 6)
@@ -208,6 +226,14 @@ export function sanitizeMem(d: any, fromBackup = false): Mem | null {
               : null,
         })),
       links: [],
+      ...(Array.isArray(e.hist)
+        ? {
+            hist: e.hist
+              .filter(h => h && typeof h.note === 'string' && SOURCE_KINDS.includes(h.by))
+              .slice(-HIST_MAX)
+              .map(h => ({ t: okTs(h.t), note: scrub(h.note.slice(0, 600)), by: h.by })),
+          }
+        : {}),
     });
   }
   for (const e of d.entries as Entry[]) {
@@ -248,6 +274,7 @@ export function sanitizeMem(d: any, fromBackup = false): Mem | null {
       flow: cleanFlow(s.flow),
       ms: cleanMs(s.ms),
       project: typeof s.project === 'string' ? scrub(s.project.slice(0, 80)) : undefined,
+      ...(typeof s.sum === 'string' ? { sum: scrub(s.sum.slice(0, 300)) } : {}),
       projectId: typeof s.projectId === 'string' ? scrub(s.projectId.slice(0, 40)) : undefined,
       used: Array.isArray(s.used)
         ? s.used.filter((u: unknown) => typeof u === 'string' && ids.has(u as string)).slice(0, 12)
@@ -269,6 +296,18 @@ export function sanitizeMem(d: any, fromBackup = false): Mem | null {
   m.runs = Math.max(0, +d.runs || 0);
   m.filtered = Math.max(0, +d.filtered || 0);
   m.lastRun = okTs(d.lastRun) || undefined;
+  m.lastDream = okTs(d.lastDream) || undefined;
+  const liveIds = new Set([...m.entries.map(e => e.id), ...m.sessions.map(s => s.id)]);
+  m.inbox = (Array.isArray(d.inbox) ? d.inbox : [])
+    .filter(
+      (x: any) =>
+        x &&
+        ['session', 'file', 'correction', 'github'].includes(x.kind) &&
+        typeof x.ref === 'string' &&
+        liveIds.has(x.ref),
+    )
+    .slice(-INBOX_MAX)
+    .map((x: Inbox) => ({ kind: x.kind, ref: x.ref }));
   m.nextId = Math.max(1 + Math.max(0, ...m.entries.map(e => parseInt(e.id.slice(1), 10))), +d.nextId || 1);
   m.nextSession = Math.max(1 + Math.max(0, ...m.sessions.map(s => parseInt(s.id.slice(1), 10))), +d.nextSession || 1);
   const st = d.settings || {};
@@ -327,6 +366,19 @@ export function saveMem(storage: Pick<Storage, 'setItem'>, mem: Mem): boolean {
 
 export const byKey = (m: Mem, k: string) => m.entries.find(e => e.key === k);
 export const byId = (m: Mem, id: string) => m.entries.find(e => e.id === id);
+/** How much a page matters in the graph: wiki links (context edges) and cited sources (evidence edges), plus use. */
+export function weight(e: Entry): number {
+  return e.strength + 0.6 * e.links.length + 0.4 * e.sources.length;
+}
+/** Dot size for a page: well-linked, well-cited pages are bigger, like a wiki graph. */
+export function nodeSize(e: Entry): number {
+  return Math.min(0.32, 0.07 + 0.045 * Math.sqrt(weight(e)));
+}
+/** Keep the old note in the page's change log before it is replaced. */
+export function keepHistory(e: Entry, by: SourceKind, now: number) {
+  if (!e.note) return;
+  e.hist = [...(e.hist || []), { t: now, note: e.note, by }].slice(-HIST_MAX);
+}
 export function link(a?: Entry, b?: Entry) {
   if (!a || !b || a === b) return;
   if (!a.links.includes(b.id)) a.links.push(b.id);
@@ -491,67 +543,20 @@ export function saveImportedListAsTask(
   const sourceLabel = repoName ? `GitHub: ${repoName}` : `Import: ${proj}`;
   const q = `[${proj}] ${sourceLabel} (${items.length} item${items.length === 1 ? '' : 's'})`;
 
+  // An import is not a team run: no bot speaks for it. Dream reads the items from the inbox with a real AI call.
   const msgs: Msg[] = [
     {
-      from: 'cursor',
-      tag: 'page',
-      text: repoName
-        ? `Connected repository ${repoName} and extracted ${items.length} memory item${items.length === 1 ? '' : 's'} (${meta?.summary || `${items.length} items synced`}).`
-        : `Imported ${items.length} memory item${items.length === 1 ? '' : 's'} into project "${proj}".`,
-    },
-    {
-      from: 'codex',
+      from: 'brain',
       tag: 'page',
       text:
-        `Structured ${items.length} item${items.length === 1 ? '' : 's'} into Concepts, Entities, and Workstreams under project "${proj}" linked to node "${targetNode.title}".\n\n` +
-        items
-          .slice(0, 15)
-          .map(it => `• [${it.type || 'concept'}] ${it.title}${it.note ? `: ${clip(it.note, 100)}` : ''}`)
-          .join('\n') +
-        (items.length > 15 ? `\n…and ${items.length - 15} more item${items.length - 15 === 1 ? '' : 's'}.` : ''),
-    },
-    {
-      from: 'grokbot',
-      tag: 'page',
-      text: `PASS: Verified and filed ${items.length} item${items.length === 1 ? '' : 's'} under project "${proj}" under node "${targetNode.title}". Saved under tasks.`,
+        (repoName
+          ? `Imported ${items.length} item${items.length === 1 ? '' : 's'} from ${repoName}`
+          : `Imported ${items.length} item${items.length === 1 ? '' : 's'} into project "${proj}"`) +
+        `${meta?.hasError ? ' with errors' : ''}. Dream will review ${items.length === 1 ? 'it' : 'them'} on its next run.`,
     },
   ];
-
-  const totalWords = msgs.reduce((acc, m) => acc + (m.text.split(/\s+/).length || 0), 0);
-  const flow: Flow[] = [
-    ['cursor', 'codex', Math.round(totalWords * 0.45)],
-    ['codex', 'grokbot', Math.round(totalWords * 0.45)],
-    ['grokbot', 'brain', Math.round(totalWords * 0.1)],
-  ];
-
-  const cover: Record<string, { s: Cover; why?: string }> = {
-    cursor: {
-      s: meta?.failedStage === 'cursor' ? 'failed' : 'done',
-      why:
-        meta?.failedStage === 'cursor'
-          ? 'Extraction failed'
-          : `Retrieved ${items.length} items from ${repoName || 'source'}.`,
-    },
-    codex: {
-      s: meta?.failedStage === 'codex' ? 'failed' : 'done',
-      why: meta?.failedStage === 'codex' ? 'Structuring failed' : `Structured entries into node "${targetNode.title}".`,
-    },
-    grokbot: {
-      s: meta?.hasError || meta?.failedStage === 'grokbot' ? 'failed' : 'done',
-      why:
-        meta?.hasError || meta?.failedStage === 'grokbot'
-          ? 'Declined based on team response.'
-          : `Verified and saved under tasks in "${proj}".`,
-    },
-    gemini: {
-      s: meta?.failedStage === 'gemini' ? 'failed' : 'done',
-      why: meta?.failedStage === 'gemini' ? 'Validation failed' : 'Validated memory graph links.',
-    },
-    muse: {
-      s: meta?.failedStage === 'muse' ? 'failed' : 'done',
-      why: meta?.failedStage === 'muse' ? 'Audit failed' : 'Audited secret redactions and source references.',
-    },
-  };
+  const flow: Flow[] = [];
+  const cover: Record<string, { s: Cover; why?: string }> = {};
 
   const matchedIds = m.entries
     .filter(e => items.some(it => it.title.toLowerCase() === e.title.toLowerCase()))
@@ -575,10 +580,6 @@ export function saveImportedListAsTask(
     used: matchedIds.slice(0, 20),
     learned: true,
     flow,
-    ms: { cursor: 280, codex: 350, grokbot: 210 },
-    grokFinalReview: Object.values(cover).some(c => c.s === 'failed')
-      ? 'DECLINED: Blocked based on team response.'
-      : 'squash push merge all main remove all branches post merge make sure to commit and deploy',
     msgs,
     cover,
   };

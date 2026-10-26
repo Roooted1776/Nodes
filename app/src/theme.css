@@ -8,9 +8,9 @@
   --surface2: #1a1a1f;
   --line: rgba(255, 255, 255, 0.07);
   --line2: rgba(255, 255, 255, 0.12);
-  --fg: #e4e4e7;
-  --muted: #a1a1aa;
-  --faint: #71717a;
+  --fg: #ededf0;
+  --muted: #b4b4bd;
+  --faint: #8b8b94;
   --accent: #a5b4fc;
   --accent-strong: #818cf8;
   --accent2: #c4b5fd;
@@ -28,8 +28,8 @@
 body {
   background: radial-gradient(1200px 800px at 35% 30%, #16161b 0%, var(--bg) 60%);
   color: var(--fg);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -66,7 +66,7 @@ strong {
 button,
 .btnlink {
   font-weight: 500;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line2);
@@ -98,7 +98,7 @@ button:disabled {
 input,
 select,
 textarea {
-  font-size: 13px;
+  font-size: 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line2);
   background: #0c0c0f;
@@ -125,7 +125,7 @@ textarea:focus {
 
 /* pills */
 .pill {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   border-radius: 999px;
   padding: 2px 9px;
@@ -157,7 +157,7 @@ textarea:focus {
 }
 .card .field > span,
 .card .field > legend {
-  font-size: 12px !important;
+  font-size: 13px !important;
   font-weight: 500;
   color: var(--muted);
 }
@@ -174,7 +174,7 @@ textarea:focus {
   background: transparent !important;
 }
 .admin-bar .panel.admin > .group {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--faint);
   opacity: 1;
@@ -183,11 +183,11 @@ textarea:focus {
   background: var(--surface) !important;
   border: 1px solid var(--line) !important;
   border-radius: var(--radius) !important;
-  font-size: 13px;
+  font-size: 14px;
 }
 .admin-bar .card2 h3 {
   text-transform: none !important;
-  font-size: 13px !important;
+  font-size: 14px !important;
   font-weight: 600;
   color: #f4f4f5 !important;
   background: var(--surface) !important;
@@ -197,7 +197,7 @@ textarea:focus {
 .admin .mini,
 .admin small {
   color: var(--muted) !important;
-  font-size: 12px;
+  font-size: 13px;
 }
 .admin-bar .key-status {
   border-left-color: var(--accent-strong);
@@ -237,7 +237,7 @@ textarea:focus {
 /* labels on the 3D brain */
 .agent-tag,
 .mem-tag {
-  font-size: 12px !important;
+  font-size: 13px !important;
   font-weight: 500;
   letter-spacing: 0 !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9) !important;

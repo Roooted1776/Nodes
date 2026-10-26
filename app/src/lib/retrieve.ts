@@ -1,4 +1,4 @@
-import { TYPE_LABEL, type Entry, type Mem } from './memory';
+import { TYPE_LABEL, weight, type Entry, type Mem } from './memory';
 import { clip, keywords, stem, words } from './text';
 
 /** Saved entries that share words with a new prompt, best first. Only fresh entries. */
@@ -27,9 +27,19 @@ export function relevant(m: Mem, prompt: string, k = 6, targetProject?: string):
     .sort((a, b) => b.score - a.score)
     .slice(0, k);
 }
-export function contextBlock(list: Entry[]): string {
-  if (!list.length) return '';
+/** Titles of Brain's pages, most linked and cited first: the wiki's index. */
+export function indexTitles(m: Mem, max = 60): string[] {
+  return m.entries
+    .filter(e => e.status === 'fresh')
+    .sort((a, b) => weight(b) - weight(a))
+    .slice(0, max)
+    .map(e => e.title);
+}
+export function contextBlock(list: Entry[], index: string[] = []): string {
+  const idx = index.length ? `BRAIN INDEX (pages Brain holds): ${index.join(' | ')}\n\n` : '';
+  if (!list.length) return idx.trim();
   return (
+    idx +
     'BRAIN CONTEXT (saved memory from earlier sessions; it may be out of date, so check it):\n' +
     list
       .map(e => {

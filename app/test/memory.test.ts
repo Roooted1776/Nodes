@@ -240,17 +240,15 @@ describe('memory storage', () => {
     expect(m.sessions).toHaveLength(1);
     expect(sess.project).toBe('WebDev');
     expect(sess.q).toContain('GitHub: Roooted1776/WebDev');
-    expect(sess.cover?.cursor?.s).toBe('done');
-    expect(sess.cover?.grokbot?.s).toBe('done');
-    expect(sess.grokFinalReview).toBeDefined();
-    expect(sess.grokFinalReview).not.toContain('DECLINED');
-    expect(sess.msgs).toHaveLength(3);
-    expect(sess.msgs[0].from).toBe('cursor');
-    expect(sess.msgs[1].from).toBe('codex');
-    expect(sess.msgs[2].from).toBe('grokbot');
+    // an import is not a team run: no bot is quoted and no review is claimed
+    expect(sess.cover).toEqual({});
+    expect(sess.grokFinalReview).toBeUndefined();
+    expect(sess.msgs).toHaveLength(1);
+    expect(sess.msgs[0].from).toBe('brain');
+    expect(sess.msgs[0].text).toContain('Dream will review');
   });
 
-  it('grokFinalReview declines when a team stage has failed', () => {
+  it('an import with errors says so, without inventing a team decision', () => {
     const m = blankMem();
     const declinedSess = saveImportedListAsTask(
       m,
@@ -258,7 +256,8 @@ describe('memory storage', () => {
       'TestProject',
       { hasError: true, failedStage: 'cursor' },
     );
-    expect(declinedSess.grokFinalReview).toBe('DECLINED: Blocked based on team response.');
+    expect(declinedSess.grokFinalReview).toBeUndefined();
+    expect(declinedSess.msgs[0].text).toContain('with errors');
   });
 });
 
