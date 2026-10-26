@@ -14,6 +14,24 @@
 
 ---
 
+# Handoff from Cursor — Oct 25, 2026 (EDT): Chat + banter review on main
+
+## Overview & Request
+Owner: merge all to main and remove other branches (after Cursor/Muse joint look at Chat + idle huddles).
+
+## What Changed & Why
+- Merged `cursor/chat-banter-review-621a` (PR #14) onto `main`: keep Chat and idle huddles from colliding.
+- `pickTopic` skips chat sessions; Chat/Task/Search (and huddles-off) abort in-flight banter; Home skips banter when `stopped`; Banter bar has Stop while huddling.
+- Rebuilt root `index.html` after merge.
+
+## Checks
+- typecheck OK; **152** unit tests; build OK (`index.html` SHA-256 `98e9ebd39a00288857143864faec2a2f128cfe0962371d129ae5364e148f8786`).
+
+## Git State
+- Fast-forward + rebuild commit on `main`; delete feature branch; close PR #14. Main only.
+
+---
+
 # Handoff from Cursor — Oct 25, 2026 (EDT): merge all to main
 
 ## What
