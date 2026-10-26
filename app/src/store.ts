@@ -20,6 +20,8 @@ import { GITHUB_ENTRY, type Keys } from './lib/keystore';
 import type { Role } from './lib/auth';
 import { DREAM_SYSTEM, applyDream, dreamPrompt, gatherInbox, parseDream } from './lib/dream';
 import { tally } from './lib/learn';
+import { SEARCH_NO_WEB, SEARCH_SYSTEM, searchMemory, searchPrompt } from './lib/search';
+import { CAN_SEARCH } from './lib/providers';
 import { MODEL_RE, PROV, PROVIDERS, ProviderError, callModel, type ProviderId, RETIRED } from './lib/providers';
 import { redact } from './lib/redact';
 import { transitMs } from './lib/geometry';
@@ -138,6 +140,8 @@ export interface State {
   testProvider(provider?: ProviderId): Promise<void>;
   /** Run Dream: one real AI call turns the inbox into cited, linked wiki pages. */
   dream(auto?: boolean): Promise<void>;
+  /** One AI call that answers like Perplexity, with web search and matching memory. */
+  search(q: string): Promise<void>;
   dreaming: boolean;
   dreams: number;
   note(o: { type: EntryType; title: string; note: string; links?: string[] }): string | null;
@@ -487,6 +491,88 @@ export const useStore = create<State>()((set, get) => {
       set({ stopped: true, status: 'Stopped. No more calls will be made.' });
       ctls.forEach(c => c.abort());
       ctls.clear();
+    },
+    async search(raw) {
+      if (!admin()) return set({ status: NOT_ADMIN });
+      const s = get();
+      const q = redact(raw.trim(), Object.values(s.keys).filter(Boolean) as string[]).text.slice(0, 500);
+      if (!q || s.busy || s.dreaming) return;
+      const pv =
+        s.keys[s.live.provider] && !s.dead[s.live.provider]
+          ? s.live.provider
+          : PROVIDERS.find(p => !!s.keys[p] && !s.dead[p]);
+      if (!pv) return set({ status: 'Search needs a working API key. Add one under API keys.' });
+      if (s.calls >= s.live.callCap + 3)
+        return set({ status: 'The call budget for this page load is used. Reload to reset it.' });
+      const web = s.live.web && CAN_SEARCH.has(pv),
+        model = s.live.models[pv] || PROV[pv].model,
+        tag = `live · ${PROV[pv].label} · ${model} · unverified`;
+      const hits = s.mem.settings.useMemory === false ? [] : searchMemory(s.mem, q);
+      set({
+        busy: true,
+        calls: s.calls + 1,
+        active: 'perplexity',
+        status: `Searching with ${PROV[pv].label}${web ? ' and the web' : ''}…`,
+      });
+      say({ from: 'owner', tag: '', text: '🔎 ' + q });
+      if (hits.length) say({ from: 'brain', tag: 'page', text: 'From memory: ' + hits.map(e => e.title).join(' · ') });
+      const ctl = new AbortController();
+      ctls.add(ctl);
+      try {
+        const r = await callModel({
+          provider: pv,
+          key: s.keys[pv]!,
+          model,
+          system: SEARCH_SYSTEM + (web ? '' : SEARCH_NO_WEB),
+          user: searchPrompt(s.mem, q),
+          maxTokens: 700,
+          web,
+          signal: ctl.signal,
+          onDelta: t => set({ draft: { from: 'perplexity', text: clean(t) } }),
+        });
+        const text = clean(r.text.trim());
+        if (!text) throw new Error(r.why ? `no text (${r.why})` : 'an empty reply');
+        say({ from: 'perplexity', tag, text });
+        set(x => ({
+          tin: x.tin + r.tin,
+          tout: x.tout + r.tout,
+          status:
+            `Search answered by ${PROV[pv].label}.` +
+            (hits.length ? ` Memory used: ${hits.map(e => e.title).join(' · ')}.` : ' No memory matched.'),
+        }));
+        if (!get().incognito && get().mem.settings.brain)
+          get().commit(m => {
+            const sess = {
+              id: 's' + m.nextSession++,
+              ts: Date.now(),
+              q: 'Search: ' + q.slice(0, 290),
+              kws: [],
+              accepted: [],
+              uncovered: [],
+              used: hits.map(e => e.id),
+              learned: false,
+              msgs: [
+                { from: 'owner', tag: '', text: q },
+                { from: 'perplexity', tag, text: text.slice(0, 4000) },
+              ],
+            };
+            m.sessions.push(sess);
+            if (m.sessions.length > 25) m.sessions.shift();
+            m.inbox.push({ kind: 'session', ref: sess.id });
+          });
+      } catch (e: unknown) {
+        if (e instanceof ProviderError && e.rejected) set(x => ({ dead: { ...x.dead, [pv]: true } }));
+        say({
+          from: 'brain',
+          tag: 'page',
+          cls: 'warn',
+          text: 'Search failed: ' + clean(e instanceof Error ? e.message : String(e)),
+        });
+        set({ status: 'Search failed. Nothing was made up.' });
+      } finally {
+        ctls.delete(ctl);
+        set({ busy: false, active: null, draft: null });
+      }
     },
     async dream(auto = false) {
       if (!admin()) {

@@ -132,4 +132,14 @@ describe('Dream (Perplexity-style memory pass)', () => {
     expect(back.entries[0].hist?.[0].note).toBe('v1');
     expect(back.inbox).toEqual([{ kind: 'session', ref: s.id }]);
   });
+
+  it('keeps project pages after a reload, and brings back ones archived before', () => {
+    const m = blankMem();
+    const p = mkEntry(m, { key: 'project:brain', type: 'workstream', title: 'Brain', note: 'Project' }, 0);
+    m.entries.push(p);
+    const old = mkEntry(m, { key: 'project:redo', type: 'workstream', title: 'Redo', note: 'Project' }, 0);
+    const back = sanitizeMem({ ...JSON.parse(JSON.stringify(m)), archived: [old] })!;
+    expect(back.entries.map(e => e.title).sort()).toEqual(['Brain', 'Redo']);
+    expect(back.archived).toEqual([]);
+  });
 });

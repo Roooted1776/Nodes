@@ -1,3 +1,4 @@
+import { splitLinks } from '../lib/search';
 import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { pulseMs, type Pulse } from '../store';
 import { colorOf } from '../data/colors';
@@ -26,6 +27,24 @@ const nameOf = (id: string) =>
   id.startsWith('mem:') ? 'Memory' : isAgent(id) ? AGENT[id].name : id === 'owner' ? 'You' : 'Brain';
 
 /** Ensures no raw code blocks (```) clutter the live chat, turning them into plain conversational text. */
+/** Chat text with web links made clickable; they open the source in a new tab. */
+function Linked({ text }: { text: string }) {
+  return (
+    <>
+      {splitLinks(text).map((p, i) =>
+        p.href ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts of one fixed string
+          <a key={i} href={p.href} target="_blank" rel="noopener noreferrer">
+            {p.t}
+          </a>
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts of one fixed string
+          <span key={i}>{p.t}</span>
+        ),
+      )}
+    </>
+  );
+}
 export function cleanChatText(text: string): string {
   if (!text) return '';
   const closed = text.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_m, code) => {
@@ -182,7 +201,9 @@ export default function ChatPanel() {
                   {a && <span className="doing">{a.role}</span>}
                   {a && !viewing && via(a.id)}
                 </header>
-                <p>{cleanChatText(m.text)}</p>
+                <p>
+                  <Linked text={cleanChatText(m.text)} />
+                </p>
               </article>
             </Fragment>
           );

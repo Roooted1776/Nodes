@@ -294,3 +294,48 @@ textarea:focus {
 .access .card.minimal input:focus {
   border-color: var(--accent-strong);
 }
+
+/* search under the brain */
+.search-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: min(620px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: rgba(17, 17, 20, 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: var(--muted);
+  z-index: 5;
+}
+.search-bar input {
+  flex: 1;
+  min-width: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 15px;
+  height: 36px;
+  padding: 0;
+}
+.search-bar button {
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: var(--fg);
+  color: #09090b;
+  border-color: var(--fg);
+}
+.chat a,
+.side a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}

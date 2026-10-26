@@ -14,6 +14,48 @@
 
 ---
 
+# Handoff from Cursor — Oct 25, 2026 (EDT): main-only merge cleanup; deploy blocked
+
+## Overview & Request
+Owner: "main only branch, merge all remove res after, deploy once done."
+
+## What Changed & Why
+- All feature work was already squash-merged into `main` (PRs #1–#8, #10). No further code merges needed.
+- Closed open PR #9 (`cursor/rules-draft-prs-only`) without merging — it would have forced draft-PRs-only and refused pushes to `main`, which conflicts with Owner's main-only / auto-push rule.
+- Deleted leftover remote branches after merge: `claude/brain-like-perplexity`, `claude/modern-look`, `claude/peaceful-bell-q659g1`, `claude/relaxed-euler-3wz8rk`, `claude/search-under-brain`, `claude/simplify-keys`, `cursor/rules-draft-prs-only`.
+- Pointed `origin` at the renamed repo `Roooted1776/ch29ouy` (GitHub redirect from Nodes).
+- Only remote branch remaining: `main` at `badf52f`.
+
+## Deploy status (blocker — honest)
+- Live https://redeemed.live still serves older HTML (`6c65fac4…`, 1,639,700 bytes). Main tip `index.html` is `4372d659…` (1,645,010 bytes).
+- Deploy path: Hostinger VPS 2010795 `brain-site` init pin (`BUILD_URL` + `BUILD_SHA256`). This cloud run has **no** `HOSTINGER_API_TOKEN`, **no** Hostinger-vps MCP, and **no** SSH key to `2.25.249.204` (ports 22/443 reachable; auth denied).
+- Setup actions requested for Owner: add secret `HOSTINGER_API_TOKEN` and attach Hostinger-vps MCP.
+
+### Pin values for the next deploy (main tip; index.html unchanged since badf52f)
+- Commit: `a353b16` (or `badf52f` — same `index.html` bytes)
+- `BUILD_URL`: `https://raw.githubusercontent.com/Roooted1776/ch29ouy/a353b16/index.html`
+- `BUILD_SHA256`: `4372d659a61d4b1359a9eaa02677a6b5bfd08483f3a8d6caa8c52606005937ac`
+- After Hostinger `vps_docker_create` (same project name `brain-site`): confirm init log `deployed 4372d659…`, then `curl -sL https://redeemed.live/ | sha256sum` must match.
+
+## Files Touched
+- `HANDOFF.md` (this entry)
+- `DEPLOYMENT.md` (current pin values + main-only note)
+
+## Checks & Real Results
+- Git: `origin/main` only; open PRs: none.
+- Live HTTPS: 200 (stale build vs main tip).
+- App format/lint/typecheck/test/build/e2e: not re-run (no app code change this turn).
+
+## How the Next AI Should Check It
+1. `git branch -r` → only `origin/main`
+2. With Hostinger-vps + token: update `brain-site` pins to values above; verify live SHA-256
+3. Do not reopen PR #9 or recreate deleted branches unless Owner asks
+
+## Git State
+- On `main`, push of this handoff pending. Deploy not completed (Hostinger connector missing).
+
+---
+
 # Handoff from Claude — Oct 25, 2026: constant memory sync + restore from database
 
 ## What changed
