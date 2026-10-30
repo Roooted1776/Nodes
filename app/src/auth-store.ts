@@ -121,7 +121,8 @@ async function unlock(u: User, kek: CryptoKey) {
   const data = (await decryptVault(s, remote.envelope)) as { mem?: unknown; keys?: unknown; deviceKeys?: unknown };
   let mem = sanitizeMem(data.mem);
   if (!mem) throw new VaultError('The encrypted memory has an invalid format.', 'format');
-  // The vault came back empty (wiped or new). The database copy is the backup: rebuild memory from it.
+  // The vault came back empty (wiped or new). The admin-only database mirror is the backup: rebuild from it.
+  // Viewers never read those tables; only an unlocked admin restores.
   let restored = 0;
   if (u.role === 'admin' && !mem.entries.length && !mem.sessions.length) {
     try {

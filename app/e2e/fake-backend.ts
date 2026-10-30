@@ -77,10 +77,20 @@ export async function fakeBackend(context: BrowserContext) {
       return send({ envelope, rev: revision });
     }
     if (url.pathname === '/rest/v1/audit_log') return send([]);
-    if (url.pathname === '/rest/v1/projects') return send([]);
-    if (url.pathname === '/rest/v1/memories') return send([]);
-    if (url.pathname === '/rest/v1/sessions') return send([]);
-    if (url.pathname.startsWith('/rest/v1/rpc/')) return send({ ok: true });
+    // Persistent memory mirror: admin only (matches production RLS).
+    if (
+      url.pathname === '/rest/v1/projects' ||
+      url.pathname === '/rest/v1/memories' ||
+      url.pathname === '/rest/v1/sessions'
+    ) {
+      if (me.role !== 'admin') return send({ message: 'Admin only' }, 403);
+      return send([]);
+    }
+    if (url.pathname.startsWith('/rest/v1/rpc/')) {
+      if (me.role !== 'admin' && /upsert_(memory|session)/.test(url.pathname))
+        return send({ message: 'Only admins may update memory' }, 403);
+      return send({ ok: true });
+    }
     return send({ error: 'Unhandled fake request' }, 400);
   });
   return { users, getEnvelope: () => envelope };

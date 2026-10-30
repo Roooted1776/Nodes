@@ -72,9 +72,16 @@ select tests.affected(
 select tests.refused($$insert into public.vaults (id, envelope) values (1, '{}')$$, 'viewer inserts a vault row');
 select tests.refused('delete from public.vaults where id = 1', 'viewer deletes the vault');
 select tests.refused($$update public.account_keys set wrap = '{"iv":"a","ct":"b"}'::jsonb$$, 'viewer writes a sealed key');
-select tests.refused('select 1 from public.memories', 'viewer reads the retired readable memory table');
-select tests.refused('select 1 from public.sessions', 'viewer reads the retired task table');
+select tests.refused('select 1 from public.memories', 'viewer reads the persistent memory table');
+select tests.refused('select 1 from public.sessions', 'viewer reads the persistent session table');
+select tests.refused('select 1 from public.projects', 'viewer reads the persistent projects table');
 select tests.refused('select count(*) from public.brain_meta', 'viewer reads the retired meta table');
+select tests.refused(
+  $$select public.upsert_memory('e1','k','concept','t','n','Brain',null,'{}'::jsonb)$$,
+  'viewer writes persistent memory');
+select tests.refused(
+  $$select public.upsert_session('s1','task','Brain',null,'{}'::jsonb)$$,
+  'viewer writes a persistent session');
 select tests.refused($$select public.claim_setup('x')$$, 'viewer spends the setup code');
 select tests.refused($$select graphql_public.graphql(null, '{profiles{edges{node{id}}}}')$$, 'viewer calls graphql');
 select tests.refused('select private.touch()', 'viewer calls an internal trigger function');
@@ -108,6 +115,18 @@ select tests.refused($$update public.vaults set rev = 9 where id = 1$$, 'admin s
 select tests.refused($$update public.vaults set id = 2 where id = 1$$, 'admin moves the vault row');
 select tests.refused('update public.audit_log set what = $q$x$q$', 'admin rewrites the access log');
 select tests.refused('delete from public.audit_log', 'admin deletes the access log');
+-- Persistent memory mirror: admin can read and upsert; direct table writes stay closed.
+select public.upsert_memory('e1', 'note:a', 'concept', 'Alpha', 'first', 'Brain', null, '{"strength":1}'::jsonb);
+select public.upsert_session('s1', 'first task', 'Brain', null, '{"id":"s1","ts":1,"q":"first task","msgs":[]}'::jsonb);
+select tests.count_is('select 1 from public.memories where key = $q$note:a$q$', 1, 'admin reads persistent memory');
+select tests.count_is('select 1 from public.sessions where id = $q$s1$q$', 1, 'admin reads persistent sessions');
+select tests.count_is('select 1 from public.projects where id = $q$Brain$q$', 1, 'admin reads persistent projects');
+select tests.refused(
+  $$insert into public.memories (id, key, type, title) values ('e2','k2','concept','x')$$,
+  'admin cannot insert memory rows directly');
+select tests.refused(
+  $$insert into public.sessions (id, task) values ('s2','x')$$,
+  'admin cannot insert session rows directly');
 reset role;
 select tests.count_is($$select 1 from public.vaults where rev = 2 and updated_at > '2001-01-01'$$, 1,
   'the vault keeps the database timestamp');
