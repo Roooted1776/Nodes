@@ -14,6 +14,26 @@
 
 ---
 
+# Handoff from Cursor — Oct 30, 2026 (EDT): push merge main; deploy blocked on Hostinger token
+
+## Overview & Request
+Owner: "push merge main deploy".
+
+## What Changed & Why
+- Fast-forwarded `cursor/admin-persistent-memory-a508` onto `origin/main` (`fc9db50`). PR #15 MERGED. Feature branch deleted.
+- Admin-only persistent memory migration was already applied on production Supabase earlier this run.
+- **Deploy not completed:** no `HOSTINGER_API_TOKEN` in this environment; SSH to `2.25.249.204` denied; no Hostinger MCP. Requested secret + panel pin action for Owner.
+
+## Deploy pin (brain-site only; do not touch RedMed)
+- `BUILD_URL`: `https://raw.githubusercontent.com/Roooted1776/ch29ouy/fc9db501cedc6a94f8599565758f3c73de1224cf/index.html`
+- `BUILD_SHA256`: `98e9ebd39a00288857143864faec2a2f128cfe0962371d129ae5364e148f8786`
+- Verify: raw GitHub hash matches; then `curl -sL https://redeemed.live/ | sha256sum` must match after Hostinger recreate.
+
+## Git State
+- `origin/main` at `fc9db50`. Working tree clean after this docs note push.
+
+---
+
 # Handoff from Cursor — Oct 30, 2026 (EDT): admin-only persistent memory + site sync
 
 ## Overview & Request
