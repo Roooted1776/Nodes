@@ -82,7 +82,7 @@ describe('idle huddles', () => {
     expect(speakers.at(-1)).toBe('grokbot'); // and closes it with the collected summary
     const middle = speakers.slice(1, -1);
     expect(middle).toHaveLength(BANTER_MAX_LINES - 2); // the teammates answer the topic
-    expect(new Set(middle).size).toBe(3); // each answers once, in turn
+    expect(new Set(middle).size).toBe(BANTER_MAX_LINES - 2); // each answers once, in turn
     expect(middle).not.toContain('grokbot');
     expect(w.state.tin).toBe(3 * BANTER_MAX_LINES);
     expect(w.state.tout).toBe(2 * BANTER_MAX_LINES);
