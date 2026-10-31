@@ -21,9 +21,19 @@ describe('approval phrase triggers no git or deploy', () => {
   it('recognises the phrase and close variants', () => {
     expect(isLegacyApprovalPhrase(LEGACY_APPROVAL_PHRASE)).toBe(true);
     expect(isLegacyApprovalPhrase(`  ${LEGACY_APPROVAL_PHRASE.toUpperCase()}.`)).toBe(true);
-    expect(isLegacyApprovalPhrase('Squash, push, merge all to main; commit and deploy!')).toBe(true);
+    expect(
+      isLegacyApprovalPhrase(
+        'Squash, push; merge all main -- remove all branches post-merge: make sure to commit AND\n deploy!',
+      ),
+    ).toBe(true);
+    expect(isLegacyApprovalPhrase('Squash, push, merge all to main; commit and deploy!')).toBe(false);
     expect(isLegacyApprovalPhrase('looks good')).toBe(false);
     expect(isLegacyApprovalPhrase(undefined)).toBe(false);
+  });
+
+  it('an ordinary message using those words is not hidden', () => {
+    expect(isLegacyApprovalPhrase('Should we squash, push, merge and deploy later?')).toBe(false);
+    expect(isLegacyApprovalPhrase(`${LEGACY_APPROVAL_PHRASE} tomorrow`)).toBe(false);
   });
 
   it('handling the phrase makes no network, git, or deploy calls', () => {

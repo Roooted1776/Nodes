@@ -14,12 +14,10 @@ const norm = (s: string) =>
     .replace(/[^a-z]+/g, ' ')
     .trim();
 
-/** True for the old phrase or close variants (case, punctuation, spacing). */
+/** True only for the exact old phrase, ignoring case, punctuation and whitespace. */
 export function isLegacyApprovalPhrase(text: string | undefined | null): boolean {
   if (!text) return false;
-  const t = norm(text);
-  if (t === norm(LEGACY_APPROVAL_PHRASE)) return true;
-  return /\bsquash\b/.test(t) && /\bpush\b/.test(t) && /\bmerge\b/.test(t) && /\bdeploy\b/.test(t);
+  return norm(text) === norm(LEGACY_APPROVAL_PHRASE);
 }
 
 /** The value saved as the final review. Only records state; it is data, never a command. */
