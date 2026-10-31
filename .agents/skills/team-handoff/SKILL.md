@@ -12,7 +12,7 @@ description: >-
 2. **Review**: Inspect existing code, diffs, and context before touching anything.
 3. **Revise**: Plan precise surgical changes with no extra moving parts.
 4. **Edit**: Implement minimal necessary modifications and verify all 6 checks (`npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e`).
-5. **Push**: Document in `HANDOFF.md`, push verified work to `origin/main` via `./scripts/push-work.sh`, and follow the review sequence below.
+5. **Push**: Push a branch and open a PR; Owner and Director merge after Audits and Security sign off.
 
 > **Standing Team Principle: We don't move slow.** Move with decisive momentum and surgeon-level precision. Complete every task start to finish, never stall or hand back half-done work, verify rapidly, and push across the desk immediately.
 
@@ -20,7 +20,7 @@ description: >-
 1. Claude builds, verifies, and records the handoff.
 2. Cursor receives the handoff to inspect code diffs and repository integration.
 3. Gemini, ChatGPT, and Muse perform independent reviews (context, code quality, audit).
-4. Grok Bot (in charge) verifies real results and issues the final team PASS/FAIL decision. Grok Bot can decline based on the team's response. Once he finishes the final review, if approved, Grok Bot saves the final directive: "squash push merge all main remove all branches post merge make sure to commit and deploy" (saved with the review record, not included in chat). If declined, the task is marked DECLINED and git actions are blocked.
+4. Approval means the PR is ready for Director to merge after Audits and Security sign off; never delete branches. Director has the final say after the three review checks. Director can decline a task. A declined task is marked DECLINED and git actions are blocked.
 
 ## Handoff File Requirements
 Create or update `HANDOFF.md` in the project root with these exact sections:
@@ -35,4 +35,4 @@ Create or update `HANDOFF.md` in the project root with these exact sections:
    - `npm run build` (confirm single-file bundle generation)
    - `npm run e2e` (Chromium browser test duration)
 5. **How the Next AI Should Check It**: Exact CLI reproduction commands.
-6. **Git State**: Confirm working tree state and verified push to main per Owner's Oct 24 auto-push rule.
+6. **Git State**: Push a branch and open a PR; Owner and Director merge after Audits and Security sign off.

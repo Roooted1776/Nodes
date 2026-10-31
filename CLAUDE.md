@@ -7,13 +7,13 @@ Owner's Brain. Read `@AGENTS.md` first.
 2. **Review**: Inspect existing code, diffs, and context before touching anything.
 3. **Revise**: Plan precise surgical changes with no extra moving parts.
 4. **Edit**: Implement minimal necessary modifications and verify all 6 checks (`npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e`).
-5. **Push**: Document in `HANDOFF.md`, push verified work to `origin/main` via `./scripts/push-work.sh`, and follow the multi-agent review sequence (Claude builds, Cursor gets handoff, Gemini/ChatGPT/Muse review, Grok Bot verifies and calls pass/fail).
+5. **Push**: Push a branch and open a PR; Owner and Director merge after Audits and Security sign off.
 
 - Write code in `app/src` (React, TypeScript, three.js) and tests in `app/test`. Never hand-edit the root `index.html`: it is the built single-file page. Rebuild it with `npm run build` in `app/`.
 - Before committing, run in `app/`: `npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, then `npm run build`. GitHub runs the same checks on every push.
 - Brain uses only real AI and real data. Never add sample, scripted or example tasks to the app.
-- Grok Bot leads the full team across projects and makes the final team decision after three checks: Gemini, Muse, then Codex/Claude/Cursor/Perplexity together. Grok Bot can decline based on the team's response. When approved, save this as the final thing he says: "squash push merge all main remove all branches post merge make sure to commit and deploy" (saved with the review record; not included in chat). When declined, the task is marked DECLINED and git actions are blocked.
-- Automated push authorized: Completed, verified task changes are automatically pushed to main after passing all checks and reviews (run `npm run push` or `./scripts/push-work.sh`). Never touch the RedMed project.
+- Approval means the PR is ready for Director to merge after Audits and Security sign off; never delete branches. Director has the final say after the three review checks. Director can decline a task. A declined task is marked DECLINED and git actions are blocked.
+- Push a branch and open a PR; Owner and Director merge after Audits and Security sign off.
 - Keep explanations in plain words, one idea at a time.
 - Auto-scroll chats: Always auto-scroll chat views to follow streaming output and new messages. Never leave viewports stuck at the top or stall waiting for manual scrolling. To be fully autonomous, auto-scrolling is required so tasks run faster without wasting time.
 - Velocity (We don't move slow): Move with decisive speed and momentum. Complete every task start to finish without stalling, wasting cycles, or handing back half-done steps. Verify cleanly and push across the desk immediately.

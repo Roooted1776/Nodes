@@ -11,7 +11,7 @@ Every bot, agent, and tool on this team must follow this exact 5-step workflow o
 2. **Review**: Inspect existing code, diffs, requirements, and test suites before touching anything.
 3. **Revise**: Plan precise surgical changes with no extra moving parts.
 4. **Edit**: Implement minimal necessary modifications and verify all 6 checks (`npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e`).
-5. **Push**: Document in `HANDOFF.md`, push verified work to `origin/main` via `./scripts/push-work.sh`, and follow the review sequence: Claude builds, Cursor gets the handoff, Gemini, ChatGPT and Muse review, and Grok Bot (in charge) verifies real results and calls PASS or FAIL.
+5. **Push**: Push a branch and open a PR; Owner and Director merge after Audits and Security sign off.
 
 > **Standing Team Principle: We don't move slow.** Move with decisive momentum and surgeon-level precision. Complete every task start to finish, never stall or hand back half-done work, verify rapidly, and push across the desk immediately.
 
@@ -19,7 +19,7 @@ Every bot, agent, and tool on this team must follow this exact 5-step workflow o
 
 - When reported AI usage reaches 90%, try to finish the current task within the remaining allowance. Use an available usage indicator; never invent a percentage or claim continuous monitoring when it is unavailable.
 - Finish only the assigned work, run the relevant checks, and leave a short handoff stating what changed, files touched, checks and results, and anything unfinished. Then step back so the next AI can continue without competing edits. Never mark unfinished work complete just to meet the threshold.
-- Owner authorizes committing and automatically pushing completed, verified task changes to `main`. This replaces earlier instructions requiring Owner to push or merge and the draft-PR-only requirement for this workflow. The 90% threshold is a wrap-up cue, not permission to publish incomplete work.
+- Push a branch and open a PR; Owner and Director merge after Audits and Security sign off.
 - Before pushing, verify the repository and remote, fetch the latest `main`, inspect the working tree and outgoing commits, and ensure the push contains only the assigned task. Preserve other AIs' files, branches, uncommitted changes, and commits; never bundle unrelated work, force-push, reset, or overwrite their work. If isolation, checks, conflicts, permissions, or branch protection prevent a safe push, leave the completed work and handoff locally and report the blocker.
 - Push only after the task is actually complete and checked. Review stages that are unavailable must be reported honestly; never fabricate another program's approval.
 
