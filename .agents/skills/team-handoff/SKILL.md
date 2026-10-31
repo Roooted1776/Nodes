@@ -20,7 +20,7 @@ description: >-
 1. Claude builds, verifies, and records the handoff.
 2. Cursor receives the handoff to inspect code diffs and repository integration.
 3. Gemini, ChatGPT, and Muse perform independent reviews (context, code quality, audit).
-4. Approval means the PR is ready for Director to merge after Audits and Security sign off; never delete branches.
+4. Approval means the PR is ready for Director to merge after Audits and Security sign off; never delete branches. Director has the final say after the three review checks. Director can decline a task. A declined task is marked DECLINED and git actions are blocked.
 
 ## Handoff File Requirements
 Create or update `HANDOFF.md` in the project root with these exact sections:
