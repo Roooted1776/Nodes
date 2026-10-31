@@ -5,6 +5,7 @@ import { colorOf } from '../data/colors';
 import { AGENT, isAgent, type AgentId } from '../data/team';
 import { useStore } from '../store';
 import { PROV } from '../lib/providers';
+import { isLegacyApprovalPhrase } from '../lib/approval';
 import BotIcon from './BotIcon';
 import Composer from './Composer';
 
@@ -117,11 +118,7 @@ export default function ChatPanel() {
   // the chat shows only what the AI team wrote, plus who is doing what right now
   const msgs = (
     currentSession ? currentSession.msgs.map((m, i) => ({ ...m, id: i, cls: undefined as 'warn' | undefined })) : log
-  ).filter(
-    m =>
-      m.from !== 'brain' &&
-      m.text !== 'squash push merge all main remove all branches post merge make sure to commit and deploy',
-  );
+  ).filter(m => m.from !== 'brain' && !isLegacyApprovalPhrase(m.text));
   const doing = currentSession
     ? []
     : (Object.entries(stages) as [AgentId, string][]).filter(([id, v]) => v === 'working' && id !== draft?.from);
