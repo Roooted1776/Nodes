@@ -79,7 +79,7 @@ Owner: make the site synced up; keep persistent memory; only admin can see or us
 # Handoff from Cursor — Oct 25, 2026 (EDT): Chat + banter review on main
 
 ## Overview & Request
-Owner: (old order removed Oct 31; see CLAUDE.md:15)
+Owner: merge all to main and remove other branches (after Cursor/Muse joint look at Chat + idle huddles).
 
 ## What Changed & Why
 - Merged `cursor/chat-banter-review-621a` (PR #14) onto `main`: keep Chat and idle huddles from colliding.
@@ -99,7 +99,7 @@ Owner: (old order removed Oct 31; see CLAUDE.md:15)
 ## What
 - Fast-forwarded `ren/idle-banter` (PR #13) onto `main`: idle team huddles + personality tones.
 - Checks: typecheck OK, **152** tests, build next.
-- (old order removed Oct 31; see CLAUDE.md:15)
+- Delete leftover branches after push; main only.
 
 ---
 
@@ -156,7 +156,7 @@ Owner finished HOSTINGER_API_TOKEN secret + external action; continue setup and 
 # Handoff from Cursor — Oct 25, 2026 (EDT): merged keys-on-device onto main
 
 ## Overview & Request
-Owner: (old order removed Oct 31; see CLAUDE.md:15) Env setup: secrets skipped; Hostinger external action marked complete.
+Owner main-only: merge remaining open work, remove branches, deploy. Env setup: secrets skipped; Hostinger external action marked complete.
 
 ## What Changed & Why
 - Merged `cursor/keys-on-device` (PR #11) into `main`: AI keys + GitHub token stay on this device only (`keystore.ts` / `brain.keys.v1`), never in the shared vault. Old vault keys migrate out on next admin unlock. Plain `brain.github.v1` token cleared.
