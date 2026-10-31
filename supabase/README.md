@@ -2,12 +2,13 @@
 
 The Brain project is `iihjcqiiavleyheqzotl`, in us-east-1. This deployment uses only that project.
 
-- Migrations preserve the initial schema and add `vaults` and `account_keys` for encrypted memory and sealed account keys. The plaintext `projects` / `memories` / `sessions` mirror is admin-only (`20261030224500_admin_only_persistent_memory`): viewers cannot select or upsert those rows; admins write memories/sessions only through `upsert_*`.
+- Migrations preserve the initial schema and add `vaults` and `account_keys` for encrypted memory and sealed account keys. The plaintext `projects` / `memories` / `sessions` mirror is admin-only (`20261030224500_admin_only_persistent_memory`): admins write memories/sessions only through `upsert_*`.
 - `20261024200000_tighten_access.sql` closes the remaining client paths: access-log rows are stamped by the database (author and time, so a member cannot name or backdate somebody else), removing an account finally works (the log kept a `not null` user id while its foreign key tried to null it), nothing in the `private` schema is callable by a client except the two role checks policies need, `anon` has no table grant at all, the GraphQL resolver is closed, and new tables are no longer auto-granted to `anon`.
-- `functions/accounts/` creates, resets, and removes accounts after checking the caller. While Brain has no accounts, the first visitor creates the admin directly (open first-admin setup). Deploy with JWT verification off because the function validates authenticated requests itself and setup/status must work before sign-in. Browser calls are answered only for Brain's own origins (`redeemed.live`, `www.redeemed.live`, local dev and the built file's `null` origin).
+- `functions/accounts/` creates, resets, and removes accounts after checking the caller. Setup only works while Brain has no accounts at all; once any account exists it is refused and the vault is never touched. Deploy with JWT verification off because the function validates authenticated requests itself and setup/status must work before sign-in. Browser calls are answered only for Brain's own origins (`redeemed.live`, `www.redeemed.live`, local dev and the built file's `null` origin).
 - Only the owner can finish first-admin setup on the deployed site. Only admins create subsequent accounts; dates of birth are checked and discarded. No admin is created by tests.
 - Public sign-up is off in `config.toml` and must stay off in the dashboard. Even if it were enabled, a sign-up could not create a Brain profile or a sealed memory key, and could not read the database vault.
 - Provider keys are sealed on the device and never uploaded to the database.
+- Recovery: keep a spare admin login that only the owner uses. A lone admin who forgets the passcode cannot reopen memory any other way.
 
 ## Config (`config.toml`)
 
@@ -55,8 +56,7 @@ granted automatically any more.
 ## Checks
 
 `bash supabase/tests/run.sh` applies every migration, in order, to a throwaway Postgres 17 (Docker
-only, no Supabase account) and then asserts the access rules: `anon` gets nothing, a viewer reads
-ciphertext only, an admin cannot rewrite the log or skip a vault revision, an account can be removed
+only, no Supabase account) and then asserts the access rules: `anon` gets nothing, a non-admin role cannot be created, an admin cannot rewrite the log or skip a vault revision, an account can be removed
 and keeps its history, and every table in `public` has row-level security. Run it after any change to
 `supabase/`.
 
