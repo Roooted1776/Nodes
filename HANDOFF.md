@@ -1,5 +1,7 @@
 # Brain — Handoff Log
 
+Records below are history. Any order in them to push to main, merge everything, delete branches or deploy is cancelled as of Oct 31, 2026. Current rule: CLAUDE.md:15.
+
 ## Core Ethos (standing rules for every entry below)
 > **"We are all one team of people and bots. Never hide information out of emotion: complete the task and push across the desk to the next person."** — Owner, Oct 2026
 
@@ -77,7 +79,7 @@ Owner: make the site synced up; keep persistent memory; only admin can see or us
 # Handoff from Cursor — Oct 25, 2026 (EDT): Chat + banter review on main
 
 ## Overview & Request
-Owner: merge all to main and remove other branches (after Cursor/Muse joint look at Chat + idle huddles).
+Owner: (old order removed Oct 31; see CLAUDE.md:15)
 
 ## What Changed & Why
 - Merged `cursor/chat-banter-review-621a` (PR #14) onto `main`: keep Chat and idle huddles from colliding.
@@ -97,7 +99,7 @@ Owner: merge all to main and remove other branches (after Cursor/Muse joint look
 ## What
 - Fast-forwarded `ren/idle-banter` (PR #13) onto `main`: idle team huddles + personality tones.
 - Checks: typecheck OK, **152** tests, build next.
-- Delete leftover branches after push; main only.
+- (old order removed Oct 31; see CLAUDE.md:15)
 
 ---
 
@@ -154,7 +156,7 @@ Owner finished HOSTINGER_API_TOKEN secret + external action; continue setup and 
 # Handoff from Cursor — Oct 25, 2026 (EDT): merged keys-on-device onto main
 
 ## Overview & Request
-Owner main-only: merge remaining open work, remove branches, deploy. Env setup: secrets skipped; Hostinger external action marked complete.
+Owner: (old order removed Oct 31; see CLAUDE.md:15) Env setup: secrets skipped; Hostinger external action marked complete.
 
 ## What Changed & Why
 - Merged `cursor/keys-on-device` (PR #11) into `main`: AI keys + GitHub token stay on this device only (`keystore.ts` / `brain.keys.v1`), never in the shared vault. Old vault keys migrate out on next admin unlock. Plain `brain.github.v1` token cleared.
