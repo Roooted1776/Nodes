@@ -5,7 +5,7 @@
 }
 .home.single {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 230px minmax(340px, 28vw);
+  grid-template-columns: minmax(0, 1fr) 230px minmax(400px, 34vw);
   grid-template-rows: minmax(0, 1fr);
   height: 100%;
   margin: 0;
