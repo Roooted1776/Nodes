@@ -182,14 +182,14 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  background: rgba(138, 123, 255, 0.15);
-  color: #a79cff;
-  border: 1px solid rgba(138, 123, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6e6e6;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   text-transform: uppercase;
 }
 .chat.grok .chat-pass.in-flight {
-  border-color: rgba(138, 123, 255, 0.3);
-  background: rgba(138, 123, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
 }
 .chat.grok .chat-pass .pass-pill.pulse {
   animation: pulse-glow 1.5s ease-in-out infinite alternate;
