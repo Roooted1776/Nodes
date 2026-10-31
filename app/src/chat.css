@@ -5,7 +5,7 @@
 }
 .home.single {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 230px minmax(340px, 28vw);
+  grid-template-columns: minmax(0, 1fr) 230px minmax(400px, 34vw);
   grid-template-rows: minmax(0, 1fr);
   height: 100%;
   margin: 0;
@@ -528,4 +528,38 @@
   background: rgba(154, 168, 255, 0.07);
   color: var(--fg);
   overflow-wrap: anywhere;
+}
+
+.memory-list {
+  position: absolute;
+  inset: 8% 6%;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  color: #fff;
+  border: 1px solid #fff;
+}
+.memory-list header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #fff;
+}
+.memory-rows {
+  overflow: auto;
+  padding: 8px 12px;
+}
+.memory-rows table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.memory-rows th,
+.memory-rows td {
+  text-align: left;
+  vertical-align: top;
+  padding: 4px 8px;
+  border-bottom: 1px solid #444;
 }

@@ -958,6 +958,23 @@ export default function BrainScene({ locked = false }: { locked?: boolean }) {
         {!locked && <History />}
         <Transits />
         <Outline />
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: three.js mesh; the memory list also opens from the search bar */}
+        <mesh
+          position={[-0.2, -0.2, 0]}
+          onClick={ev => {
+            ev.stopPropagation();
+            useStore.getState().setMemoryOpen(true);
+          }}
+          onPointerOver={() => {
+            document.body.style.cursor = 'pointer';
+          }}
+          onPointerOut={() => {
+            document.body.style.cursor = '';
+          }}
+        >
+          <sphereGeometry args={[0.9, 16, 16]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
       </group>
       <Rig />
     </Canvas>
