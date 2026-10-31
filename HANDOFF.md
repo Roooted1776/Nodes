@@ -381,7 +381,7 @@ Owner: "main only branch, merge all remove res after, deploy once done."
 - **Cursor (Handoff)**: Verified all components and stores are typed, imported properly, and responsive.
 - **Gemini & ChatGPT (Review)**: Confirmed GitHub API rate-limit friendliness (differential `since` parameter, 5-release pagination), secret redaction in notes, and zero RedMed coupling.
 - **Muse (Review)**: Confirmed 3D halo visual clarity, Minecraft 16px/32px font hierarchy, and accessible aria-labels.
-- **Grok Bot (Lead Verification)**: PASS. All 118 Vitest tests passing, 0 TypeScript errors, 0 Biome errors, Playwright E2E passing. Grok Bot holds full authority to decline based on the team's response; when approved, the final saved review directive: "squash push merge all main remove all branches post merge make sure to commit and deploy" (saved with the review record; not included in chat). When declined, tasks are marked DECLINED and git actions blocked.
+- **Grok Bot (Lead Verification)**: PASS. All 118 Vitest tests passing, 0 TypeScript errors, 0 Biome errors, Playwright E2E passing. Grok Bot holds full authority to decline based on the team's response; when approved, the final saved review directive: (old order removed Oct 31; see CLAUDE.md:15) (saved with the review record; not included in chat). When declined, tasks are marked DECLINED and git actions blocked.
 
 ---
 
