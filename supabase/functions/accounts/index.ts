@@ -105,6 +105,10 @@ async function handle(req: Request) {
     case 'setup': {
       const name = checkName(b.name), password = checkPass(b.password);
       const wrap = checkWrap(b.wrap), envelope = checkEnvelope(b.envelope);
+      // Setup deletes and recreates the vault, so it must never run on a live Brain: refuse while any
+      // account exists (any role), before the vault is touched. Only a brand-new, empty project gets past.
+      const { count, error: ce } = await db.from('profiles').select('id', { count: 'exact', head: true });
+      if (ce || count === null || count > 0) throw new Refuse('Brain is already set up. Sign in instead.', 409);
       const { data: ok } = await db.rpc('claim_open_setup');
       if (ok !== true) throw new Refuse('Brain is already set up. Sign in instead.', 409);
       let u;
