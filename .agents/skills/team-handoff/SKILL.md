@@ -12,7 +12,7 @@ description: >-
 2. **Review**: Inspect existing code, diffs, and context before touching anything.
 3. **Revise**: Plan precise surgical changes with no extra moving parts.
 4. **Edit**: Implement minimal necessary modifications and verify all 6 checks (`npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e`).
-5. **Push**: Document in `HANDOFF.md`, push verified work to `origin/main` via `./scripts/push-work.sh`, and follow the review sequence below.
+5. **Push**: Push a branch and open a PR; Owner and Director merge after Audits and Security sign off.
 
 > **Standing Team Principle: We don't move slow.** Move with decisive momentum and surgeon-level precision. Complete every task start to finish, never stall or hand back half-done work, verify rapidly, and push across the desk immediately.
 
@@ -35,4 +35,4 @@ Create or update `HANDOFF.md` in the project root with these exact sections:
    - `npm run build` (confirm single-file bundle generation)
    - `npm run e2e` (Chromium browser test duration)
 5. **How the Next AI Should Check It**: Exact CLI reproduction commands.
-6. **Git State**: Confirm working tree state and verified push to main per Owner's Oct 24 auto-push rule.
+6. **Git State**: Push a branch and open a PR; Owner and Director merge after Audits and Security sign off.
