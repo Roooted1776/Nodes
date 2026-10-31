@@ -29,10 +29,13 @@ export default function Composer() {
     if (prov && !busy) {
       const st = useStore.getState();
       st.setKey(t, prov);
-      st.setLive({ remember: true });
-      useStore.setState({
-        status: `${PROV[prov].label} key saved on this device.`,
-      });
+      // setKey refuses non-admins and leaves its own message; only claim "saved" if the key was stored
+      if (useStore.getState().keys[prov] === t.slice(0, 300)) {
+        st.setLive({ remember: true });
+        useStore.setState({
+          status: `${PROV[prov].label} key saved on this device.`,
+        });
+      }
       setQ('');
       return;
     }
