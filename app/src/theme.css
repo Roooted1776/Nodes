@@ -339,3 +339,37 @@ textarea:focus {
   text-underline-offset: 2px;
   overflow-wrap: anywhere;
 }
+
+/* Black and white outside the brain and the chat (Owner, Oct 2026).
+   The brain view, the flow pane and the chat keep their bot and memory colours. Red and green alerts stay. */
+:root {
+  --accent: #f4f4f5;
+  --accent-strong: #d4d4d8;
+  --accent2: #d4d4d8;
+  --concept: #e4e4e7;
+  --entity: #d4d4d8;
+  --workstream: #a1a1aa;
+  --live: #f4f4f5;
+  --line: rgba(255, 255, 255, 0.1);
+  --line2: rgba(255, 255, 255, 0.18);
+}
+.stage,
+.flow-side,
+.side {
+  --accent: #a5b4fc;
+  --accent-strong: #818cf8;
+  --accent2: #c4b5fd;
+  --concept: #93c5fd;
+  --entity: #5eead4;
+  --workstream: #fdba74;
+  --live: #5eead4;
+}
+::selection {
+  background: rgba(255, 255, 255, 0.28);
+}
+.admin-bar,
+.admin-bar *:not(.bad):not(.err):not(.error):not(.good):not(.ok),
+.access,
+.access * {
+  --accent-strong: #d4d4d8;
+}
