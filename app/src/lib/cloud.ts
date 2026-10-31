@@ -156,7 +156,10 @@ const BODY_LIMIT = 200_000; // the sessions table refuses bodies near 256 KB
 const sent = new Map<string, string>();
 export const resetMirror = () => sent.clear();
 
-/** Persist memory entries, projects and task sessions to the database. Reports what really saved. */
+/**
+ * Persist memory entries, projects and task sessions to the database (admin only; RLS + upsert checks).
+ * Viewers never call this. Reports what really saved.
+ */
 export async function syncMemoryDatabase(mem: import('./memory').Mem, d: Db = db()): Promise<SyncResult> {
   const out: SyncResult = { saved: 0, failed: 0, firstError: '' };
   // The database answers with an error value instead of throwing, so check it every time.
@@ -223,7 +226,10 @@ export async function syncMemoryDatabase(mem: import('./memory').Mem, d: Db = db
   return out;
 }
 
-/** Read memory back from the database tables (the copy `syncMemoryDatabase` keeps), shaped for `sanitizeMem`. */
+/**
+ * Read memory back from the admin-only database mirror (the copy `syncMemoryDatabase` keeps).
+ * Shaped for `sanitizeMem`. Viewers have no SELECT on these tables.
+ */
 export async function loadMemoryDatabase(d: Db = db()): Promise<{ entries: unknown[]; sessions: unknown[] }> {
   const [m, t] = await Promise.all([
     d.from('memories').select('id, key, type, title, note, project, body').eq('archived', false).limit(10000),

@@ -14,6 +14,66 @@
 
 ---
 
+# Handoff from Cursor — Oct 30, 2026 (EDT): push merge main; deploy blocked on Hostinger token
+
+## Overview & Request
+Owner: "push merge main deploy".
+
+## What Changed & Why
+- Fast-forwarded `cursor/admin-persistent-memory-a508` onto `origin/main` (`fc9db50`). PR #15 MERGED. Feature branch deleted.
+- Admin-only persistent memory migration was already applied on production Supabase earlier this run.
+- **Deploy not completed:** no `HOSTINGER_API_TOKEN` in this environment; SSH to `2.25.249.204` denied; no Hostinger MCP. Requested secret + panel pin action for Owner.
+
+## Deploy pin (brain-site only; do not touch RedMed)
+- `BUILD_URL`: `https://raw.githubusercontent.com/Roooted1776/ch29ouy/fc9db501cedc6a94f8599565758f3c73de1224cf/index.html`
+- `BUILD_SHA256`: `98e9ebd39a00288857143864faec2a2f128cfe0962371d129ae5364e148f8786`
+- Verify: raw GitHub hash matches; then `curl -sL https://redeemed.live/ | sha256sum` must match after Hostinger recreate.
+
+## Git State
+- `origin/main` at `fc9db50`. Working tree clean after this docs note push.
+
+---
+
+# Handoff from Cursor — Oct 30, 2026 (EDT): admin-only persistent memory + site sync
+
+## Overview & Request
+Owner: make the site synced up; keep persistent memory; only admin can see or use that mirror ("thats good").
+
+## What Changed & Why
+- Production already had `persistent_memory`, but SELECT grants on `memories`/`sessions` were revoked and policies still said "members read". Admin restore from the DB mirror could not work; member policies were wrong for Owner's rule.
+- New migration `20261030224500_admin_only_persistent_memory.sql` (applied on Brain project `iihjcqiiavleyheqzotl`): admins-only SELECT policies on projects/memories/sessions; GRANT SELECT to authenticated (RLS blocks viewers); direct INSERT on memories/sessions stays revoked; `upsert_*` remains admin-checked.
+- Access tests assert viewer refused / admin can upsert+read; e2e fake backend matches admin-only.
+- Encrypted vault unchanged as the shared copy. Admin mirror keeps syncing via `startMirror` / `syncMemoryDatabase`.
+
+## Files Touched
+- `supabase/migrations/20261030224500_admin_only_persistent_memory.sql` (new; applied remotely)
+- `supabase/tests/access.sql`, `supabase/README.md`
+- `app/src/auth-store.ts`, `app/src/lib/cloud.ts` (comments only)
+- `app/e2e/fake-backend.ts`, `DEPLOYMENT.md`, `HANDOFF.md`
+
+## Checks & Real Results
+- `npm run format` OK
+- `npm run lint` warnings only (baseline)
+- `npm run typecheck` OK
+- `npm test` **152** passed
+- `npm run build` OK (root `index.html` SHA-256 unchanged: `98e9ebd39a00288857143864faec2a2f128cfe0962371d129ae5364e148f8786` — no bundle-affecting code)
+- `npm run e2e` **3** passed (~1.1m)
+
+## Site sync / deploy blocker
+- Live https://redeemed.live still serves SHA `b53ce8c1…` (old pin). Main tip HTML is `98e9ebd3…`.
+- This run has **no** `HOSTINGER_API_TOKEN` and no Hostinger MCP. Cannot update `brain-site` compose pin from here.
+- After merge, Hostinger pin: `BUILD_URL=https://raw.githubusercontent.com/Roooted1776/ch29ouy/<main-sha>/index.html`, `BUILD_SHA256=98e9ebd39a00288857143864faec2a2f128cfe0962371d129ae5364e148f8786` (re-hash if a later commit rebuilds HTML).
+
+## How the Next AI Should Check It
+- `cd app && npm run format && npm run lint && npm run typecheck && npm test && npm run build && npm run e2e`
+- Confirm remote policies: `admins read memories|sessions|projects` only.
+- Deploy: update Hostinger `brain-site` BUILD_URL/SHA only; leave RedMed containers alone. `curl -sL https://redeemed.live/ | sha256sum` must match pin.
+
+## Git State
+- Branch `cursor/admin-persistent-memory-a508` (draft PR). Named external reviews not run in this chat; no Grok Bot PASS claimed.
+
+---
+
 # Handoff from Cursor — Oct 25, 2026 (EDT): Chat + banter review on main
 
 ## Overview & Request
