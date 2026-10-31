@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# scripts/push-work.sh — Automated, verified push to GitHub
-# Aligned with Owner's Oct 24 auto-push authorization in AGENTS.md
+# scripts/push-work.sh — Verified push of the current branch plus a pull request
+# Never pushes to main; Owner and Director merge after Audits and Security sign off.
 
 set -euo pipefail
 
 # Ensure standard tools (node, npm, git, gh) are in PATH
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
+GH_BIN="${GH_BIN:-gh}"  # override only for tests
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 APP_DIR="$REPO_ROOT/app"
 GIT_COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null || git rev-parse --git-dir)"
@@ -14,56 +15,40 @@ GIT_COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null || git rev-parse --
 usage() {
   cat << 'EOF'
 Usage:
-  ./scripts/push-work.sh [OPTIONS] [COMMIT_MESSAGE]
+  ./scripts/push-work.sh [OPTIONS]   (commit your work first; the script never commits it for you)
 
 Options:
-  --install-hook   Install git post-commit hook for 100% automated push on every commit
   --no-verify      Skip test/build checks (use with extreme caution)
   --help           Show this message
 
 Examples:
-  ./scripts/push-work.sh "feat: add user profile"
   ./scripts/push-work.sh
-  ./scripts/push-work.sh --install-hook
 EOF
   exit 0
 }
-
-# Handle --install-hook
-if [[ "${1:-}" == "--install-hook" ]]; then
-  HOOK_PATH="$GIT_COMMON_DIR/hooks/post-commit"
-  mkdir -p "$(dirname "$HOOK_PATH")"
-  cat > "$HOOK_PATH" << 'HOOK_EOF'
-#!/usr/bin/env bash
-# Auto-push hook installed by push-work.sh
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-echo "==> [post-commit hook] Automatically pushing to GitHub..."
-git push origin HEAD:main || {
-  echo "==> [post-commit hook] Warning: Automatic push failed. Run './scripts/push-work.sh' to re-verify and push."
-}
-HOOK_EOF
-  chmod +x "$HOOK_PATH"
-  echo "✓ Successfully installed git post-commit hook at $HOOK_PATH"
-  echo "Every future git commit will now automatically push to GitHub!"
-  exit 0
-fi
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   usage
 fi
 
 SKIP_VERIFY=0
-COMMIT_MSG=""
 
 for arg in "$@"; do
   if [[ "$arg" == "--no-verify" ]]; then
     SKIP_VERIFY=1
   else
-    COMMIT_MSG="$arg"
+    echo "ERROR: Unknown argument '$arg'. Commit your changes yourself first; see --help." >&2
+    exit 1
   fi
 done
 
 cd "$REPO_ROOT"
+
+CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "HEAD" ]]; then
+  echo "ERROR: On '$CURRENT_BRANCH'. Never push to main. Switch to a work branch first." >&2
+  exit 1
+fi
 
 echo "=========================================="
 echo "    Brain / Nodes — Automated GitHub Push "
@@ -81,27 +66,14 @@ if echo "$ALL_CHANGED" | grep -qi "RedMed"; then
 fi
 echo "✓ Isolation verified: No RedMed content."
 
-# 2. Stage and commit if message provided or changes exist
-if [[ -n "$COMMIT_MSG" ]]; then
-  echo "==> 2. Staging and committing changes with message: '$COMMIT_MSG'..."
-  git add -A
-  if ! git diff --cached --quiet; then
-    git commit -m "$COMMIT_MSG"
-    echo "✓ Committed changes locally."
-  else
-    echo "• Working tree already clean. Proceeding with existing commits."
-  fi
-else
-  echo "==> 2. Checking working tree state..."
-  if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "NOTE: Uncommitted changes exist. Staging and committing automatically..."
-    git add -A
-    git commit -m "chore: automated work save and verified sync"
-    echo "✓ Committed changes as: chore: automated work save and verified sync"
-  else
-    echo "✓ Working tree is clean."
-  fi
+# 2. Refuse to run with uncommitted or untracked changes (no automatic commits)
+echo "==> 2. Checking working tree state..."
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "ERROR: Uncommitted or untracked changes found. Commit or stash them yourself, then rerun. Nothing was committed." >&2
+  git status --short >&2
+  exit 1
 fi
+echo "✓ Working tree is clean."
 
 # 3. Verification checks in app/
 if [[ "$SKIP_VERIFY" -eq 0 && -d "$APP_DIR" ]]; then
@@ -136,35 +108,19 @@ else
   echo "==> 3. Verification skipped."
 fi
 
-# 4. Fetch and rebase to prevent remote conflicts
-echo "==> 4. Checking remote sync with origin/main..."
-git fetch origin main
+# 4. Push the current branch (never main)
+echo "==> 4. Pushing branch '$CURRENT_BRANCH' to GitHub..."
+git push -u origin "$CURRENT_BRANCH:$CURRENT_BRANCH"
 
-# Check if origin/main has diverged
-UPSTREAM_COMMIT="$(git rev-parse origin/main)"
-LOCAL_COMMIT="$(git rev-parse HEAD)"
-
-if [[ "$UPSTREAM_COMMIT" == "$LOCAL_COMMIT" ]]; then
-  echo "✓ Everything is already up to date with origin/main."
-  exit 0
+# 5. Open a draft pull request to main (skip if one already exists)
+echo "==> 5. Opening pull request..."
+if "$GH_BIN" pr view "$CURRENT_BRANCH" >/dev/null 2>&1; then
+  echo "• A pull request for '$CURRENT_BRANCH' already exists."
+else
+  "$GH_BIN" pr create --draft --base main --head "$CURRENT_BRANCH" --fill
 fi
-
-# If upstream has new commits, rebase cleanly
-if ! git merge-base --is-ancestor origin/main HEAD; then
-  echo "--> Fetching latest remote commits and rebasing..."
-  git rebase origin/main
-fi
-
-# 5. Push to GitHub
-echo "==> 5. Pushing to GitHub (origin/main)..."
-CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-git push origin "$CURRENT_BRANCH:main"
 
 LATEST_SHA="$(git rev-parse --short HEAD)"
-LATEST_MSG="$(git log -1 --pretty=%B | head -n 1)"
-
 echo "=========================================="
-echo "✓ SUCCESS: Pushed to GitHub main successfully!"
-echo "  Commit: $LATEST_SHA - $LATEST_MSG"
-echo "  Remote: $(git remote get-url origin)"
+echo "✓ Pushed '$CURRENT_BRANCH' ($LATEST_SHA). Owner and Director merge after Audits and Security sign off."
 echo "=========================================="
