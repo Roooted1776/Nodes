@@ -12,7 +12,7 @@ Owner's Brain. Read `@AGENTS.md` first.
 - Write code in `app/src` (React, TypeScript, three.js) and tests in `app/test`. Never hand-edit the root `index.html`: it is the built single-file page. Rebuild it with `npm run build` in `app/`.
 - Before committing, run in `app/`: `npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, then `npm run build`. GitHub runs the same checks on every push.
 - Brain uses only real AI and real data. Never add sample, scripted or example tasks to the app.
-- Approval means the PR is ready for Director to merge after Audits and Security sign off; never delete branches.
+- Approval means the PR is ready for Director to merge after Audits and Security sign off; never delete branches. Director has the final say after the three review checks. Director can decline a task. A declined task is marked DECLINED and git actions are blocked.
 - Push a branch and open a PR; Owner and Director merge after Audits and Security sign off.
 - Keep explanations in plain words, one idea at a time.
 - Auto-scroll chats: Always auto-scroll chat views to follow streaming output and new messages. Never leave viewports stuck at the top or stall waiting for manual scrolling. To be fully autonomous, auto-scrolling is required so tasks run faster without wasting time.
