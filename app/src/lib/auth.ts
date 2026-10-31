@@ -8,8 +8,8 @@ export const PASS_ITER = 310_000,
   IDLE_MS = 15 * 60_000,
   FREE_TRIES = 5,
   MAX_BACKOFF_MS = 15 * 60_000;
-export type Role = 'admin' | 'viewer';
-export const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', viewer: 'Viewer' };
+export type Role = 'admin';
+export const ROLE_LABEL: Record<Role, string> = { admin: 'Admin' };
 /** The signed-in person. The role comes from Brain's profiles table, not from this browser. */
 export interface User {
   id: string;

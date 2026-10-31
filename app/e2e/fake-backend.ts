@@ -1,6 +1,6 @@
 // All browser tests intercept the entire project origin. No real Supabase or AI traffic.
 import type { BrowserContext } from '@playwright/test';
-type Account = { id: string; name: string; role: 'admin' | 'viewer'; password: string; wrap: unknown };
+type Account = { id: string; name: string; role: 'admin'; password: string; wrap: unknown };
 export async function fakeBackend(context: BrowserContext) {
   const users: Account[] = [];
   let envelope: unknown = null,
@@ -23,10 +23,14 @@ export async function fakeBackend(context: BrowserContext) {
       if (b.action === 'status') return send({ setupNeeded: users.length === 0 });
       if (b.action === 'setup' || b.action === 'create') {
         if (b.action === 'create' && me?.role !== 'admin') return send({ error: 'Only admins' }, 403);
+        if (b.action === 'create' && b.role !== 'admin')
+          return send({ error: 'Only admin accounts can be created.' }, 400);
+        if (b.action === 'setup' && users.length)
+          return send({ error: 'Brain is already set up. Sign in instead.' }, 409);
         const user: Account = {
           id: `00000000-0000-4000-8000-${String(users.length + 1).padStart(12, '0')}`,
           name: b.name,
-          role: b.action === 'setup' ? 'admin' : b.role,
+          role: 'admin',
           password: b.password,
           wrap: b.wrap,
         };

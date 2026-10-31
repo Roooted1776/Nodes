@@ -30,7 +30,7 @@ function cors(req: Request): Record<string, string> {
 }
 const NAME_RE = /^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/;
 const PASS_RE = /^[A-Za-z0-9_-]{43}$/; // 32 bytes, base64url, made in the browser
-type Role = 'admin' | 'viewer';
+type Role = 'admin';
 
 class Refuse extends Error {
   constructor(msg: string, public status = 400) {
@@ -137,7 +137,8 @@ async function handle(req: Request) {
     case 'create': {
       const me = await caller(req);
       if (me.role !== 'admin') throw new Refuse('Only admins can add accounts.', 403);
-      const name = checkName(b.name), password = checkPass(b.password), role: Role = b.role === 'admin' ? 'admin' : 'viewer';
+      if (b.role !== 'admin') throw new Refuse('Only admin accounts can be created.');
+      const name = checkName(b.name), password = checkPass(b.password), role: Role = 'admin';
       const u = await makeUser(name, password, role, checkWrap(b.wrap));
       await audit(me, `Added ${role} ${name}`);
       return { ok: true, user: u };

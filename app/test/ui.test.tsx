@@ -11,7 +11,7 @@ vi.mock('../src/components/BrainScene', () => ({
 
 // Fake backend only: no test sends credentials or traffic to the real project.
 const server = vi.hoisted(() => ({
-  users: [] as { id: string; name: string; role: 'admin' | 'viewer'; password: string; wrap: any }[],
+  users: [] as { id: string; name: string; role: 'admin'; password: string; wrap: any }[],
   vault: null as any,
   rev: 1,
   failStatus: false,
@@ -166,7 +166,7 @@ describe('setup and login', () => {
 
 describe('who can do what', () => {
   /** Accounts and an encrypted vault made the way the app makes them, then a real sign-in through the store. */
-  async function asRole(role: 'admin' | 'viewer', seed?: object, vaultKeys?: object, prep?: () => void) {
+  async function asRole(_role: 'admin', seed?: object, vaultKeys?: object, prep?: () => void) {
     vi.resetModules();
     localStorage.clear();
     sessionStorage.clear();
@@ -176,35 +176,20 @@ describe('who can do what', () => {
     const { blankMem } = await import('../src/lib/memory');
     const sec = await newSecrets();
     server.users = [];
-    for (const [name, accountRole, pass] of [
-      ['Owner', 'admin', 'correct horse battery'],
-      ['Guest', 'viewer', 'visitor pass phrase'],
-    ] as const) {
+    for (const [name, pass] of [['Owner', 'correct horse battery']] as const) {
       const { password, kek } = await derivePassword(name, pass);
-      server.users.push({
-        id: name,
-        name,
-        role: accountRole,
-        password,
-        wrap: await sealFor(kek, sec, accountRole === 'admin'),
-      });
+      server.users.push({ id: name, name, role: 'admin', password, wrap: await sealFor(kek, sec) });
     }
     server.vault = await encryptVault(sec, { mem: { ...blankMem(), ...seed }, keys: vaultKeys || {} }, 1);
-    if (role === 'admin') server.users = server.users.filter(u => u.role === 'admin');
     server.rev = 1;
     const m = await boot();
     await act(async () => {
-      await m.auth.useAuth
-        .getState()
-        .login(
-          role === 'admin' ? 'Owner' : 'Guest',
-          role === 'admin' ? 'correct horse battery' : 'visitor pass phrase',
-        );
+      await m.auth.useAuth.getState().login('Owner', 'correct horse battery');
     });
     return { ...m, u: userEvent.setup(), sec };
   }
-  it('a viewer sees only the brain and the live chat: no composer, no admin panel, no way to change anything', async () => {
-    const { App, store } = await asRole('viewer', {
+  it('once locked there is no role: no composer, no admin panel, no way to change anything', async () => {
+    const { App, store, auth } = await asRole('admin', {
       entries: [
         {
           id: 'e1',
@@ -225,8 +210,9 @@ describe('who can do what', () => {
     });
     render(<App />);
     expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'Live chat' })).toBeTruthy();
-    expect(screen.queryAllByRole('tab')).toEqual([]);
+    act(() => auth.useAuth.getState().logout());
+    expect(await screen.findByRole('heading', { name: 'Sign in to Brain' })).toBeTruthy();
+    expect(store.useStore.getState().role).toBeNull();
     expect(screen.queryByLabelText('Task for the team')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Admin panel' })).toBeNull();
     // even calling the store directly cannot change anything
@@ -234,7 +220,7 @@ describe('who can do what', () => {
     expect(s.note({ type: 'concept', title: 'Sneaky', note: 'x' })).toBeNull();
     s.remove('e1');
     s.erase();
-    expect(store.useStore.getState().mem.entries.map(e => e.title)).toEqual(['Plain words']);
+    expect(store.useStore.getState().mem.entries).toEqual([]);
     expect(store.useStore.getState().status).toMatch(/Only admins/);
     expect(await s.send('hello')).toBeUndefined();
     expect(store.useStore.getState().calls).toBe(0);
@@ -332,19 +318,19 @@ describe('who can do what', () => {
     const { store, auth, sec } = await asRole('admin', {}, { openai: 'sk-test-old-vault-key' });
     const { decryptVault } = await import('../src/lib/vault');
     expect(store.useStore.getState().keys.openai).toBe('sk-test-old-vault-key');
-    // the re-saved shared vault (the database copy) has no keys, also when opened with a viewer's secrets
+    // the re-saved shared vault (the database copy) has no keys, also when opened with only the read keys
     expect(server.rev).toBe(2);
-    const viewer = { dek: sec.dek, pub: sec.pub };
-    const shared = (await decryptVault(viewer, server.vault)) as Record<string, unknown>;
+    const reader = { dek: sec.dek, pub: sec.pub };
+    const shared = (await decryptVault(reader, server.vault)) as Record<string, unknown>;
     expect(Object.keys(shared)).toEqual(['mem']);
     expect(JSON.stringify(shared)).not.toContain('sk-test-old-vault-key');
-    const local = (await decryptVault(viewer, JSON.parse(localStorage.getItem('brain.vault.v1')!))) as object;
+    const local = (await decryptVault(reader, JSON.parse(localStorage.getItem('brain.vault.v1')!))) as object;
     expect(Object.keys(local)).toEqual(['mem']);
     // a key added now is sealed on this device and never reaches the shared vault
     act(() => store.useStore.getState().setKey('sk-test-new-key', 'anthropic'));
     await waitFor(() => expect(server.rev).toBe(3));
     await waitFor(() => expect(localStorage.getItem('brain.keys.v1')).toBeTruthy());
-    const after = (await decryptVault(viewer, server.vault)) as Record<string, unknown>;
+    const after = (await decryptVault(reader, server.vault)) as Record<string, unknown>;
     expect(Object.keys(after)).toEqual(['mem']);
     expect(JSON.stringify(after)).not.toMatch(/sk-test/);
     const everything = Object.keys(localStorage)
@@ -395,8 +381,9 @@ describe('who can do what', () => {
     expect(store.useStore.getState().githubToken).toBe('ghp_typedNewToken');
   }, 30000);
 
-  it('a viewer cannot test the GitHub connection and gets no keys or token', async () => {
-    const { store } = await asRole('viewer', {}, { openai: 'sk-test-viewer-should-not-get' });
+  it('once locked nobody can test the GitHub connection and no keys or token stay loaded', async () => {
+    const { store, auth } = await asRole('admin', {}, { openai: 'sk-test-locked-should-not-keep' });
+    act(() => auth.useAuth.getState().logout());
     expect(store.useStore.getState().keys).toEqual({});
     expect(store.useStore.getState().githubToken).toBe('');
     const r = await store.useStore.getState().testGithub('Roooted1776/ch29ouy', 'ghp_x');

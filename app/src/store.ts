@@ -94,7 +94,7 @@ export interface State {
   mem: Mem;
   rev: number;
   storageOk: boolean;
-  role: Role;
+  role: Role | null; // null while locked: only a signed-in admin has a role
   who: string;
   notes: Partial<Record<AgentId, string>>;
   live: LiveCfg;
@@ -370,7 +370,7 @@ export const useStore = create<State>()((set, get) => {
     storageOk: true,
     dreaming: false,
     dreams: 0,
-    role: 'viewer',
+    role: null,
     who: '',
     notes: {},
     live: lv.live,

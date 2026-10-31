@@ -14,7 +14,7 @@ const KEY = 'sk-ant-abcdefghijklmnopqrstuvwxyz0123';
 
 describe('pasting a key into the composer', () => {
   it('a non-admin is refused: no "saved" message and the key is not stored', async () => {
-    useStore.setState({ role: 'viewer', keys: {}, status: '', busy: false });
+    useStore.setState({ role: null, keys: {}, status: '', busy: false });
     render(<Composer />);
     const u = userEvent.setup();
     await u.type(screen.getByLabelText('Task for the team'), `${KEY}{Enter}`);

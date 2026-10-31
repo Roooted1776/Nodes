@@ -301,10 +301,6 @@ h2:first-child {
   color: var(--workstream);
   border-color: rgba(255, 189, 112, 0.5);
 }
-.role.viewer {
-  color: var(--entity);
-  border-color: rgba(115, 223, 189, 0.5);
-}
 .bar .readout {
   margin-left: auto;
 }

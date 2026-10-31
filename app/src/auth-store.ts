@@ -14,7 +14,7 @@ import {
   writeAudit,
 } from './lib/cloud';
 import { blankMem, sanitizeMem } from './lib/memory';
-import { mirror, openChannel, publish, type Hub } from './lib/share';
+import { openChannel, publish, type Hub } from './lib/share';
 import { VaultError, decryptVault, encryptVault, newSecrets, openFor, sealFor, type Secrets } from './lib/vault';
 import { GITHUB_ENTRY, KEYS_KEY, type Keys, openKeys, sealKeys } from './lib/keystore';
 import { setKeySave, setVault, takePlainGithubToken, useStore } from './store';
@@ -122,7 +122,7 @@ async function unlock(u: User, kek: CryptoKey) {
   let mem = sanitizeMem(data.mem);
   if (!mem) throw new VaultError('The encrypted memory has an invalid format.', 'format');
   // The vault came back empty (wiped or new). The admin-only database mirror is the backup: rebuild from it.
-  // Viewers never read those tables; only an unlocked admin restores.
+  // Only an unlocked admin reads those tables and restores.
   let restored = 0;
   if (u.role === 'admin' && !mem.entries.length && !mem.sessions.length) {
     try {
@@ -139,7 +139,7 @@ async function unlock(u: User, kek: CryptoKey) {
   revision = remote.rev;
   chain = Promise.resolve();
   // Provider keys and the GitHub token stay on this device only, sealed with this admin's passcode
-  // (keystore.ts). They never go into the shared vault, which every viewer can open.
+  // (keystore.ts). They never go into the shared vault in the database.
   let saved: Keys = {};
   if (s.priv) {
     // An older Brain kept the sealed copy inside the local vault cache (`deviceKeys`): move it to the keystore.
@@ -235,22 +235,7 @@ let stop: (() => void)[] = [];
 function enter(u: User) {
   leave(true);
   const ch = openChannel();
-  if (ch) stop.push(u.role === 'admin' ? publish(hub, ch) : mirror(hub, ch), () => ch.close());
-  if (u.role === 'viewer') {
-    const onStorage = (e: StorageEvent) => {
-      const key = secrets;
-      if (e.key === VAULT_KEY && e.newValue && key)
-        void decryptVault(key, JSON.parse(e.newValue)).then(
-          d => {
-            const mem = sanitizeMem((d as { mem?: unknown }).mem);
-            if (mem) useStore.setState(st => ({ mem, rev: st.rev + 1 }));
-          },
-          () => useStore.setState({ status: 'Memory failed its signature check.' }),
-        );
-    };
-    addEventListener('storage', onStorage);
-    stop.push(() => removeEventListener('storage', onStorage));
-  }
+  if (ch) stop.push(publish(hub, ch), () => ch.close());
   const touch = () => {
     const t = Date.now();
     if (t - useAuth.getState().lastActive > 2000) useAuth.setState({ lastActive: t });
@@ -306,7 +291,7 @@ function leave(keepKey = false) {
   setKeySave(null);
   if (useStore.getState().busy) useStore.getState().stop(); // a running task is cancelled on lock
   useStore.setState(st => ({
-    role: 'viewer',
+    role: null,
     who: '',
     mem: blankMem(),
     rev: st.rev + 1,
@@ -406,7 +391,7 @@ export const useAuth = create<AuthState>()((set, get) => {
         await accounts('setup', {
           name,
           password,
-          wrap: await sealFor(kek, sec, true),
+          wrap: await sealFor(kek, sec),
           envelope: await encryptVault(sec, { mem: blankMem() }, 1),
         });
         return await login(name, i.passcode);
@@ -431,11 +416,7 @@ export const useAuth = create<AuthState>()((set, get) => {
       try {
         const name = checkNewAccount(i);
         const { password, kek } = await derivePassword(name, i.passcode);
-        await accounts(
-          'create',
-          { name, password, role: i.role, wrap: await sealFor(kek, secrets, i.role === 'admin') },
-          true,
-        );
+        await accounts('create', { name, password, role: i.role, wrap: await sealFor(kek, secrets) }, true);
         await refresh();
         set({ busy: false });
         return true;
@@ -461,7 +442,7 @@ export const useAuth = create<AuthState>()((set, get) => {
       if (bad) return bad;
       try {
         const { password, kek } = await derivePassword(u.name, pass);
-        await accounts('reset', { id, password, wrap: await sealFor(kek, secrets, u.role === 'admin') }, true);
+        await accounts('reset', { id, password, wrap: await sealFor(kek, secrets) }, true);
         if (id === get().user?.id) get().logout('Passcode changed. Sign in again.');
         return '';
       } catch (e) {

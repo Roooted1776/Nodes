@@ -25,8 +25,8 @@ describe('Supabase account rules', () => {
     expect(a.password).toBe(b.password);
     expect(a.password).not.toBe(c.password);
     const sec = await newSecrets(),
-      wrap = await sealFor(a.kek, sec, false);
-    expect((await openFor(b.kek, wrap)).priv).toBeUndefined();
+      wrap = await sealFor(a.kek, sec);
+    expect((await openFor(b.kek, wrap)).priv).toBe(sec.priv);
     await expect(openFor(c.kek, wrap)).rejects.toThrow();
   });
 });
