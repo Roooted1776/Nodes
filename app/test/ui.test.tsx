@@ -142,26 +142,25 @@ describe('setup and login', () => {
     expect(await screen.findByRole('main', { name: 'Brain view' })).toBeTruthy();
   }, 30000);
 
-  it('allows toggling between sign in and register as admin', async () => {
-    const { App } = await boot(),
-      u = userEvent.setup();
+  it('the sign-in screen has no way to register: admin sign-in only', async () => {
+    server.users = [{ id: '1', name: 'Owner', role: 'admin', password: 'x', wrap: null }];
+    const { App } = await boot();
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Set up Brain' })).toBeTruthy();
-    await u.click(screen.getByRole('button', { name: 'Already an admin? Sign in' }));
     expect(screen.getByRole('heading', { name: 'Sign in to Brain' })).toBeTruthy();
-    await u.click(screen.getByRole('button', { name: 'Register as admin' }));
-    expect(screen.getByRole('heading', { name: 'Set up Brain' })).toBeTruthy();
+    expect(screen.getByText('Admin sign-in only.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Register as admin' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Set up Brain' })).toBeNull();
   });
 
-  it('allows registering as admin even if connection check fails initially', async () => {
+  it('the connection-error screen offers only Retry', async () => {
     server.failStatus = true;
     vi.resetModules();
     const { default: App } = await import('../src/App');
-    const u = userEvent.setup();
     render(<App />);
     expect(await screen.findByText('Cannot reach server')).toBeTruthy();
-    await u.click(screen.getByRole('button', { name: 'Register as admin' }));
-    expect(await screen.findByRole('heading', { name: 'Set up Brain' })).toBeTruthy();
+    expect(screen.getAllByRole('button').map(b => b.textContent)).toEqual(['Retry']);
+    expect(screen.queryByRole('button', { name: 'Register as admin' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Already an admin? Sign in' })).toBeNull();
   });
 });
 

@@ -40,22 +40,14 @@ export default function App() {
               {error ? error : 'Connecting to Brain…'}
             </p>
             {error && (
-              <>
-                <button
-                  type="button"
-                  className="primary"
-                  style={{ marginTop: '0.75rem' }}
-                  onClick={() => void useAuth.getState().init()}
-                >
-                  Retry
-                </button>
-                <button type="button" className="toggle-mode" onClick={() => useAuth.getState().setPhase('setup')}>
-                  Register as admin
-                </button>
-                <button type="button" className="toggle-mode" onClick={() => useAuth.getState().setPhase('login')}>
-                  Already an admin? Sign in
-                </button>
-              </>
+              <button
+                type="button"
+                className="primary"
+                style={{ marginTop: '0.75rem' }}
+                onClick={() => void useAuth.getState().init()}
+              >
+                Retry
+              </button>
             )}
           </section>
         </main>

@@ -70,7 +70,7 @@ export function Setup() {
 }
 
 export function Login() {
-  const { login, busy, error, notice, db, setPhase } = useAuth();
+  const { login, busy, error, notice, db } = useAuth();
   const [name, setName] = useState(''),
     [pass, setPass] = useState('');
   const wait = useCountdown(db.lockedUntil);
@@ -111,9 +111,7 @@ export function Login() {
         <button type="submit" className="primary" disabled={busy || wait > 0}>
           {wait > 0 ? `Wait ${wait}s` : busy ? 'Checking…' : 'Sign in'}
         </button>
-        <button type="button" className="toggle-mode" onClick={() => setPhase('setup')}>
-          Register as admin
-        </button>
+        <p className="lead">Admin sign-in only.</p>
       </form>
     </Shell>
   );
