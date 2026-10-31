@@ -33,3 +33,33 @@ major_version = 17
 
 [db.migrations]
 enabled = false
+
+# ---------------------------------------------------------------------------------------------------
+# DO NOT RUN `supabase config push` YET. A push replaces the project's whole auth section, and any
+# auth key left out of this file falls back to the CLI default.
+# Before anyone runs it, the owner must copy `site_url` and `additional_redirect_urls` from the
+# dashboard (Auth -> URL Configuration) into [auth] below. They are not public, so they are not
+# guessed here. Also copy the other auth values that are not listed here (token expiry, password
+# length, rate limits, email and MFA settings) from the dashboard. Nobody runs `config push` until then.
+#
+# Values below were verified on Oct 31 2026 against the live public auth settings
+# (GET /auth/v1/settings: disable_signup = true; email = true; phone, anonymous and every
+# other provider = false; mailer_autoconfirm = false; phone_autoconfirm = false).
+# ---------------------------------------------------------------------------------------------------
+[auth]
+enabled = true
+# Accounts exist only when an admin makes one through Brain's accounts function.
+enable_signup = false
+enable_anonymous_sign_ins = false
+
+[auth.email]
+# This switch is the email PROVIDER (live: email = true). It must stay true or nobody can sign in;
+# new sign-ups are still refused by `enable_signup = false` above.
+enable_signup = true
+# live: mailer_autoconfirm = false
+enable_confirmations = true
+
+[auth.sms]
+# live: phone = false, phone_autoconfirm = false
+enable_signup = false
+enable_confirmations = true
