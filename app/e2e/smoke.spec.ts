@@ -38,9 +38,23 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   await expect(page.getByRole('region', { name: 'Live chat' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Admin panel' })).toBeVisible();
 
-  // no key yet: nothing can be sent
+  // no key yet: the task box stays usable (so a key can be pasted into it) but nothing is sent to the team
   await expect(page.getByLabel('OpenAI key')).toBeVisible();
-  await expect(page.getByLabel('Task for the team')).toBeDisabled();
+  const task = page.getByLabel('Task for the team');
+  await expect(task).toBeEnabled();
+  await expect(task).toHaveAttribute('placeholder', 'Paste an API key here to save it');
+  const modelCalls: string[] = [];
+  page.on('request', r => {
+    if (/openai\.com|anthropic\.com|googleapis\.com|x\.ai/.test(r.url())) modelCalls.push(r.url());
+  });
+  await task.fill('summarise the plan');
+  await expect(task).toHaveValue('summarise the plan');
+  await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled();
+  await task.press('Enter');
+  await expect(task).toHaveValue('summarise the plan'); // not sent: the draft stays put
+  await expect(task).toHaveAttribute('placeholder', 'Paste an API key here to save it');
+  expect(modelCalls, 'no model requests without a key').toEqual([]);
+  await task.fill('');
 
   // Brain's own System check: shaders, drawing, encryption, policy, storage
   await page.getByRole('button', { name: 'Run system check' }).click();
