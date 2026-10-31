@@ -75,14 +75,14 @@ describe('idle huddles', () => {
     const n = await runBanter(w.deps, fast);
     expect(n).toBe(BANTER_MAX_LINES);
     expect(w.calls()).toBe(BANTER_MAX_LINES);
-    expect(w.said.map(m => m.text)).toEqual(['line 1', 'line 2', 'line 3', 'line 4', 'line 5']);
+    expect(w.said.map(m => m.text)).toEqual(Array.from({ length: BANTER_MAX_LINES }, (_, i) => 'line ' + (i + 1)));
     expect(w.said.every(m => m.tag === 'live · OpenAI · gpt-4o-mini · unverified')).toBe(true);
     const speakers = w.said.map(m => m.from);
     expect(speakers[0]).toBe('grokbot'); // the team head opens the huddle
     expect(speakers.at(-1)).toBe('grokbot'); // and closes it with the collected summary
     const middle = speakers.slice(1, -1);
-    expect(middle).toHaveLength(3); // two or three teammates answer the topic
-    expect(new Set(middle).size).toBe(3); // each answers once, in turn
+    expect(middle).toHaveLength(BANTER_MAX_LINES - 2); // the teammates answer the topic
+    expect(new Set(middle).size).toBe(BANTER_MAX_LINES - 2); // each answers once, in turn
     expect(middle).not.toContain('grokbot');
     expect(w.state.tin).toBe(3 * BANTER_MAX_LINES);
     expect(w.state.tout).toBe(2 * BANTER_MAX_LINES);

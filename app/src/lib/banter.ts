@@ -19,18 +19,18 @@ import { TYPE_LABEL, weight, type Msg } from './memory';
 import { PROV, PROVIDERS, ProviderError, callModel, isLimitError, type ProviderId } from './providers';
 import { clip } from './text';
 
-/** Lines in one idle huddle: Grok Bot opens, up to three teammates answer, Grok Bot closes. */
-export const BANTER_MAX_LINES = 5;
+/** Lines in one idle huddle: Grok Bot opens, teammates answer, Grok Bot closes. */
+export const BANTER_MAX_LINES = 6;
 /** Idle huddles per page load. */
-export const BANTER_MAX_SESSIONS = 2;
+export const BANTER_MAX_SESSIONS = 6;
 /** One huddle line never gets more output room than this, however the task setting is set. */
 export const BANTER_MAX_TOKENS = 120;
 /** Quiet time after the page settles before the first line. */
-export const BANTER_FIRST_DELAY_MS = 15_000;
+export const BANTER_FIRST_DELAY_MS = 5_000;
 /** Pause between lines, so the chat reads like people talking, not a dump. */
-export const BANTER_GAP_MS = 8_000;
+export const BANTER_GAP_MS = 5_000;
 /** Quiet time between two huddles. */
-export const BANTER_SESSION_GAP_MS = 60_000;
+export const BANTER_SESSION_GAP_MS = 30_000;
 
 type SetFn = (p: Partial<State> | ((s: State) => Partial<State>)) => void;
 export interface BanterDeps {

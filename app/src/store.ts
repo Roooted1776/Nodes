@@ -123,6 +123,8 @@ export interface State {
   selected: string | null;
   sceneFocus: { kind: 'memory' | 'agent'; id: string; sequence: number } | null;
   autoRotate: boolean;
+  memoryOpen: boolean;
+  setMemoryOpen(v: boolean): void;
   /** The current task: its text, the reply streaming in now, how long each bot took (ms) and what really passed between them. */
   task: string;
   draft: { from: AgentId; text: string } | null;
@@ -396,6 +398,10 @@ export const useStore = create<State>()((set, get) => {
     selected: null,
     sceneFocus: null,
     autoRotate: true,
+    memoryOpen: false,
+    setMemoryOpen(v) {
+      set({ memoryOpen: v });
+    },
     task: '',
     draft: null,
     timing: {},
