@@ -58,7 +58,31 @@ git fetch -q origin
 grep -q -- "pr create --draft --base main --head work/test" "$GH_LOG" || fail "draft PR not opened"
 echo "PASS: pushes only the work branch and opens a draft PR"
 
-# 3. The auto-push hook option is gone.
+# 3. Dirty tree: must exit nonzero, commit nothing, push nothing.
+HEAD_BEFORE="$(git rev-parse HEAD)"
+echo dirty >> file.txt
+echo new > untracked.txt
+set +e
+OUT="$(./scripts/push-work.sh --no-verify 2>&1)"
+CODE=$?
+set -e
+[[ $CODE -ne 0 ]] || fail "script exited 0 with uncommitted changes"
+grep -q "Uncommitted or untracked changes" <<<"$OUT" || fail "no clear dirty-tree message"
+[[ "$(git rev-parse HEAD)" == "$HEAD_BEFORE" ]] || fail "script committed on a dirty tree"
+[[ -n "$(git status --porcelain)" ]] || fail "changes were staged or lost"
+git diff --cached --quiet || fail "script staged changes"
+echo "PASS: refuses dirty tree without committing (exit $CODE)"
+git checkout -q -- file.txt && rm -f untracked.txt
+
+# 4. Untracked file only: must also refuse.
+echo new > untracked.txt
+set +e; ./scripts/push-work.sh --no-verify >/dev/null 2>&1; CODE=$?; set -e
+[[ $CODE -ne 0 ]] || fail "script exited 0 with an untracked file"
+[[ "$(git rev-parse HEAD)" == "$HEAD_BEFORE" ]] || fail "script committed an untracked file"
+echo "PASS: refuses untracked file without committing (exit $CODE)"
+rm -f untracked.txt
+
+# 5. The auto-push hook option is gone.
 [[ ! -e "$(git rev-parse --git-common-dir)/hooks/post-commit" ]] || fail "post-commit hook exists"
 ! grep -q -- "--install-hook" scripts/push-work.sh || fail "--install-hook still in script"
 echo "PASS: no auto-push hook"
