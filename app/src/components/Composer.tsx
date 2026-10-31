@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
+import { guessProvider } from '../lib/keyguide';
+import { PROV } from '../lib/providers';
 
 export default function Composer() {
   const [q, setQ] = useState(''),
@@ -21,7 +23,20 @@ export default function Composer() {
     }
   }, [promptDraft, setPromptDraft]);
   const go = () => {
-    if (!q.trim() || busy || !ready) return;
+    const t = q.trim();
+    // a pasted API key is saved on this device (sealed) and is never sent as a message
+    const prov = /^\S{20,300}$/.test(t) ? guessProvider(t) : null;
+    if (prov && !busy) {
+      const st = useStore.getState();
+      st.setKey(t, prov);
+      st.setLive({ remember: true });
+      useStore.setState({
+        status: `${PROV[prov].label} key saved on this device.`,
+      });
+      setQ('');
+      return;
+    }
+    if (!t || busy || !ready) return;
     void send(q);
     setQ('');
   };
@@ -72,10 +87,10 @@ export default function Composer() {
         onChange={e => setQ(e.target.value)}
         rows={1}
         maxLength={2000}
-        disabled={busy || !ready}
+        disabled={busy}
         placeholder={
           !ready
-            ? 'Add an API key to send'
+            ? 'Paste an API key here to save it'
             : mode === 'chat'
               ? 'Chat with one model… (not filed to wiki)'
               : 'Task for the team…'
@@ -95,7 +110,13 @@ export default function Composer() {
           </svg>
         </button>
       ) : (
-        <button type="submit" className="icon-btn send" disabled={!q.trim() || !ready} aria-label="Send" title="Send">
+        <button
+          type="submit"
+          className="icon-btn send"
+          disabled={!q.trim() || (!ready && !guessProvider(q))}
+          aria-label="Send"
+          title="Send"
+        >
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" shapeRendering="crispEdges">
             <path d="M8 2 3 7h3v7h4V7h3z" fill="currentColor" />
           </svg>

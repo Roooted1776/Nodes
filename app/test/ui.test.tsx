@@ -257,7 +257,7 @@ describe('who can do what', () => {
         .getAttribute('href'),
     ).toBe('https://platform.openai.com/api-keys');
     expect(within(bar).queryByRole('region', { name: 'Connect real AI' })).toBeNull();
-    expect((screen.getByLabelText('Task for the team') as HTMLTextAreaElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Task for the team') as HTMLTextAreaElement).disabled).toBe(false);
     const acc = within(bar).getByText('Accounts').closest('section')!;
     expect(within(acc as HTMLElement).getByText('Owner')).toBeTruthy();
     await u.type(screen.getByLabelText('Name', { selector: 'input[placeholder="Name"]' }), 'Kid');
