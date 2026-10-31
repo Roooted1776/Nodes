@@ -80,7 +80,7 @@ export async function signIn(name: string, passcode: string): Promise<{ user: Us
     .select('id, name, role')
     .eq('id', data.user.id)
     .maybeSingle();
-  if (pe || !p || (p.role !== 'admin' && p.role !== 'viewer')) {
+  if (pe || !p || p.role !== 'admin') {
     await signOut();
     throw new AuthError(
       pe ? `Brain could not read your account: ${why(pe)}` : 'This sign-in has no Brain account. Ask an admin.',
@@ -158,7 +158,7 @@ export const resetMirror = () => sent.clear();
 
 /**
  * Persist memory entries, projects and task sessions to the database (admin only; RLS + upsert checks).
- * Viewers never call this. Reports what really saved.
+ * Only admins call this. Reports what really saved.
  */
 export async function syncMemoryDatabase(mem: import('./memory').Mem, d: Db = db()): Promise<SyncResult> {
   const out: SyncResult = { saved: 0, failed: 0, firstError: '' };
@@ -228,7 +228,7 @@ export async function syncMemoryDatabase(mem: import('./memory').Mem, d: Db = db
 
 /**
  * Read memory back from the admin-only database mirror (the copy `syncMemoryDatabase` keeps).
- * Shaped for `sanitizeMem`. Viewers have no SELECT on these tables.
+ * Shaped for `sanitizeMem`. Only admins have SELECT on these tables.
  */
 export async function loadMemoryDatabase(d: Db = db()): Promise<{ entries: unknown[]; sessions: unknown[] }> {
   const [m, t] = await Promise.all([

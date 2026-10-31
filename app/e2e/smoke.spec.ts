@@ -68,6 +68,9 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
   // lock, then sign back in with the same passcode
   await page.getByRole('button', { name: 'Lock' }).click();
   await expect(page.getByRole('heading', { name: 'Sign in to Brain' })).toBeAttached();
+  // admin sign-in only: no way to register from the sign-in screen
+  await expect(page.getByText('Admin sign-in only.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Register as admin' })).toHaveCount(0);
   await page.getByLabel('Username').fill('Owner');
   await page.getByLabel('Password').fill(pass);
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -84,40 +87,31 @@ test('built page: set up admin, draw brain, pass System check, lock', async ({ p
     await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 20, { steps: 8 });
     await page.mouse.up();
   }
-  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Guest');
-  await page.getByPlaceholder(/Password \(6/).fill('fake viewer passcode');
+  // the Accounts card adds admins only (no role choice): add a spare admin and sign in with it in a second tab
+  await expect(page.getByRole('combobox', { name: 'Role' })).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Spare');
+  await page.getByPlaceholder(/Password \(6/).fill('fake spare passcode');
   await page.getByRole('button', { name: 'Add account' }).click();
-  await expect(page.getByText('Added Guest.', { exact: true })).toBeVisible();
-  const viewer = await context.newPage();
-  await viewer.goto(PAGE);
-  await expect(viewer.getByRole('heading', { name: 'Sign in to Brain' })).toBeAttached();
-  await viewer.getByLabel('Username').fill('Guest');
-  await viewer.getByLabel('Password').fill('fake viewer passcode');
-  await viewer.getByRole('button', { name: 'Sign in' }).click();
-  await expect(viewer.getByRole('main', { name: 'Brain view' })).toBeVisible({ timeout: 30_000 });
-  await expect(viewer.getByRole('region', { name: 'Admin panel' })).toHaveCount(0);
-  await expect(viewer.getByLabel('Task for the team')).toHaveCount(0);
-  // Verify the real same-browser transport with explicitly fake test text, without AI calls.
-  await page.evaluate(() => {
-    const ch = new BroadcastChannel('brain.live.v1');
-    ch.postMessage({
-      t: 'msg',
-      m: { id: 12345, from: 'grokbot', tag: 'fake test only', text: 'Fake transport verification only' },
-    });
-    ch.close();
-  });
-  await expect(viewer.getByText('Fake transport verification only', { exact: true })).toBeVisible();
+  await expect(page.getByText('Added Spare.', { exact: true })).toBeVisible();
+  const spare = await context.newPage();
+  await spare.goto(PAGE);
+  await expect(spare.getByRole('heading', { name: 'Sign in to Brain' })).toBeAttached();
+  await spare.getByLabel('Username').fill('Spare');
+  await spare.getByLabel('Password').fill('fake spare passcode');
+  await spare.getByRole('button', { name: 'Sign in' }).click();
+  await expect(spare.getByRole('main', { name: 'Brain view' })).toBeVisible({ timeout: 30_000 });
+  await expect(spare.getByRole('region', { name: 'Admin panel' })).toBeVisible();
   // GitHub's runners draw the 3D brain in software, a few frames a second. Both windows share one CPU,
-  // so close the admin window (all its errors are already collected) and give the phone steps room.
+  // so close the first window (all its errors are already collected) and give the phone steps room.
   await page.close();
-  await viewer.setViewportSize({ width: 390, height: 844 });
-  await expect(viewer.getByRole('main', { name: 'Brain view' })).toBeVisible({ timeout: 30_000 });
-  await info.attach('phone-viewer.png', {
-    body: await viewer.screenshot({ timeout: 30_000 }),
+  await spare.setViewportSize({ width: 390, height: 844 });
+  await expect(spare.getByRole('main', { name: 'Brain view' })).toBeVisible({ timeout: 30_000 });
+  await info.attach('phone-spare-admin.png', {
+    body: await spare.screenshot({ timeout: 30_000 }),
     contentType: 'image/png',
   });
-  expect(await viewer.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await viewer.close();
+  expect(await spare.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await spare.close();
 
   expect(problems, 'console errors, page errors or blocked content').toEqual([]);
 });

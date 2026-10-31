@@ -59,7 +59,7 @@ async function oldKek(u: OldUser, pass: string): Promise<CryptoKey | null> {
 
 /**
  * Open the old local copy. Plain old memory needs nothing; the encrypted vault needs the name and passcode of an old
- * admin or viewer account on this browser. Returns null when there is nothing to upload.
+ * account on this browser. Returns null when there is nothing to upload.
  */
 export async function openLegacy(s: Pick<Storage, 'getItem'>, name: string, pass: string): Promise<LegacyData | null> {
   const raw = s.getItem(OLD_VAULT);

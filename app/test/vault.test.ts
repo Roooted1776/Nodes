@@ -28,20 +28,19 @@ describe('vault', () => {
     await expect(decryptVault(s, flip)).rejects.toMatchObject({ code: 'tampered' });
     await expect(decryptVault(s, { ...v, n: 2 })).rejects.toMatchObject({ code: 'tampered' }); // the counter is signed too
   });
-  it('a viewer can read but cannot sign, and cannot forge with its own key', async () => {
+  it('every account is sealed as an admin (no read-only viewer seal), and keys without the signer cannot write or forge', async () => {
     const s = await newSecrets(),
-      k = await kek(),
-      viewer = await openFor(k, await sealFor(k, s, false));
-    expect(viewer.priv).toBeUndefined();
-    expect(await decryptVault(viewer, await encryptVault(s, DATA, 1))).toEqual(DATA);
-    await expect(encryptVault(viewer, DATA, 2)).rejects.toMatchObject({ code: 'read-only' });
+      k = await kek();
+    expect(await openFor(k, await sealFor(k, s))).toEqual(s);
+    const readOnly = { dek: s.dek, pub: s.pub };
+    await expect(encryptVault(readOnly, DATA, 2)).rejects.toMatchObject({ code: 'read-only' });
     const other = await newSecrets();
     const forged = await encryptVault({ ...other, dek: s.dek }, { mem: 'forged' }, 3);
-    await expect(decryptVault(viewer, forged)).rejects.toMatchObject({ code: 'tampered' });
+    await expect(decryptVault(readOnly, forged)).rejects.toMatchObject({ code: 'tampered' });
   });
   it('a sealed copy only opens with the right account key', async () => {
     const s = await newSecrets(),
-      w = await sealFor(await kek(), s, true);
+      w = await sealFor(await kek(), s);
     await expect(openFor(await kek(), w)).rejects.toBeInstanceOf(VaultError);
   });
   it('backups are encrypted with a passphrase', async () => {

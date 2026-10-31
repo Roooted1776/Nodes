@@ -30,7 +30,7 @@ function cors(req: Request): Record<string, string> {
 }
 const NAME_RE = /^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/;
 const PASS_RE = /^[A-Za-z0-9_-]{43}$/; // 32 bytes, base64url, made in the browser
-type Role = 'admin' | 'viewer';
+type Role = 'admin';
 
 class Refuse extends Error {
   constructor(msg: string, public status = 400) {
@@ -105,6 +105,10 @@ async function handle(req: Request) {
     case 'setup': {
       const name = checkName(b.name), password = checkPass(b.password);
       const wrap = checkWrap(b.wrap), envelope = checkEnvelope(b.envelope);
+      // Setup deletes and recreates the vault, so it must never run on a live Brain: refuse while any
+      // account exists (any role), before the vault is touched. Only a brand-new, empty project gets past.
+      const { count, error: ce } = await db.from('profiles').select('id', { count: 'exact', head: true });
+      if (ce || count === null || count > 0) throw new Refuse('Brain is already set up. Sign in instead.', 409);
       const { data: ok } = await db.rpc('claim_open_setup');
       if (ok !== true) throw new Refuse('Brain is already set up. Sign in instead.', 409);
       let u;
@@ -133,7 +137,8 @@ async function handle(req: Request) {
     case 'create': {
       const me = await caller(req);
       if (me.role !== 'admin') throw new Refuse('Only admins can add accounts.', 403);
-      const name = checkName(b.name), password = checkPass(b.password), role: Role = b.role === 'admin' ? 'admin' : 'viewer';
+      if (b.role !== 'admin') throw new Refuse('Only admin accounts can be created.');
+      const name = checkName(b.name), password = checkPass(b.password), role: Role = 'admin';
       const u = await makeUser(name, password, role, checkWrap(b.wrap));
       await audit(me, `Added ${role} ${name}`);
       return { ok: true, user: u };

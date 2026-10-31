@@ -88,9 +88,8 @@ async function open(
   }
 }
 
-/** Seal the secrets for one account. Viewers get the read key and the public key; admins also get the signing key. */
-export const sealFor = (kek: CryptoKey, s: Secrets, admin: boolean) =>
-  seal(kek, enc.encode(JSON.stringify(admin ? s : { dek: s.dek, pub: s.pub })));
+/** Seal the secrets for one account. Every account is an admin, so it gets the read, public and signing keys. */
+export const sealFor = (kek: CryptoKey, s: Secrets) => seal(kek, enc.encode(JSON.stringify(s)));
 export async function openFor(kek: CryptoKey, w: Sealed): Promise<Secrets> {
   const j = JSON.parse(
     dec.decode(await open(kek, w, undefined, 'This account could not open the memory key.', 'tampered')),

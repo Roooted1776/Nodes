@@ -18,7 +18,7 @@ describe('no-key hint under the composer', () => {
     expect(screen.getByText(ADMIN_HINT)).toBeTruthy();
   });
   it('a non-admin with no key sees no hint line', () => {
-    useStore.setState({ role: 'viewer', keys: {}, busy: false });
+    useStore.setState({ role: null, keys: {}, busy: false });
     const { container } = render(<Composer />);
     expect(screen.queryByText(ADMIN_HINT)).toBeNull();
     expect(container.querySelector('.composer-key-hint')).toBeNull();

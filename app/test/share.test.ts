@@ -1,19 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mirror, publish, type Chan, type Hub, type Live } from '../src/lib/share';
+import { publish, type Chan, type Hub, type Live } from '../src/lib/share';
 
-function pair() {
-  const a: Chan = {
-    postMessage: d => queueMicrotask(() => b.onmessage?.({ data: structuredClone(d) })),
-    onmessage: null,
-    close() {},
-  };
-  const b: Chan = {
-    postMessage: d => queueMicrotask(() => a.onmessage?.({ data: structuredClone(d) })),
-    onmessage: null,
-    close() {},
-  };
-  return [a, b] as const;
-}
 function hub(init: Partial<Live> = {}): Hub & { set(p: Partial<Live>): void } {
   let s: Live = {
     log: [],
@@ -42,53 +29,10 @@ function hub(init: Partial<Live> = {}): Hub & { set(p: Partial<Live>): void } {
     },
   };
 }
-const tick = () => new Promise(r => setTimeout(r, 5));
 const msg = (id: number, text: string) => ({ id, from: 'gemini', text, tag: 'live · OpenAI · m · unverified' });
 
 describe('live chat sharing', () => {
-  it('a viewer sees the admin chat, stages and handoffs as they happen', async () => {
-    const [x, y] = pair(),
-      admin = hub(),
-      viewer = hub();
-    publish(admin, x);
-    mirror(viewer, y, () => 100);
-    await tick();
-    admin.set({ log: [msg(1, 'first')], stages: { gemini: 'working' }, active: 'gemini', busy: true });
-    admin.set({ log: [...admin.getState().log, msg(2, 'second')], stages: { gemini: 'done' }, active: null });
-    admin.set({ pulses: [{ id: 1, from: 'gemini', to: 'muse', t0: 5, color: '#fff' }] });
-    await tick();
-    const v = viewer.getState();
-    expect(v.log.map(m => m.text)).toEqual(['first', 'second']);
-    expect(v.stages.gemini).toBe('done');
-    expect(v.busy).toBe(true);
-    expect(v.pulses).toMatchObject([{ from: 'gemini', to: 'muse', t0: 100 }]);
-  });
-  it('a viewer who joins late gets the chat so far', async () => {
-    const [x, y] = pair(),
-      admin = hub({ log: [msg(1, 'earlier')], stages: { gemini: 'done' }, busy: true });
-    publish(admin, x);
-    const viewer = hub();
-    mirror(viewer, y);
-    await tick();
-    expect(viewer.getState().log.map(m => m.text)).toEqual(['earlier']);
-    expect(viewer.getState().busy).toBe(true);
-  });
-  it('a new task clears the viewer chat and nothing is shown twice', async () => {
-    const [x, y] = pair(),
-      admin = hub(),
-      viewer = hub();
-    publish(admin, x);
-    mirror(viewer, y);
-    await tick();
-    admin.set({ log: [msg(1, 'a')] });
-    await tick();
-    admin.set({ log: [] });
-    await tick();
-    admin.set({ log: [msg(2, 'b')] });
-    await tick();
-    expect(viewer.getState().log.map(m => m.text)).toEqual(['b']);
-  });
-  it('sends no keys or settings, and a viewer cannot push anything to the admin', async () => {
+  it('sends no keys or settings, and another tab cannot push anything to the admin', async () => {
     const sent: unknown[] = [],
       ch: Chan = { postMessage: d => sent.push(d), onmessage: null, close() {} },
       admin = hub();
