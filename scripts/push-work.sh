@@ -15,14 +15,13 @@ GIT_COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null || git rev-parse --
 usage() {
   cat << 'EOF'
 Usage:
-  ./scripts/push-work.sh [OPTIONS] [COMMIT_MESSAGE]
+  ./scripts/push-work.sh [OPTIONS]   (commit your work first; the script never commits it for you)
 
 Options:
   --no-verify      Skip test/build checks (use with extreme caution)
   --help           Show this message
 
 Examples:
-  ./scripts/push-work.sh "feat: add user profile"
   ./scripts/push-work.sh
 EOF
   exit 0
@@ -33,13 +32,13 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 fi
 
 SKIP_VERIFY=0
-COMMIT_MSG=""
 
 for arg in "$@"; do
   if [[ "$arg" == "--no-verify" ]]; then
     SKIP_VERIFY=1
   else
-    COMMIT_MSG="$arg"
+    echo "ERROR: Unknown argument '$arg'. Commit your changes yourself first; see --help." >&2
+    exit 1
   fi
 done
 
@@ -67,27 +66,14 @@ if echo "$ALL_CHANGED" | grep -qi "RedMed"; then
 fi
 echo "✓ Isolation verified: No RedMed content."
 
-# 2. Stage and commit if message provided or changes exist
-if [[ -n "$COMMIT_MSG" ]]; then
-  echo "==> 2. Staging and committing changes with message: '$COMMIT_MSG'..."
-  git add -A
-  if ! git diff --cached --quiet; then
-    git commit -m "$COMMIT_MSG"
-    echo "✓ Committed changes locally."
-  else
-    echo "• Working tree already clean. Proceeding with existing commits."
-  fi
-else
-  echo "==> 2. Checking working tree state..."
-  if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "NOTE: Uncommitted changes exist. Staging and committing automatically..."
-    git add -A
-    git commit -m "chore: automated work save and verified sync"
-    echo "✓ Committed changes as: chore: automated work save and verified sync"
-  else
-    echo "✓ Working tree is clean."
-  fi
+# 2. Refuse to run with uncommitted or untracked changes (no automatic commits)
+echo "==> 2. Checking working tree state..."
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "ERROR: Uncommitted or untracked changes found. Commit or stash them yourself, then rerun. Nothing was committed." >&2
+  git status --short >&2
+  exit 1
 fi
+echo "✓ Working tree is clean."
 
 # 3. Verification checks in app/
 if [[ "$SKIP_VERIFY" -eq 0 && -d "$APP_DIR" ]]; then

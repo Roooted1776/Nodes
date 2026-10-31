@@ -20,7 +20,7 @@ description: >-
 1. Claude builds, verifies, and records the handoff.
 2. Cursor receives the handoff to inspect code diffs and repository integration.
 3. Gemini, ChatGPT, and Muse perform independent reviews (context, code quality, audit).
-4. Grok Bot (in charge) verifies real results and issues the final team PASS/FAIL decision. Grok Bot can decline based on the team's response. Once he finishes the final review, if approved, Grok Bot saves the final directive: "squash push merge all main remove all branches post merge make sure to commit and deploy" (saved with the review record, not included in chat). If declined, the task is marked DECLINED and git actions are blocked.
+4. Approval means the PR is ready for Director to merge after Audits and Security sign off; never delete branches.
 
 ## Handoff File Requirements
 Create or update `HANDOFF.md` in the project root with these exact sections:
