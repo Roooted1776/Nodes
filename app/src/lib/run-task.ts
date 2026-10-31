@@ -3,6 +3,7 @@
 import { AGENT, IOS_RE, LIVE_ORDER, type AgentId } from '../data/team';
 import { TYPE_COLOR } from '../data/colors';
 import type { State } from '../store';
+import { finalReviewFor } from './approval';
 import { audit } from './audit';
 import { chainFor, runChain } from './chain';
 import { tally } from './learn';
@@ -300,9 +301,8 @@ export async function runTask(raw: string, d: TaskDeps): Promise<void> {
       /\b(fail|failed|decline|declined|declines|reject|rejected|rejects|block|blocked|abort|aborted)\b/i.test(
         lastGrokBotMsg,
       );
-    const grokFinalReview = hasFailures
-      ? 'DECLINED: Blocked based on team response.'
-      : 'squash push merge all main remove all branches post merge make sure to commit and deploy';
+    // Approval only records state for Director's review; it never runs git or deploy.
+    const grokFinalReview = finalReviewFor(hasFailures);
     const sess: Session = {
       id: 's' + m.nextSession++,
       ts: Date.now(),
